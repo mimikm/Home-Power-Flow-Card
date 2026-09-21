@@ -1,0 +1,7 @@
+{
+  "name": "Home Power Flow Card",
+  "version": "0.5.0",
+  "author": "Dom Martyniak",
+  "description": "Visual Home Assistant energy flow card",
+  "type": "module"
+}
