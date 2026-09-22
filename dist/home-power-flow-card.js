@@ -1,6 +1,6 @@
 /* Home Power Flow Card V1 - standalone Lovelace custom element */
 (() => {
-  const VERSION = '0.6.0';
+  const VERSION = '0.5.7';
   const DEFAULT_BG = '/hacsfiles/Home-Power-Flow-Card/smart-home-energy-background.png';
   const DEFAULT_BG_NIGHT = '/hacsfiles/Home-Power-Flow-Card/smart-home-energy-background2.png';
   const TYPES = [
@@ -418,43 +418,60 @@
 
     _flowDirection(a, b, va, vb) {
       const ta = a.type || 'load', tb = b.type || 'load';
-      const threshold = Math.max(0, Number(this._config.flow_threshold_watts) || 0.5);
-      if (va == null || vb == null) return {active:false, reverse:false, magnitude:0};
-      const A = Number(va), B = Number(vb);
-      if (!Number.isFinite(A) || !Number.isFinite(B)) return {active:false, reverse:false, magnitude:0};
-      if (Math.max(Math.abs(A), Math.abs(B)) < threshold) return {active:false, reverse:false, magnitude:0};
+      const threshold = Math.max(0, Number.isFinite(Number(this._config.flow_threshold_watts)) ? Number(this._config.flow_threshold_watts) : 0.5);
 
-      // Direction is controlled only by energy devices. Inverter is a passive hub.
+      // A connection is active only when BOTH endpoint entities have a
+      // meaningful non-zero power value. This is important for loads such as
+      // Zappi: if the Zappi reports 0 W, its flow must disappear even when
+      // the upstream inverter still has power available.
+      if (va == null || vb == null || !Number.isFinite(Number(va)) || !Number.isFinite(Number(vb))) return {active:false, reverse:false, magnitude:0};
+      const aa = Math.abs(Number(va)), ab = Math.abs(Number(vb));
+      if (aa < threshold || ab < threshold) return {active:false, reverse:false, magnitude:0};
+
+      // Universal rule: positive = output, negative = input. Each device can invert it.
+      const output = (d, v) => {
+        if (v == null) return null;
+        const positiveIsOutput = Number(v) > 0;
+        return d && d.invert_flow ? !positiveIsOutput : positiveIsOutput;
+      };
+
       let reverse = false;
-      if (ta === 'grid') reverse = A > 0;
-      else if (tb === 'grid') reverse = !(B > 0);
-      else if (ta === 'battery') reverse = true;
-      else if (tb === 'battery') reverse = false;
-      else if (ta === 'solar') reverse = false;
-      else if (tb === 'solar') reverse = true;
-      else if (ta === 'load' || ta === 'house' || ta === 'ev') reverse = true;
-      else if (tb === 'load' || tb === 'house' || tb === 'ev') reverse = false;
+      const oa = output(a, va), ob = output(b, vb);
+      if (oa === true && ob === false) reverse = false;
+      else if (ob === true && oa === false) reverse = true;
+      else if (oa === true && ob !== true) reverse = false;
+      else if (ob === true && oa !== true) reverse = true;
+      else {
+        if (ta === 'grid') reverse = va > 0;
+        else if (tb === 'grid') reverse = vb > 0;
+        else if (ta === 'battery' && va > 0) reverse = true;
+        else if (tb === 'battery' && vb > 0) reverse = false;
+        else if (ta === 'house' || ta === 'load' || ta === 'ev') reverse = true;
+      }
 
-      return {active:true, reverse, magnitude:Math.max(Math.abs(A),Math.abs(B))};
+      return {active:true, reverse, magnitude:Math.max(aa,ab)};
     }
 
     _flowEdges(devices) {
-      const edges=[];
-      const by=t=>devices.map((d,i)=>({d,i})).filter(x=>(x.d.type||'load')===t);
+      const edges = [];
+      const by = type => devices.map((d,i)=>({d,i})).filter(x => (x.d.type || 'load') === type);
       const solar=by('solar'), inv=by('inverter'), bat=by('battery'), grid=by('grid'), house=by('house'), ev=by('ev'), loads=by('load');
-      const add=(a,b)=>{ if(a&&b) edges.push([a.i,b.i,0]); };
+
+      // Inverter is a junction only. Direction is calculated from solar/grid/battery values.
+      const add=(a,b)=>{ if(a && b) edges.push([a.i,b.i,0]); };
       const hub=inv[0];
-      if(!hub) return edges;
-      solar.forEach(s=>add(s,hub));
-      bat.forEach(b=>add(hub,b));
-      grid.forEach(g=>add(hub,g));
-      house.forEach(h=>add(hub,h));
-      ev.forEach(e=>add(hub,e));
-      loads.forEach(l=>add(hub,l));
+      if (hub) {
+        solar.forEach(s=>add(s,hub));
+        bat.forEach(b=>add(hub,b));
+        grid.forEach(g=>add(hub,g));
+        house.forEach(h=>add(hub,h));
+        ev.forEach(e=>add(hub,e));
+        loads.forEach(l=>add(hub,l));
+      }
       return edges;
     }
 
-    _flowStateKey(devices, snapshot) {
+    _flowStateKey    _flowStateKey(devices, snapshot) {
       if (!devices.length) return '';
       const seen = new Set();
       return this._flowEdges(devices).map(([a,b,dir]) => {
@@ -583,7 +600,7 @@
       const c=this._config;
       this.shadowRoot.innerHTML=`<style>
         :host{display:block;width:min(680px,calc(100vw - 24px));max-width:680px}.wrap{padding:4px 0;font-family:var(--primary-font-family,Arial)}h3{margin:18px 0 8px}.hint{opacity:.65;font-size:12px;margin-bottom:12px}.row{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin:8px 0}.field{display:flex;flex-direction:column;gap:5px}.field.full{grid-column:1/-1}.entity-id{font:11px/1.35 ui-monospace,SFMono-Regular,Consolas,monospace;opacity:.72;word-break:break-all;margin-top:2px}.section{padding:14px 16px;margin:12px 0;border:1px solid var(--divider-color,#ddd);border-radius:14px}.section h3{margin-top:0}label{font-size:12px;opacity:.75}input,select{width:100%;padding:10px;border:1px solid var(--divider-color,#ddd);border-radius:8px;background:var(--card-background-color,#fff);color:var(--primary-text-color,#111)}.device{padding:13px;margin:10px 0;border:1px solid var(--divider-color,#ddd);border-radius:12px;background:var(--secondary-background-color,rgba(0,0,0,.03))}.device-head{display:flex;justify-content:space-between;align-items:center;font-weight:700}.device-head button{border:0;background:transparent;color:var(--error-color,#db4437);font-size:20px;cursor:pointer}.btn{border:0;border-radius:10px;padding:11px 14px;background:var(--primary-color,#03a9f4);color:#fff;cursor:pointer;font-weight:700}.small{font-size:11px;opacity:.6}.layout-editor{position:relative;width:100%;aspect-ratio:1.5/1;min-height:420px;border-radius:16px;overflow:hidden;border:1px solid var(--divider-color,#ddd);background:#10202c;touch-action:none}.layout-bg{position:absolute;inset:0;background-size:cover;background-position:center}.layout-node{position:absolute;transform:translate(-50%,-50%);min-width:112px;max-width:160px;padding:8px 10px;border-radius:11px;background:rgba(8,29,45,.9);border:1px solid rgba(255,255,255,.35);color:#fff;box-shadow:0 6px 16px rgba(0,0,0,.35);cursor:grab;user-select:none;touch-action:none;font-size:12px;z-index:2}.layout-node.dragging{cursor:grabbing;box-shadow:0 10px 24px rgba(0,0,0,.5);border-color:var(--primary-color,#03a9f4)}.layout-node .ln-top{font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.layout-node .ln-pos{font:10px ui-monospace,SFMono-Regular,Consolas,monospace;opacity:.65;margin-top:2px}.secondary-btn{margin-bottom:8px;background:var(--secondary-text-color,#607d8b)}.flow-colours{grid-template-columns:repeat(3,minmax(0,1fr))}.color-row{display:grid;grid-template-columns:42px 1fr;gap:6px;align-items:center}.color-row input[type=color]{height:40px;padding:3px}.color-row input[type=text]{padding:9px;font:12px ui-monospace,SFMono-Regular,Consolas,monospace}.upload-row{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:4px}.upload-row .btn{padding:9px 12px;font-size:12px}.upload-status{font-size:11px;opacity:.65;margin-bottom:6px}
-      </style><div class="wrap"><h3>Home Power Flow V0.6.0</h3><div class="hint">Bidirectional power flow from live positive/negative values, dotted connections, single moving power dot, invertible device direction, dynamic flow colors and draggable layout. Entity IDs are shown in full below each picker.</div>
+      </style><div class="wrap"><h3>Home Power Flow V0.5.7</h3><div class="hint">Bidirectional power flow from live positive/negative values, dotted connections, single moving power dot, invertible device direction, dynamic flow colors and draggable layout. Entity IDs are shown in full below each picker.</div>
       <div class="row"><div class="field"><label>Title</label><input data-key="title" value="${esc(c.title||'Energy Flow')}"></div><div class="field"><label>Time format</label><select data-key="time_format"><option value="24h" ${(c.time_format||'24h')==='24h'?'selected':''}>24 hour</option><option value="12h" ${c.time_format==='12h'?'selected':''}>12 hour</option></select></div><div class="field full"><label>Weather entity</label><ha-entity-picker data-editor-key="weather_entity" allow-custom-entity></ha-entity-picker></div><div class="field full">${this._bgUploadField('day','Day background')}</div><div class="field full">${this._bgUploadField('night','Night background')}</div><div class="field full"><label>Sun entity (switches day/night background)</label><ha-entity-picker data-editor-key="sun_entity" allow-custom-entity></ha-entity-picker></div><div class="field"><label>Flow threshold (W)</label><input type="number" min="0" step="0.1" data-key="flow_threshold_watts" value="${esc((Number(c.flow_threshold ?? 0.0005)*1000).toFixed(1))}"></div><div class="field"><label>Flow animation speed (seconds)</label><input type="number" min="3" max="30" step="0.5" data-key="flow_speed" value="${esc(c.flow_speed??8)}"></div><div class="field"><label>Particle stagger (seconds)</label><input type="number" min="0.15" max="1.5" step="0.05" data-key="flow_stagger" value="${esc(c.flow_stagger??0.55)}"></div></div>
       <h3>Flow colours</h3><div class="hint">Choose the colour used by the dotted flow path and its travelling power dot. Changes apply immediately.</div><div class="row flow-colours">${this._colorField('solar','Solar')}${this._colorField('inverter','Inverter')}${this._colorField('battery','Battery')}${this._colorField('gateway','Gateway')}${this._colorField('house','House / Load')}${this._colorField('grid','Grid')}${this._colorField('ev','EV Charger')}${this._colorField('load','Extra Load')}${this._colorField('neutral','Inactive')}</div>
       <h3>Visual layout</h3><div class="hint">Drag the device boxes on the template to place them exactly where you want. Positions are saved automatically. New devices without a saved position use the automatic layout.</div><div class="layout-editor" id="layout-editor"><div class="layout-bg"></div>${(c.devices||[]).map((d,i)=>this._layoutNode(d,i)).join('')}${this._layoutSpecial('weather','Weather','🌤️',c.weather_position,82,10)}${this._layoutSpecial('stats','Daily Stats','📊',c.stats_position,17,86)}<button class="btn secondary-btn" id="reset-layout" style="position:absolute;right:10px;bottom:10px;z-index:5">Reset positions</button></div><button class="btn secondary-btn" id="reset-layout">↺ Reset positions to automatic</button>
