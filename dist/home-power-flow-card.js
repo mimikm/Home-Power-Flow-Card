@@ -1,6 +1,6 @@
 /* Home Power Flow Card V1 - standalone Lovelace custom element */
 (() => {
-  const VERSION = '0.6.0';
+  const VERSION = '0.7.0';
   const DEFAULT_BG = '/hacsfiles/Home-Power-Flow-Card/smart-home-energy-background.png';
   const DEFAULT_BG_NIGHT = '/hacsfiles/Home-Power-Flow-Card/smart-home-energy-background2.png';
   const TYPES = [
@@ -190,7 +190,7 @@
           :host { display:block; width:100%; }
           * { box-sizing:border-box; }
           .card { position:relative; width:100%; min-height:700px; aspect-ratio: 1.5 / 1; overflow:hidden; border-radius:22px; color:#fff; font-family:var(--primary-font-family,Arial,sans-serif); background:#101820; box-shadow:0 12px 40px rgba(0,0,0,.28); }
-          .bg { position:absolute; inset:0; background-image:linear-gradient(180deg,rgba(0,0,0,.06),rgba(0,0,0,.22)),url('${esc(bg)}'); background-size:cover; background-position:center; }
+          .bg { position:absolute; inset:0; background-size:cover; background-position:center; }
           .vignette { position:absolute; inset:0; background:radial-gradient(circle at 55% 45%,transparent 25%,rgba(0,0,0,.12) 72%,rgba(0,0,0,.32)); pointer-events:none; }
           .header { position:absolute; left:2.6%; top:2.7%; z-index:20; }
           .title { font-size:clamp(24px,3vw,44px); font-weight:700; letter-spacing:-.03em; text-shadow:0 2px 8px rgba(0,0,0,.4); }
@@ -221,6 +221,7 @@
         </div>`;
 
       this._rendered = true;
+      this._applyBackground(bg);
       // Clicking a device opens the corresponding Home Assistant entity dialog.
       this.shadowRoot.querySelectorAll('.node[data-entity-id]').forEach(node => {
         node.addEventListener('click', () => {
@@ -239,7 +240,42 @@
 
     _resolveBackground() {
       const c = this._config || {};
-      return this._isNight() ? (c.background_night || DEFAULT_BG_NIGHT) : (c.background || DEFAULT_BG);
+      if (this._isNight()) return c.background_upload_night || c.background_night || DEFAULT_BG_NIGHT;
+      return c.background_upload_day || c.background || DEFAULT_BG;
+    }
+
+    // Paths under /media/ are served by Home Assistant's protected media
+    // view and require an Authorization header - a plain CSS url() or <img>
+    // request cannot supply one. We fetch those ourselves with the current
+    // access token and swap in a local blob URL. Anything else (the
+    // /hacsfiles/ defaults, /local/, or a full external URL) loads directly.
+    async _applyBackground(bg) {
+      const bgEl = this.shadowRoot?.querySelector('.bg');
+      if (!bgEl || !bg) return;
+      const grad = 'linear-gradient(180deg,rgba(0,0,0,.06),rgba(0,0,0,.22))';
+      if (!bg.startsWith('/media/')) {
+        bgEl.style.backgroundImage = `${grad},url('${bg}')`;
+        return;
+      }
+      this._bgBlobUrls ||= {};
+      if (this._bgBlobUrls[bg]) {
+        bgEl.style.backgroundImage = `${grad},url('${this._bgBlobUrls[bg]}')`;
+        return;
+      }
+      try {
+        const token = this._hass?.auth?.data?.access_token;
+        const resp = await fetch(bg, { headers: token ? { Authorization: `Bearer ${token}` } : {} });
+        if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+        const blob = await resp.blob();
+        const url = URL.createObjectURL(blob);
+        this._bgBlobUrls[bg] = url;
+        if (this._currentBg === bg) {
+          const el = this.shadowRoot?.querySelector('.bg');
+          if (el) el.style.backgroundImage = `${grad},url('${url}')`;
+        }
+      } catch (e) {
+        console.error('Home Power Flow Card: failed to load uploaded background', bg, e);
+      }
     }
 
     _uiPosition(pos, dx, dy) {
@@ -262,8 +298,7 @@
       const nextBg = this._resolveBackground();
       if (nextBg !== this._currentBg) {
         this._currentBg = nextBg;
-        const bgEl = this.shadowRoot.querySelector('.bg');
-        if (bgEl) bgEl.style.backgroundImage = `linear-gradient(180deg,rgba(0,0,0,.06),rgba(0,0,0,.22)),url('${esc(nextBg)}')`;
+        this._applyBackground(nextBg);
       }
       const devices = this._config.devices || [];
       this.shadowRoot.querySelectorAll('.node[data-device-index]').forEach(node => {
@@ -562,9 +597,9 @@
     _render(){
       const c=this._config;
       this.shadowRoot.innerHTML=`<style>
-        :host{display:block;width:min(680px,calc(100vw - 24px));max-width:680px}.wrap{padding:4px 0;font-family:var(--primary-font-family,Arial)}h3{margin:18px 0 8px}.hint{opacity:.65;font-size:12px;margin-bottom:12px}.row{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin:8px 0}.field{display:flex;flex-direction:column;gap:5px}.field.full{grid-column:1/-1}.entity-id{font:11px/1.35 ui-monospace,SFMono-Regular,Consolas,monospace;opacity:.72;word-break:break-all;margin-top:2px}.section{padding:14px 16px;margin:12px 0;border:1px solid var(--divider-color,#ddd);border-radius:14px}.section h3{margin-top:0}label{font-size:12px;opacity:.75}input,select{width:100%;padding:10px;border:1px solid var(--divider-color,#ddd);border-radius:8px;background:var(--card-background-color,#fff);color:var(--primary-text-color,#111)}.device{padding:13px;margin:10px 0;border:1px solid var(--divider-color,#ddd);border-radius:12px;background:var(--secondary-background-color,rgba(0,0,0,.03))}.device-head{display:flex;justify-content:space-between;align-items:center;font-weight:700}.device-head button{border:0;background:transparent;color:var(--error-color,#db4437);font-size:20px;cursor:pointer}.btn{border:0;border-radius:10px;padding:11px 14px;background:var(--primary-color,#03a9f4);color:#fff;cursor:pointer;font-weight:700}.small{font-size:11px;opacity:.6}.layout-editor{position:relative;width:100%;aspect-ratio:1.5/1;min-height:420px;border-radius:16px;overflow:hidden;border:1px solid var(--divider-color,#ddd);background:#10202c;touch-action:none}.layout-bg{position:absolute;inset:0;background-image:linear-gradient(180deg,rgba(0,0,0,.08),rgba(0,0,0,.25)),url('${esc(c.background||DEFAULT_BG)}');background-size:cover;background-position:center}.layout-node{position:absolute;transform:translate(-50%,-50%);min-width:112px;max-width:160px;padding:8px 10px;border-radius:11px;background:rgba(8,29,45,.9);border:1px solid rgba(255,255,255,.35);color:#fff;box-shadow:0 6px 16px rgba(0,0,0,.35);cursor:grab;user-select:none;touch-action:none;font-size:12px;z-index:2}.layout-node.dragging{cursor:grabbing;box-shadow:0 10px 24px rgba(0,0,0,.5);border-color:var(--primary-color,#03a9f4)}.layout-node .ln-top{font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.layout-node .ln-pos{font:10px ui-monospace,SFMono-Regular,Consolas,monospace;opacity:.65;margin-top:2px}.secondary-btn{margin-bottom:8px;background:var(--secondary-text-color,#607d8b)}.flow-colours{grid-template-columns:repeat(3,minmax(0,1fr))}.color-row{display:grid;grid-template-columns:42px 1fr;gap:6px;align-items:center}.color-row input[type=color]{height:40px;padding:3px}.color-row input[type=text]{padding:9px;font:12px ui-monospace,SFMono-Regular,Consolas,monospace}
+        :host{display:block;width:min(680px,calc(100vw - 24px));max-width:680px}.wrap{padding:4px 0;font-family:var(--primary-font-family,Arial)}h3{margin:18px 0 8px}.hint{opacity:.65;font-size:12px;margin-bottom:12px}.row{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin:8px 0}.field{display:flex;flex-direction:column;gap:5px}.field.full{grid-column:1/-1}.entity-id{font:11px/1.35 ui-monospace,SFMono-Regular,Consolas,monospace;opacity:.72;word-break:break-all;margin-top:2px}.section{padding:14px 16px;margin:12px 0;border:1px solid var(--divider-color,#ddd);border-radius:14px}.section h3{margin-top:0}label{font-size:12px;opacity:.75}input,select{width:100%;padding:10px;border:1px solid var(--divider-color,#ddd);border-radius:8px;background:var(--card-background-color,#fff);color:var(--primary-text-color,#111)}.device{padding:13px;margin:10px 0;border:1px solid var(--divider-color,#ddd);border-radius:12px;background:var(--secondary-background-color,rgba(0,0,0,.03))}.device-head{display:flex;justify-content:space-between;align-items:center;font-weight:700}.device-head button{border:0;background:transparent;color:var(--error-color,#db4437);font-size:20px;cursor:pointer}.btn{border:0;border-radius:10px;padding:11px 14px;background:var(--primary-color,#03a9f4);color:#fff;cursor:pointer;font-weight:700}.small{font-size:11px;opacity:.6}.layout-editor{position:relative;width:100%;aspect-ratio:1.5/1;min-height:420px;border-radius:16px;overflow:hidden;border:1px solid var(--divider-color,#ddd);background:#10202c;touch-action:none}.layout-bg{position:absolute;inset:0;background-size:cover;background-position:center}.layout-node{position:absolute;transform:translate(-50%,-50%);min-width:112px;max-width:160px;padding:8px 10px;border-radius:11px;background:rgba(8,29,45,.9);border:1px solid rgba(255,255,255,.35);color:#fff;box-shadow:0 6px 16px rgba(0,0,0,.35);cursor:grab;user-select:none;touch-action:none;font-size:12px;z-index:2}.layout-node.dragging{cursor:grabbing;box-shadow:0 10px 24px rgba(0,0,0,.5);border-color:var(--primary-color,#03a9f4)}.layout-node .ln-top{font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.layout-node .ln-pos{font:10px ui-monospace,SFMono-Regular,Consolas,monospace;opacity:.65;margin-top:2px}.secondary-btn{margin-bottom:8px;background:var(--secondary-text-color,#607d8b)}.flow-colours{grid-template-columns:repeat(3,minmax(0,1fr))}.color-row{display:grid;grid-template-columns:42px 1fr;gap:6px;align-items:center}.color-row input[type=color]{height:40px;padding:3px}.color-row input[type=text]{padding:9px;font:12px ui-monospace,SFMono-Regular,Consolas,monospace}.upload-row{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:4px}.upload-row .btn{padding:9px 12px;font-size:12px}.upload-status{font-size:11px;opacity:.65;margin-bottom:6px}
       </style><div class="wrap"><h3>Home Power Flow V4.3.11</h3><div class="hint">Bidirectional power flow from live positive/negative values, dotted connections, single moving power dot, invertible device direction, dynamic flow colors and draggable layout. Entity IDs are shown in full below each picker.</div>
-      <div class="row"><div class="field"><label>Title</label><input data-key="title" value="${esc(c.title||'Energy Flow')}"></div><div class="field"><label>Time format</label><select data-key="time_format"><option value="24h" ${(c.time_format||'24h')==='24h'?'selected':''}>24 hour</option><option value="12h" ${c.time_format==='12h'?'selected':''}>12 hour</option></select></div><div class="field full"><label>Weather entity</label><ha-entity-picker data-editor-key="weather_entity" allow-custom-entity></ha-entity-picker></div><div class="field full"><label>Background image URL (day)</label><input data-key="background" value="${esc(c.background||DEFAULT_BG)}"></div><div class="field full"><label>Background image URL (night)</label><input data-key="background_night" value="${esc(c.background_night||DEFAULT_BG_NIGHT)}"></div><div class="field full"><label>Sun entity (switches day/night background)</label><ha-entity-picker data-editor-key="sun_entity" allow-custom-entity></ha-entity-picker></div><div class="field"><label>Flow threshold (W)</label><input type="number" min="0" step="0.1" data-key="flow_threshold_watts" value="${esc((Number(c.flow_threshold ?? 0.0005)*1000).toFixed(1))}"></div><div class="field"><label>Flow animation speed (seconds)</label><input type="number" min="3" max="30" step="0.5" data-key="flow_speed" value="${esc(c.flow_speed??8)}"></div><div class="field"><label>Particle stagger (seconds)</label><input type="number" min="0.15" max="1.5" step="0.05" data-key="flow_stagger" value="${esc(c.flow_stagger??0.55)}"></div></div>
+      <div class="row"><div class="field"><label>Title</label><input data-key="title" value="${esc(c.title||'Energy Flow')}"></div><div class="field"><label>Time format</label><select data-key="time_format"><option value="24h" ${(c.time_format||'24h')==='24h'?'selected':''}>24 hour</option><option value="12h" ${c.time_format==='12h'?'selected':''}>12 hour</option></select></div><div class="field full"><label>Weather entity</label><ha-entity-picker data-editor-key="weather_entity" allow-custom-entity></ha-entity-picker></div><div class="field full">${this._bgUploadField('day','Day background')}</div><div class="field full">${this._bgUploadField('night','Night background')}</div><div class="field full"><label>Sun entity (switches day/night background)</label><ha-entity-picker data-editor-key="sun_entity" allow-custom-entity></ha-entity-picker></div><div class="field"><label>Flow threshold (W)</label><input type="number" min="0" step="0.1" data-key="flow_threshold_watts" value="${esc((Number(c.flow_threshold ?? 0.0005)*1000).toFixed(1))}"></div><div class="field"><label>Flow animation speed (seconds)</label><input type="number" min="3" max="30" step="0.5" data-key="flow_speed" value="${esc(c.flow_speed??8)}"></div><div class="field"><label>Particle stagger (seconds)</label><input type="number" min="0.15" max="1.5" step="0.05" data-key="flow_stagger" value="${esc(c.flow_stagger??0.55)}"></div></div>
       <h3>Flow colours</h3><div class="hint">Choose the colour used by the dotted flow path and its travelling power dot. Changes apply immediately.</div><div class="row flow-colours">${this._colorField('solar','Solar')}${this._colorField('inverter','Inverter')}${this._colorField('battery','Battery')}${this._colorField('gateway','Gateway')}${this._colorField('house','House / Load')}${this._colorField('grid','Grid')}${this._colorField('ev','EV Charger')}${this._colorField('load','Extra Load')}${this._colorField('neutral','Inactive')}</div>
       <h3>Visual layout</h3><div class="hint">Drag the device boxes on the template to place them exactly where you want. Positions are saved automatically. New devices without a saved position use the automatic layout.</div><div class="layout-editor" id="layout-editor"><div class="layout-bg"></div>${(c.devices||[]).map((d,i)=>this._layoutNode(d,i)).join('')}${this._layoutSpecial('weather','Weather','🌤️',c.weather_position,82,10)}${this._layoutSpecial('stats','Daily Stats','📊',c.stats_position,17,86)}<button class="btn secondary-btn" id="reset-layout" style="position:absolute;right:10px;bottom:10px;z-index:5">Reset positions</button></div><button class="btn secondary-btn" id="reset-layout">↺ Reset positions to automatic</button>
       <h3>Devices</h3>${(c.devices||[]).map((d,i)=>this._device(d,i)).join('')}<button class="btn" id="add">＋ Add device</button>
@@ -590,6 +625,10 @@
       this.shadowRoot.querySelector('#add-connection')?.addEventListener('click',()=>{if(this._config.devices.length<2)return;this._config.connections.push({from:0,to:1});this._emit(false);this._render();});
       this.shadowRoot.querySelectorAll('[data-device]').forEach(el=>el.addEventListener('change',e=>{const i=Number(el.dataset.device),k=el.dataset.field;this._config.devices[i][k]=e.target.value;this._emit(false);if(k==='type')this._render();}));this.shadowRoot.querySelectorAll('[data-invert-flow]').forEach(b=>b.addEventListener('click',()=>{const i=Number(b.dataset.invertFlow);this._config.devices[i].invert_flow=!this._config.devices[i].invert_flow;this._emit(false);this._render();}));
       this._enableLayoutDragging();
+      this._applyLayoutBg();
+      this.shadowRoot.querySelectorAll('[data-bg-upload-btn]').forEach(b=>b.addEventListener('click',()=>{this.shadowRoot.querySelector(`[data-bg-file="${b.dataset.bgUploadBtn}"]`)?.click();}));
+      this.shadowRoot.querySelectorAll('[data-bg-file]').forEach(inp=>inp.addEventListener('change',e=>{const f=e.target.files?.[0];if(f)this._uploadBackground(f,inp.dataset.bgFile);}));
+      this.shadowRoot.querySelectorAll('[data-bg-restore]').forEach(b=>b.addEventListener('click',()=>{const slot=b.dataset.bgRestore;delete this._config[slot==='day'?'background_upload_day':'background_upload_night'];this._emit(false);this._render();}));
       this.shadowRoot.querySelector('#reset-layout')?.addEventListener('click',()=>{this._config.devices.forEach(d=>delete d.position);delete this._config.weather_position;delete this._config.stats_position;this._emit(false);this._render();});
       this._enlargeDialogPreview();
     }
@@ -606,6 +645,59 @@
       return conns.map((e,i)=>`<div class="device" style="padding:10px"><div class="row"><div class="field"><label>From</label><select data-conn="${i}" data-field="from">${opts(e.from)}</select></div><div class="field"><label>To</label><select data-conn="${i}" data-field="to">${opts(e.to)}</select></div><div class="field full"><label>Flow direction</label><select data-conn="${i}" data-field="direction"><option value="0" ${Number(e.direction||0)===0?'selected':''}>Auto — use live power signs</option><option value="1" ${Number(e.direction||0)===1?'selected':''}>From → To</option><option value="2" ${Number(e.direction||0)===2?'selected':''}>To → From</option></select></div></div><button class="btn" style="background:var(--error-color,#db4437);padding:7px 10px" data-conn-remove="${i}">Remove connection</button></div>`).join('');
     }
 
+    _bgUploadField(slot,label){
+      const key = slot==='day' ? 'background_upload_day' : 'background_upload_night';
+      const urlKey = slot==='day' ? 'background' : 'background_night';
+      const uploaded = this._config[key];
+      const status = uploaded ? `Custom uploaded file: ${esc(uploaded.split('/').pop())}` : 'Using the default background';
+      return `<label>${label}</label><div class="upload-row"><input type="file" accept="image/*" data-bg-file="${slot}" style="display:none"><button class="btn secondary-btn" type="button" data-bg-upload-btn="${slot}">📤 Upload image</button>${uploaded ? `<button class="btn secondary-btn" type="button" data-bg-restore="${slot}">↺ Restore default</button>` : ''}</div><div class="upload-status" data-bg-status="${slot}">${status}</div><input data-key="${urlKey}" placeholder="Or paste an image URL instead" value="${esc(this._config[urlKey]||'')}">`;
+    }
+    async _uploadBackground(file, slot){
+      if (!file || !this._hass) return;
+      const statusEl = this.shadowRoot.querySelector(`[data-bg-status="${slot}"]`);
+      if (statusEl) statusEl.textContent = 'Uploading…';
+      try {
+        const ext = (file.name.split('.').pop() || 'png').toLowerCase().replace(/[^a-z0-9]/g,'') || 'png';
+        const filename = `home-power-flow-card-${slot}.${ext}`;
+        const fd = new FormData();
+        fd.append('media_content_id', 'media-source://media_source/local');
+        fd.append('file', file, filename);
+        const token = this._hass?.auth?.data?.access_token;
+        const resp = await fetch('/api/media_source/local_source/upload', {
+          method: 'POST',
+          headers: token ? { Authorization: `Bearer ${token}` } : {},
+          body: fd
+        });
+        if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+        const data = await resp.json();
+        const path = '/media/' + String(data.media_content_id).replace('media-source://media_source/', '');
+        this._config[slot === 'day' ? 'background_upload_day' : 'background_upload_night'] = path;
+        this._emit(false);
+        this._render();
+      } catch (e) {
+        console.error('Home Power Flow Card: background upload failed', e);
+        if (statusEl) statusEl.textContent = 'Upload failed - check that you are an admin user and try again.';
+      }
+    }
+    // Mirrors the card's own _applyBackground: paths under /media/ need an
+    // authenticated fetch, so the layout-editor preview background is loaded
+    // the same way rather than embedded directly in CSS.
+    async _applyLayoutBg(){
+      const bgEl = this.shadowRoot.querySelector('.layout-bg');
+      if (!bgEl) return;
+      const bg = this._config.background_upload_day || this._config.background || DEFAULT_BG;
+      const grad = 'linear-gradient(180deg,rgba(0,0,0,.08),rgba(0,0,0,.25))';
+      if (!bg.startsWith('/media/')) { bgEl.style.backgroundImage = `${grad},url('${bg}')`; return; }
+      try {
+        const token = this._hass?.auth?.data?.access_token;
+        const resp = await fetch(bg, { headers: token ? { Authorization: `Bearer ${token}` } : {} });
+        if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+        const blob = await resp.blob();
+        bgEl.style.backgroundImage = `${grad},url('${URL.createObjectURL(blob)}')`;
+      } catch (e) {
+        console.error('Home Power Flow Card: failed to load uploaded background preview', e);
+      }
+    }
     _colorField(key,label){ const colors={...FLOW_COLORS,...(this._config.flow_colors||{})}; return `<div class="field color-field"><label>${label}</label><div class="color-row"><input type="color" data-flow-color="${key}" value="${esc(colors[key])}"><input type="text" data-flow-color-text="${key}" value="${esc(colors[key])}" maxlength="7" spellcheck="false"></div></div>`; }
 
     _statField(key,label){const s=this._config.statistics||{};return `<div class="field"><label>${label}</label><ha-entity-picker data-stat="${key}" allow-custom-entity></ha-entity-picker></div>`;}
