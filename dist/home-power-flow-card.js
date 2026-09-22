@@ -1,7 +1,8 @@
 /* Home Power Flow Card V1 - standalone Lovelace custom element */
 (() => {
-  const VERSION = '0.5.0';
-  const DEFAULT_BG = '/hacsfiles/home-power-flow-card/backgrounds/smart-home-energy-background.png';
+  const VERSION = '0.6.0';
+  const DEFAULT_BG = '/hacsfiles/Home-Power-Flow-Card/smart-home-energy-background.png';
+  const DEFAULT_BG_NIGHT = '/hacsfiles/Home-Power-Flow-Card/smart-home-energy-background2.png';
   const TYPES = [
     ['solar', '☀️ Solar PV'],
     ['inverter', '⚡ Inverter'],
@@ -104,6 +105,8 @@
         type: 'custom:home-power-flow-card',
         weather_entity: '',
         background: DEFAULT_BG,
+        background_night: DEFAULT_BG_NIGHT,
+        sun_entity: 'sun.sun',
         devices: [
           { type: 'solar', name: 'Solar PV', power_entity: '' },
           { type: 'inverter', name: 'Inverter 1', power_entity: '', temp_entity: '' },
@@ -137,6 +140,9 @@
       this._config.flow_threshold = Number(this._config.flow_threshold_watts) / 1000;
       if (!this._config.flow_speed) this._config.flow_speed = 7;
       if (!this._config.background || this._config.background === '/hacsfiles/home-power-flow-card/smart-home-energy-background.png' || this._config.background === '/local/home-power-flow-card/smart-home-energy-background.png') this._config.background = DEFAULT_BG;
+      if (!this._config.background_night) this._config.background_night = DEFAULT_BG_NIGHT;
+      if (!this._config.sun_entity) this._config.sun_entity = 'sun.sun';
+      this._currentBg = null;
       this._render();
     }
 
@@ -155,7 +161,8 @@
     _render() {
       if (!this._hass || !this._config) return;
       const c = this._config;
-      const bg = c.background || DEFAULT_BG;
+      const bg = this._resolveBackground();
+      this._currentBg = bg;
       const weather = state(this._hass, c.weather_entity);
       const weatherTemp = weather?.attributes?.temperature;
       const weatherUnit = weather?.attributes?.temperature_unit || '°C';
@@ -224,6 +231,17 @@
       if (!this._timer) this._timer = setInterval(() => this._updateLiveValues(), 30000);
     }
 
+    _isNight() {
+      const sunEntity = this._config?.sun_entity || 'sun.sun';
+      const sunState = state(this._hass, sunEntity);
+      return !!sunState && sunState.state === 'below_horizon';
+    }
+
+    _resolveBackground() {
+      const c = this._config || {};
+      return this._isNight() ? (c.background_night || DEFAULT_BG_NIGHT) : (c.background || DEFAULT_BG);
+    }
+
     _uiPosition(pos, dx, dy) {
       if (pos && Number.isFinite(Number(pos.x)) && Number.isFinite(Number(pos.y))) return { x:Number(pos.x), y:Number(pos.y) };
       return { x:dx, y:dy };
@@ -241,6 +259,12 @@
 
     _updateLiveValues() {
       if (!this._hass || !this._config || !this._rendered) return;
+      const nextBg = this._resolveBackground();
+      if (nextBg !== this._currentBg) {
+        this._currentBg = nextBg;
+        const bgEl = this.shadowRoot.querySelector('.bg');
+        if (bgEl) bgEl.style.backgroundImage = `linear-gradient(180deg,rgba(0,0,0,.06),rgba(0,0,0,.22)),url('${esc(nextBg)}')`;
+      }
       const devices = this._config.devices || [];
       this.shadowRoot.querySelectorAll('.node[data-device-index]').forEach(node => {
         const i = Number(node.dataset.deviceIndex);
@@ -540,7 +564,7 @@
       this.shadowRoot.innerHTML=`<style>
         :host{display:block;width:min(680px,calc(100vw - 24px));max-width:680px}.wrap{padding:4px 0;font-family:var(--primary-font-family,Arial)}h3{margin:18px 0 8px}.hint{opacity:.65;font-size:12px;margin-bottom:12px}.row{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin:8px 0}.field{display:flex;flex-direction:column;gap:5px}.field.full{grid-column:1/-1}.entity-id{font:11px/1.35 ui-monospace,SFMono-Regular,Consolas,monospace;opacity:.72;word-break:break-all;margin-top:2px}.section{padding:14px 16px;margin:12px 0;border:1px solid var(--divider-color,#ddd);border-radius:14px}.section h3{margin-top:0}label{font-size:12px;opacity:.75}input,select{width:100%;padding:10px;border:1px solid var(--divider-color,#ddd);border-radius:8px;background:var(--card-background-color,#fff);color:var(--primary-text-color,#111)}.device{padding:13px;margin:10px 0;border:1px solid var(--divider-color,#ddd);border-radius:12px;background:var(--secondary-background-color,rgba(0,0,0,.03))}.device-head{display:flex;justify-content:space-between;align-items:center;font-weight:700}.device-head button{border:0;background:transparent;color:var(--error-color,#db4437);font-size:20px;cursor:pointer}.btn{border:0;border-radius:10px;padding:11px 14px;background:var(--primary-color,#03a9f4);color:#fff;cursor:pointer;font-weight:700}.small{font-size:11px;opacity:.6}.layout-editor{position:relative;width:100%;aspect-ratio:1.5/1;min-height:420px;border-radius:16px;overflow:hidden;border:1px solid var(--divider-color,#ddd);background:#10202c;touch-action:none}.layout-bg{position:absolute;inset:0;background-image:linear-gradient(180deg,rgba(0,0,0,.08),rgba(0,0,0,.25)),url('${esc(c.background||DEFAULT_BG)}');background-size:cover;background-position:center}.layout-node{position:absolute;transform:translate(-50%,-50%);min-width:112px;max-width:160px;padding:8px 10px;border-radius:11px;background:rgba(8,29,45,.9);border:1px solid rgba(255,255,255,.35);color:#fff;box-shadow:0 6px 16px rgba(0,0,0,.35);cursor:grab;user-select:none;touch-action:none;font-size:12px;z-index:2}.layout-node.dragging{cursor:grabbing;box-shadow:0 10px 24px rgba(0,0,0,.5);border-color:var(--primary-color,#03a9f4)}.layout-node .ln-top{font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.layout-node .ln-pos{font:10px ui-monospace,SFMono-Regular,Consolas,monospace;opacity:.65;margin-top:2px}.secondary-btn{margin-bottom:8px;background:var(--secondary-text-color,#607d8b)}.flow-colours{grid-template-columns:repeat(3,minmax(0,1fr))}.color-row{display:grid;grid-template-columns:42px 1fr;gap:6px;align-items:center}.color-row input[type=color]{height:40px;padding:3px}.color-row input[type=text]{padding:9px;font:12px ui-monospace,SFMono-Regular,Consolas,monospace}
       </style><div class="wrap"><h3>Home Power Flow V4.3.11</h3><div class="hint">Bidirectional power flow from live positive/negative values, dotted connections, single moving power dot, invertible device direction, dynamic flow colors and draggable layout. Entity IDs are shown in full below each picker.</div>
-      <div class="row"><div class="field"><label>Title</label><input data-key="title" value="${esc(c.title||'Energy Flow')}"></div><div class="field"><label>Time format</label><select data-key="time_format"><option value="24h" ${(c.time_format||'24h')==='24h'?'selected':''}>24 hour</option><option value="12h" ${c.time_format==='12h'?'selected':''}>12 hour</option></select></div><div class="field full"><label>Weather entity</label><ha-entity-picker data-editor-key="weather_entity" allow-custom-entity></ha-entity-picker></div><div class="field full"><label>Background image URL</label><input data-key="background" value="${esc(c.background||DEFAULT_BG)}"></div><div class="field"><label>Flow threshold (W)</label><input type="number" min="0" step="0.1" data-key="flow_threshold_watts" value="${esc((Number(c.flow_threshold ?? 0.0005)*1000).toFixed(1))}"></div><div class="field"><label>Flow animation speed (seconds)</label><input type="number" min="3" max="30" step="0.5" data-key="flow_speed" value="${esc(c.flow_speed??8)}"></div><div class="field"><label>Particle stagger (seconds)</label><input type="number" min="0.15" max="1.5" step="0.05" data-key="flow_stagger" value="${esc(c.flow_stagger??0.55)}"></div></div>
+      <div class="row"><div class="field"><label>Title</label><input data-key="title" value="${esc(c.title||'Energy Flow')}"></div><div class="field"><label>Time format</label><select data-key="time_format"><option value="24h" ${(c.time_format||'24h')==='24h'?'selected':''}>24 hour</option><option value="12h" ${c.time_format==='12h'?'selected':''}>12 hour</option></select></div><div class="field full"><label>Weather entity</label><ha-entity-picker data-editor-key="weather_entity" allow-custom-entity></ha-entity-picker></div><div class="field full"><label>Background image URL (day)</label><input data-key="background" value="${esc(c.background||DEFAULT_BG)}"></div><div class="field full"><label>Background image URL (night)</label><input data-key="background_night" value="${esc(c.background_night||DEFAULT_BG_NIGHT)}"></div><div class="field full"><label>Sun entity (switches day/night background)</label><ha-entity-picker data-editor-key="sun_entity" allow-custom-entity></ha-entity-picker></div><div class="field"><label>Flow threshold (W)</label><input type="number" min="0" step="0.1" data-key="flow_threshold_watts" value="${esc((Number(c.flow_threshold ?? 0.0005)*1000).toFixed(1))}"></div><div class="field"><label>Flow animation speed (seconds)</label><input type="number" min="3" max="30" step="0.5" data-key="flow_speed" value="${esc(c.flow_speed??8)}"></div><div class="field"><label>Particle stagger (seconds)</label><input type="number" min="0.15" max="1.5" step="0.05" data-key="flow_stagger" value="${esc(c.flow_stagger??0.55)}"></div></div>
       <h3>Flow colours</h3><div class="hint">Choose the colour used by the dotted flow path and its travelling power dot. Changes apply immediately.</div><div class="row flow-colours">${this._colorField('solar','Solar')}${this._colorField('inverter','Inverter')}${this._colorField('battery','Battery')}${this._colorField('gateway','Gateway')}${this._colorField('house','House / Load')}${this._colorField('grid','Grid')}${this._colorField('ev','EV Charger')}${this._colorField('load','Extra Load')}${this._colorField('neutral','Inactive')}</div>
       <h3>Visual layout</h3><div class="hint">Drag the device boxes on the template to place them exactly where you want. Positions are saved automatically. New devices without a saved position use the automatic layout.</div><div class="layout-editor" id="layout-editor"><div class="layout-bg"></div>${(c.devices||[]).map((d,i)=>this._layoutNode(d,i)).join('')}${this._layoutSpecial('weather','Weather','🌤️',c.weather_position,82,10)}${this._layoutSpecial('stats','Daily Stats','📊',c.stats_position,17,86)}<button class="btn secondary-btn" id="reset-layout" style="position:absolute;right:10px;bottom:10px;z-index:5">Reset positions</button></div><button class="btn secondary-btn" id="reset-layout">↺ Reset positions to automatic</button>
       <h3>Devices</h3>${(c.devices||[]).map((d,i)=>this._device(d,i)).join('')}<button class="btn" id="add">＋ Add device</button>
