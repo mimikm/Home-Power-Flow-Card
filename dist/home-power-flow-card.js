@@ -629,6 +629,7 @@
       this.shadowRoot.querySelectorAll('[data-bg-upload-btn]').forEach(b=>b.addEventListener('click',()=>{this.shadowRoot.querySelector(`[data-bg-file="${b.dataset.bgUploadBtn}"]`)?.click();}));
       this.shadowRoot.querySelectorAll('[data-bg-file]').forEach(inp=>inp.addEventListener('change',e=>{const f=e.target.files?.[0];if(f)this._uploadBackground(f,inp.dataset.bgFile);}));
       this.shadowRoot.querySelectorAll('[data-bg-restore]').forEach(b=>b.addEventListener('click',()=>{const slot=b.dataset.bgRestore;delete this._config[slot==='day'?'background_upload_day':'background_upload_night'];this._emit(false);this._render();}));
+      this.shadowRoot.querySelectorAll('[data-bg-preview]').forEach(b=>b.addEventListener('click',()=>{this._applyLayoutBg(b.dataset.bgPreview);}));
       this.shadowRoot.querySelector('#reset-layout')?.addEventListener('click',()=>{this._config.devices.forEach(d=>delete d.position);delete this._config.weather_position;delete this._config.stats_position;this._emit(false);this._render();});
       this._enlargeDialogPreview();
     }
@@ -650,7 +651,7 @@
       const urlKey = slot==='day' ? 'background' : 'background_night';
       const uploaded = this._config[key];
       const status = uploaded ? `Custom uploaded file: ${esc(uploaded.split('/').pop())}` : 'Using the default background';
-      return `<label>${label}</label><div class="upload-row"><input type="file" accept="image/*" data-bg-file="${slot}" style="display:none"><button class="btn secondary-btn" type="button" data-bg-upload-btn="${slot}">📤 Upload image</button>${uploaded ? `<button class="btn secondary-btn" type="button" data-bg-restore="${slot}">↺ Restore default</button>` : ''}</div><div class="upload-status" data-bg-status="${slot}">${status}</div><input data-key="${urlKey}" placeholder="Or paste an image URL instead" value="${esc(this._config[urlKey]||'')}">`;
+      return `<label>${label}</label><div class="upload-row"><input type="file" accept="image/*" data-bg-file="${slot}" style="display:none"><button class="btn secondary-btn" type="button" data-bg-upload-btn="${slot}">📤 Upload image</button><button class="btn secondary-btn" type="button" data-bg-preview="${slot}">👁 Preview this background</button>${uploaded ? `<button class="btn secondary-btn" type="button" data-bg-restore="${slot}">↺ Restore default</button>` : ''}</div><div class="upload-status" data-bg-status="${slot}">${status}</div><input data-key="${urlKey}" placeholder="Or paste an image URL instead" value="${esc(this._config[urlKey]||'')}">`;
     }
     async _uploadBackground(file, slot){
       if (!file || !this._hass) return;
@@ -674,6 +675,7 @@
         this._config[slot === 'day' ? 'background_upload_day' : 'background_upload_night'] = path;
         this._emit(false);
         this._render();
+        setTimeout(()=>this._applyLayoutBg(slot),200);
       } catch (e) {
         console.error('Home Power Flow Card: background upload failed', e);
         if (statusEl) statusEl.textContent = 'Upload failed - check that you are an admin user and try again.';
@@ -682,10 +684,12 @@
     // Mirrors the card's own _applyBackground: paths under /media/ need an
     // authenticated fetch, so the layout-editor preview background is loaded
     // the same way rather than embedded directly in CSS.
-    async _applyLayoutBg(){
+    async _applyLayoutBg(slot=null){
       const bgEl = this.shadowRoot.querySelector('.layout-bg');
       if (!bgEl) return;
-      const bg = this._config.background_upload_day || this._config.background || DEFAULT_BG;
+      const bg = slot === 'night'
+        ? (this._config.background_upload_night || this._config.background_night || DEFAULT_BG_NIGHT)
+        : (this._config.background_upload_day || this._config.background || DEFAULT_BG);
       const grad = 'linear-gradient(180deg,rgba(0,0,0,.08),rgba(0,0,0,.25))';
       if (!bg.startsWith('/media/')) { bgEl.style.backgroundImage = `${grad},url('${bg}')`; return; }
       try {
