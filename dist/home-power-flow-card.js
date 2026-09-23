@@ -10,7 +10,7 @@
  * Issues & feature requests: https://github.com/mimikm/Home-Power-Flow-Card/issues
  */
 (() => {
-  const VERSION = '0.9.2';
+  const VERSION = 'batteryglow';
   const DEFAULT_BG = '/hacsfiles/Home-Power-Flow-Card/smart-home-energy-background.png';
   const DEFAULT_BG_NIGHT = '/hacsfiles/Home-Power-Flow-Card/smart-home-energy-background2.png';
   const TYPES = [
@@ -125,6 +125,21 @@
     return config;
   }
 
+  // A noise-filtering flow threshold in the thousands of watts is never
+  // intentional for a home setup - it's almost always a stale/corrupted
+  // value carried over from an old config format or a units mixup. The
+  // legacy migration below only fills in a MISSING value; it previously
+  // trusted an already-present-but-wrong value forever. Clamp it instead.
+  function migrateFlowThreshold(config) {
+    if (!Number.isFinite(Number(config.flow_threshold_watts))) {
+      const legacy = Number(config.flow_threshold);
+      config.flow_threshold_watts = Number.isFinite(legacy) ? legacy * 1000 : 1;
+    }
+    config.flow_threshold_watts = Math.min(2000, Math.max(0, Number(config.flow_threshold_watts) || 0));
+    config.flow_threshold = config.flow_threshold_watts / 1000;
+    return config;
+  }
+
   function state(hass, entity) {
     return entity && hass?.states?.[entity] ? hass.states[entity] : null;
   }
@@ -219,13 +234,10 @@
         return copy;
       });
       this._config.flow_colors = { ...FLOW_COLORS, ...(this._config.flow_colors || {}) };
-      // V4.3.10 stores the threshold canonically in watts. Migrate older configs
-      // where flow_threshold was stored in kW.
-      if (!Number.isFinite(Number(this._config.flow_threshold_watts))) {
-        const legacy = Number(this._config.flow_threshold);
-        this._config.flow_threshold_watts = Number.isFinite(legacy) ? legacy * 1000 : 1;
-      }
-      this._config.flow_threshold = Number(this._config.flow_threshold_watts) / 1000;
+      // V4.3.10 stores the threshold canonically in watts. Migrate older
+      // configs where flow_threshold was stored in kW, and clamp against a
+      // stale/corrupted value (see migrateFlowThreshold).
+      migrateFlowThreshold(this._config);
       if (!this._config.flow_speed) this._config.flow_speed = 7;
       if (!this._config.background || this._config.background === '/hacsfiles/home-power-flow-card/smart-home-energy-background.png' || this._config.background === '/local/home-power-flow-card/smart-home-energy-background.png') this._config.background = DEFAULT_BG;
       if (!this._config.background_night) this._config.background_night = DEFAULT_BG_NIGHT;
@@ -299,6 +311,8 @@
           .flow-dot { filter:url(#dotglow); }
           .node { position:absolute; transform:translate(-50%,-50%) scale(${nodeScale}); width:clamp(135px,13vw,205px); min-height:74px; padding:11px 13px; border-radius:15px; z-index:10; background:linear-gradient(145deg,rgba(9,25,40,.87),rgba(15,30,44,.73)); border:1px solid rgba(255,255,255,.17); box-shadow:0 8px 22px rgba(0,0,0,.32); backdrop-filter:blur(10px); }
           .node .top { display:flex; align-items:center; gap:8px; }.node .icon { font-size:24px; line-height:1; }.node .name { font-weight:700; font-size:14px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }.node .power { margin-top:5px; font-size:19px; font-weight:750; }.node .extras { margin-top:4px; display:flex; flex-wrap:wrap; gap:2px 8px; }.node .extras:empty { display:none; margin:0; }.node .extra-row { display:inline-flex; align-items:center; gap:3px; font-size:10px; line-height:1.3; opacity:.78; white-space:nowrap; max-width:100%; overflow:hidden; text-overflow:ellipsis; }.node .extra-row ha-icon { --mdc-icon-size:12px; width:12px; height:12px; flex:none; }.node.battery { border-color:rgba(123,255,158,.28); }.node.grid { border-color:rgba(93,191,255,.3); }.node.ev { border-color:rgba(151,255,103,.28); }
+          @keyframes hpf-charge-pulse { 0%,100% { box-shadow:0 8px 22px rgba(0,0,0,.32), 0 0 0 0 var(--pulse-color); } 50% { box-shadow:0 8px 22px rgba(0,0,0,.32), 0 0 30px 8px var(--pulse-color); } }
+          @media (prefers-reduced-motion: reduce) { .node[data-batt-state="charging"], .node[data-batt-state="discharging"] { animation:none !important; } }
           .legend { position:absolute; right:2.6%; bottom:3.2%; z-index:18; padding:9px 12px; border-radius:12px; background:rgba(4,15,25,.55); font-size:11px; opacity:.8; backdrop-filter:blur(8px); }
           .empty { position:absolute; inset:0; display:flex; align-items:center; justify-content:center; z-index:30; }.empty > div { padding:24px 30px; background:rgba(10,25,38,.82); border-radius:18px; border:1px solid rgba(255,255,255,.18); text-align:center; backdrop-filter:blur(10px); }.empty b{display:block;font-size:20px;margin-bottom:6px}.empty span{opacity:.75}
           @media (max-width: 800px) { .card{aspect-ratio:auto; min-height:760px}.weather{min-width:190px;padding:10px 12px}.header{top:2%;left:2%}.stats{width:46%;min-width:260px}.node{width:130px}.legend{display:none} }
@@ -404,6 +418,24 @@
         if (powerEl) powerEl.textContent = power == null ? '—' : fmtPower(power);
         const extrasEl = node.querySelector('.extras');
         if (extrasEl) extrasEl.innerHTML = this._extraEntitiesRows(d);
+        const battState = this._batteryState(d, power);
+        node.dataset.battState = battState || '';
+        // Plain inline styles (see _batteryGlowStyle), not a CSS class -
+        // directly visible in the node's own style attribute when inspected.
+        node.style.borderColor = '';
+        node.style.borderWidth = '';
+        node.style.boxShadow = '';
+        node.style.animation = '';
+        node.style.removeProperty('--pulse-color');
+        if (battState) {
+          const glow = battState === 'charging' ? 'rgba(90,255,125,.95)' : 'rgba(255,150,40,.95)';
+          const border = battState === 'charging' ? 'rgba(90,255,125,.85)' : 'rgba(255,150,40,.85)';
+          node.style.borderColor = border;
+          node.style.borderWidth = '2px';
+          node.style.boxShadow = `0 8px 22px rgba(0,0,0,.32), 0 0 30px 8px ${glow}`;
+          node.style.setProperty('--pulse-color', glow);
+          node.style.animation = 'hpf-charge-pulse 1.8s ease-in-out infinite';
+        }
       });
       const c = this._config;
       const weather = state(this._hass, c.weather_entity);
@@ -482,10 +514,40 @@
       }).join('');
     }
 
+    // Charging/discharging state for a battery device, purely from its own
+    // live value + invert_flow. This mirrors _flowDirection's battery
+    // branch formula exactly (not just its intent), so the pulse can never
+    // contradict the dot's own travel direction on the flow line, whichever
+    // way that resolves for a given sensor and Invert Flow setting. Returns
+    // null when idle/below threshold, or for any non-battery device.
+    _batteryState(d, value) {
+      if ((d.type || 'load') !== 'battery') return null;
+      const threshold = Math.max(1, Number.isFinite(Number(this._config.flow_threshold_watts)) ? Number(this._config.flow_threshold_watts) : 1);
+      if (value == null || !Number.isFinite(Number(value)) || Math.abs(Number(value)) < threshold) return null;
+      let reverse = Number(value) < 0 ? false : true; // same expression as _flowDirection's battery branch
+      if (d.invert_flow) reverse = !reverse;
+      // reverse=true means the dot travels battery -> hub (discharging);
+      // reverse=false means hub -> battery (charging).
+      return reverse ? 'discharging' : 'charging';
+    }
+
+    // Plain inline CSS text for the charge/discharge glow - deliberately NOT
+    // a stylesheet class or a ::after pseudo-element, so the effect is
+    // directly visible in the node's own style="..." attribute (and its
+    // data-batt-state attribute) when inspected, with nothing hidden behind
+    // cascade order or pseudo-elements that don't show up when copying HTML.
+    _batteryGlowStyle(battState) {
+      if (!battState) return '';
+      const glow = battState === 'charging' ? 'rgba(90,255,125,.95)' : 'rgba(255,150,40,.95)';
+      const border = battState === 'charging' ? 'rgba(90,255,125,.85)' : 'rgba(255,150,40,.85)';
+      return `border-color:${border};border-width:2px;box-shadow:0 8px 22px rgba(0,0,0,.32), 0 0 30px 8px ${glow};--pulse-color:${glow};animation:hpf-charge-pulse 1.8s ease-in-out infinite;`;
+    }
+
     _deviceHTML(d, i, p) {
       const power = powerValue(this._hass, d.power_entity);
       const powerText = power == null ? '—' : fmtPower(power);
-      return `<div class="node ${esc(d.type || 'load')}" data-device-index="${i}" data-entity-id="${esc(d.power_entity || '')}" title="${esc(d.power_entity ? 'Open ' + d.power_entity : '')}" style="left:${p.x}%;top:${p.y}%"><div class="top"><span class="icon">${esc(ICONS[d.type] || '⚙️')}</span><span class="name">${esc(d.name || LABELS[d.type] || 'Device')}</span></div><div class="power">${esc(powerText)}</div><div class="extras">${this._extraEntitiesRows(d)}</div></div>`;
+      const battState = this._batteryState(d, power);
+      return `<div class="node ${esc(d.type || 'load')}" data-device-index="${i}" data-batt-state="${battState || ''}" data-entity-id="${esc(d.power_entity || '')}" title="${esc(d.power_entity ? 'Open ' + d.power_entity : '')}" style="left:${p.x}%;top:${p.y}%;${this._batteryGlowStyle(battState)}"><div class="top"><span class="icon">${esc(ICONS[d.type] || '⚙️')}</span><span class="name">${esc(d.name || LABELS[d.type] || 'Device')}</span></div><div class="power">${esc(powerText)}</div><div class="extras">${this._extraEntitiesRows(d)}</div></div>`;
     }
 
     // Generic junction model: a device with no power_entity configured acts
@@ -690,6 +752,7 @@
       next.connections ||= [];
       next.statistics ||= {};
       migrateDeviceIdsAndLinks(next);
+      migrateFlowThreshold(next);
       const changed=JSON.stringify(next)!==JSON.stringify(this._config);
       this._config=next;
       if(changed || !this.shadowRoot.firstElementChild) this._render();
