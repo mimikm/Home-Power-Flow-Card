@@ -10,7 +10,7 @@
  * Issues & feature requests: https://github.com/mimikm/Home-Power-Flow-Card/issues
  */
 (() => {
-  const VERSION = '0.9.9';
+  const VERSION = '0.7.1';
   const DEFAULT_BG = '/hacsfiles/Home-Power-Flow-Card/smart-home-energy-background.png';
   const DEFAULT_BG_NIGHT = '/hacsfiles/Home-Power-Flow-Card/smart-home-energy-background2.png';
   const TYPES = [
