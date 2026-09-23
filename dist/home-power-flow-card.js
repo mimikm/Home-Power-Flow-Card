@@ -116,7 +116,7 @@
           { type: 'house', name: 'House', power_entity: '' },
           { type: 'grid', name: 'Grid', power_entity: '', voltage_entity: '', frequency_entity: '' }
         ],
-        statistics: {},
+        statistics: { entities: [] },
         connections: [],
         flow_speed: 8,
         flow_stagger: 0.55,
@@ -526,14 +526,12 @@
     }
 
     _statsHTML(s) {
-      const rows = [
-        ['☀️','Solar Generation',s.solar_energy],
-        ['🏠','House Consumption',s.house_energy],
-        ['⚡','Exported to Grid',s.grid_export],
-        ['🔋','Battery Charge',s.battery_charge],
-      ].filter(r => r[2]);
-      if (!rows.length && !s.co2_saved) return '';
-      return `<div class="stats"><h3>${esc(s.title || 'Today')}</h3>${rows.map(r=>`<div class="stat"><span class="ico">${r[0]}</span><span>${esc(r[1])}</span><span class="value">${esc(this._energyEntity(r[2]))}</span></div>`).join('')}${s.co2_saved ? `<div class="stat co2"><span class="ico">🌿</span><span>CO₂ Saved</span><span class="value">${esc(this._energyEntity(s.co2_saved))}</span></div>`:''}</div>`;
+      const list = Array.isArray(s.entities) ? s.entities.slice(0,20) : [];
+      if (!list.length) return '';
+      return `<div class="stats"><h3>${esc(s.title || 'Today')}</h3>${list.map(r=>{
+        const icon = r.icon || '📊';
+        return `<div class="stat"><span class="ico">${esc(icon)}</span><span>${esc(r.name || 'Statistic')}</span><span class="value">${esc(this._energyEntity(r.entity))}</span></div>`;
+      }).join('')}</div>`;
     }
 
     _energyEntity(entity) {
@@ -617,7 +615,7 @@
       <div class="row"><div class="field"><label>Title</label><input data-key="title" value="${esc(c.title||'Energy Flow')}"></div><div class="field"><label>Time format</label><select data-key="time_format"><option value="24h" ${(c.time_format||'24h')==='24h'?'selected':''}>24 hour</option><option value="12h" ${c.time_format==='12h'?'selected':''}>12 hour</option></select></div><div class="field full"><label>Weather entity</label><ha-entity-picker data-editor-key="weather_entity" allow-custom-entity></ha-entity-picker></div><div class="field full">${this._bgUploadField('day','Day background')}</div><div class="field full">${this._bgUploadField('night','Night background')}</div><div class="field full"><label>Sun entity (switches day/night background)</label><ha-entity-picker data-editor-key="sun_entity" allow-custom-entity></ha-entity-picker></div><div class="field"><label>Flow threshold (W)</label><input type="number" min="0" step="0.1" data-key="flow_threshold_watts" value="${esc((Number(c.flow_threshold ?? 0.0005)*1000).toFixed(1))}"></div><div class="field"><label>Flow animation speed (seconds)</label><input type="number" min="3" max="30" step="0.5" data-key="flow_speed" value="${esc(c.flow_speed??8)}"></div><div class="field"><label>Particle stagger (seconds)</label><input type="number" min="0.15" max="1.5" step="0.05" data-key="flow_stagger" value="${esc(c.flow_stagger??0.55)}"></div></div>
       <h3>Visual layout</h3><div class="hint">Drag the device boxes on the template to place them exactly where you want. Positions are saved automatically. New devices without a saved position use the automatic layout.</div><div class="layout-editor" id="layout-editor"><div class="layout-bg"></div>${(c.devices||[]).map((d,i)=>this._layoutNode(d,i)).join('')}${this._layoutSpecial('weather','Weather','🌤️',c.weather_position,82,10)}${this._layoutSpecial('stats','Daily Stats','📊',c.stats_position,17,86)}<button class="btn secondary-btn" id="reset-layout" style="position:absolute;right:10px;bottom:10px;z-index:5">Reset positions</button></div><button class="btn secondary-btn" id="reset-layout">↺ Reset positions to automatic</button>
       <h3>Devices</h3>${(c.devices||[]).map((d,i)=>this._device(d,i)).join('')}<button class="btn" id="add">＋ Add device</button>
-      <h3>Connections</h3><div class="hint">Optional. Leave empty to use the automatic topology. Add connections to take full control of where power flows.</div><div id="connections">${this._connectionsHTML()}</div><button class="btn" id="add-connection">＋ Add connection</button><h3>Today statistics</h3><div class="hint">Optional energy entities. Leave blank to hide the panel.</div><div class="row">${this._statField('solar_energy','Solar Generation')}${this._statField('house_energy','House Consumption')}${this._statField('grid_export','Exported to Grid')}${this._statField('battery_charge','Battery Charge')}${this._statField('co2_saved','CO₂ Saved')}</div>
+      <h3>Connections</h3><div class="hint">Optional. Leave empty to use the automatic topology. Add connections to take full control of where power flows.</div><div id="connections">${this._connectionsHTML()}</div><button class="btn" id="add-connection">＋ Add connection</button><h3>Today statistics</h3><div class="hint">Add up to 20 custom statistics. Choose your own name, entity and icon.</div><div id="stats-list">${this._statsEditorHTML()}</div><button class="btn" id="add-stat">＋ Add statistic</button>
       </div>`;
       this.shadowRoot.querySelectorAll('ha-entity-picker').forEach(el=>{
         el.hass=this._hass;
@@ -635,6 +633,10 @@
       this.shadowRoot.querySelectorAll('[data-conn-remove]').forEach(b=>b.addEventListener('click',()=>{this._config.connections.splice(Number(b.dataset.connRemove),1);this._emit(false);this._render();}));
       this.shadowRoot.querySelectorAll('[data-conn]').forEach(el=>el.addEventListener('change',e=>{const i=Number(el.dataset.conn),k=el.dataset.field;this._config.connections[i][k]=Number(e.target.value);this._emit(false);}));
       this.shadowRoot.querySelector('#add-connection')?.addEventListener('click',()=>{if(this._config.devices.length<2)return;this._config.connections.push({from:0,to:1});this._emit(false);this._render();});
+      this.shadowRoot.querySelector('#add-stat')?.addEventListener('click',()=>{this._config.statistics ||= {}; this._config.statistics.entities ||= []; if(this._config.statistics.entities.length<20){this._config.statistics.entities.push({name:'Statistic',entity:'',icon:'📊'});this._emit(false);this._render();}});
+      this.shadowRoot.querySelectorAll('[data-remove-stat]').forEach(b=>b.addEventListener('click',()=>{this._config.statistics.entities.splice(Number(b.dataset.removeStat),1);this._emit(false);this._render();}));
+      this.shadowRoot.querySelectorAll('[data-stat-field]').forEach(el=>el.addEventListener('change',e=>{const i=Number(el.dataset.index); const k=el.dataset.statField; this._config.statistics.entities[i][k]=e.target.value; this._emit(false);}));
+      this.shadowRoot.querySelectorAll('[data-stat-picker]').forEach(el=>{el.hass=this._hass; el.value=this._config.statistics.entities[Number(el.dataset.index)]?.entity||''; el.addEventListener('value-changed',e=>{this._config.statistics.entities[Number(el.dataset.index)].entity=e.detail.value||'';this._emit(false);});});
       this.shadowRoot.querySelectorAll('[data-device]').forEach(el=>el.addEventListener('change',e=>{const i=Number(el.dataset.device),k=el.dataset.field;this._config.devices[i][k]=e.target.value;this._emit(false);if(k==='type')this._render();}));this.shadowRoot.querySelectorAll('[data-invert-flow]').forEach(b=>b.addEventListener('click',()=>{const i=Number(b.dataset.invertFlow);this._config.devices[i].invert_flow=!this._config.devices[i].invert_flow;this._emit(false);this._render();}));
       this._enableLayoutDragging();
       this._applyLayoutBg();
@@ -715,6 +717,11 @@
       }
     }
     _colorField(key,label){ const colors={...FLOW_COLORS,...(this._config.flow_colors||{})}; return `<div class="field color-field"><label>${label}</label><div class="color-row"><input type="color" data-flow-color="${key}" value="${esc(colors[key])}"><input type="text" data-flow-color-text="${key}" value="${esc(colors[key])}" maxlength="7" spellcheck="false"></div></div>`; }
+
+    _statsEditorHTML(){
+      const list=this._config.statistics?.entities || [];
+      return list.map((r,i)=>`<div class="device"><div class="device-head"><span>📊 Statistic ${i+1}</span><button data-remove-stat="${i}">×</button></div><div class="row"><div class="field"><label>Name</label><input data-stat-field="name" data-index="${i}" value="${esc(r.name||'')}"></div><div class="field"><label>Icon</label><input data-stat-field="icon" data-index="${i}" value="${esc(r.icon||'📊')}"></div><div class="field full"><label>Entity</label><ha-entity-picker data-stat-picker data-index="${i}" allow-custom-entity></ha-entity-picker></div></div></div>`).join('') || '<div class="small">No statistics added.</div>';
+    }
 
     _statField(key,label){const s=this._config.statistics||{};return `<div class="field"><label>${label}</label><ha-entity-picker data-stat="${key}" allow-custom-entity></ha-entity-picker></div>`;}
     _emit(syncStats=true){
