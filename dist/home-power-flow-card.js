@@ -10,7 +10,7 @@
  * Issues & feature requests: https://github.com/mimikm/Home-Power-Flow-Card/issues
  */
 (() => {
-  const VERSION = '0.7.1';
+  const VERSION = '0.9.11';
   const DEFAULT_BG = '/hacsfiles/Home-Power-Flow-Card/smart-home-energy-background.png';
   const DEFAULT_BG_NIGHT = '/hacsfiles/Home-Power-Flow-Card/smart-home-energy-background2.png';
   const TYPES = [
@@ -45,15 +45,17 @@
   function flowColor(a, b, reverse, active, customColors = {}) {
     const colors = { ...FLOW_COLORS, ...(customColors || {}) };
     if (!active) return colors.neutral || FLOW_COLORS.neutral;
-    // Colour is owned by the metered device (the one with a power_entity),
-    // never by a bare pass-through hub - regardless of its type. A metered
-    // second inverter or Gateway owns its colour just like any other device;
-    // a bare inverter/gateway/junction never does.
+    // Inverters and Gateways are junctions: they never dictate a flow line's
+    // colour themselves, even when metered - colour always comes from
+    // whichever connected device is the "real" one (solar, battery, grid,
+    // house, EV, load). Only when BOTH sides of an edge are junctions
+    // (e.g. inverter <-> gateway) does a junction's own colour apply, since
+    // there's nothing else for that edge to take its colour from.
     let source = reverse ? b : a;
-    const hasEntity = d => !!(d?.power_entity && String(d.power_entity).trim());
-    if (!hasEntity(source)) {
+    const isHub = d => { const t = d?.type || 'load'; return t === 'inverter' || t === 'gateway'; };
+    if (isHub(source)) {
       const other = source === a ? b : a;
-      if (hasEntity(other)) source = other;
+      if (!isHub(other)) source = other;
     }
     return source?.flow_color || colors[source?.type || 'neutral'] || colors.neutral || FLOW_COLORS.neutral;
   }
@@ -717,7 +719,7 @@
         const stroke=flowColor(da,db,reverse,true,this._config.flow_colors);
         const width=2.1;
         const delay=(idx*stagger).toFixed(2)+'s';
-        return `<path id="${id}" class="flow-path" d="${path}" stroke="${stroke}" stroke-width="${width}" stroke-dasharray="2 14" opacity=".92"></path><circle class="flow-dot" r="2.4" fill="${stroke}"><animateMotion dur="${duration}" begin="-${delay}" repeatCount="indefinite" rotate="auto" ${reverse?'keyPoints="1;0" keyTimes="0;1"':''}><mpath href="#${id}"/></animateMotion><animate attributeName="r" values="1.8;3.4;1.8" dur="1.1s" repeatCount="indefinite"/><animate attributeName="opacity" values=".55;1;.55" dur="1.1s" repeatCount="indefinite"/></circle>`;
+        return `<path id="${id}" class="flow-path" d="${path}" stroke="${stroke}" stroke-width="${width}" stroke-dasharray="2 6" opacity=".92"></path><circle class="flow-dot" r="2.4" fill="${stroke}"><animateMotion dur="${duration}" begin="-${delay}" repeatCount="indefinite" rotate="auto" ${reverse?'keyPoints="1;0" keyTimes="0;1"':''}><mpath href="#${id}"/></animateMotion><animate attributeName="r" values="1.8;3.4;1.8" dur="1.1s" repeatCount="indefinite"/><animate attributeName="opacity" values=".55;1;.55" dur="1.1s" repeatCount="indefinite"/></circle>`;
       }).join('');
     }
 
