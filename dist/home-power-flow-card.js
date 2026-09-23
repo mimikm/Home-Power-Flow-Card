@@ -10,7 +10,7 @@
  * Issues & feature requests: https://github.com/mimikm/Home-Power-Flow-Card/issues
  */
 (() => {
-  const VERSION = '0.7.o';
+  const VERSION = '0.6.9.9.5';
   const DEFAULT_BG = '/hacsfiles/Home-Power-Flow-Card/smart-home-energy-background.png';
   const DEFAULT_BG_NIGHT = '/hacsfiles/Home-Power-Flow-Card/smart-home-energy-background2.png';
   const TYPES = [
@@ -564,7 +564,18 @@
       this.shadowRoot.querySelectorAll('ha-entity-picker').forEach(el=>{ el.hass=h; });
       this._enlargeDialogPreview();
     }
-    connectedCallback(){ this._enlargeDialogPreview(); }
+    connectedCallback(){
+      this._enlargeDialogPreview();
+      if (!this._onResize) {
+        // A maximised/resized browser window doesn't fire our hass setter, so
+        // without this the preview only re-sizes on the next HA state update.
+        this._onResize = () => this._enlargeDialogPreview();
+        window.addEventListener('resize', this._onResize);
+      }
+    }
+    disconnectedCallback(){
+      if (this._onResize) { window.removeEventListener('resize', this._onResize); this._onResize=null; }
+    }
     _enlargeDialogPreview(){
       // Home Assistant renders custom card editors inside hui-dialog-edit-card.
       // The standard dialog gives the preview a fairly small card width and our
@@ -573,7 +584,7 @@
       let root=this.getRootNode();
       let host=root && root.host;
       let dialog=null;
-      for(let i=0;i<8 && host;i++){
+      for(let i=0;i<12 && host;i++){
         if(String(host.tagName||'').toLowerCase()==='hui-dialog-edit-card'){ dialog=host; break; }
         root=host.getRootNode?.();
         host=root?.host;
@@ -582,13 +593,32 @@
       const preview=dialog.shadowRoot.querySelector('.element-preview');
       const previewCard=preview?.querySelector('hui-card');
       if(!preview || !previewCard) return;
-      // The HA editor dialog can be resized, but its preview column/card keeps
-      // a conservative max-width unless we explicitly override the layout.
-      // Make the preview column and card consume the available right-hand space.
+
+      // The settings column (the preview's flex sibling) defaults to
+      // min-width:auto, the classic flexbox trap: it refuses to shrink below
+      // its own content's natural width, which forces the whole row to
+      // overflow (clipping input rows, showing a horizontal scrollbar) and
+      // eats the space the preview should be growing into. Freeing it to
+      // shrink is what actually lets the preview stretch on a wide dialog.
+      const settingsCol = Array.from(preview.parentElement?.children || []).find(c => c !== preview);
+      if (settingsCol) { settingsCol.style.minWidth = '0'; settingsCol.style.boxSizing = 'border-box'; settingsCol.style.overflowX = 'hidden'; }
+      if (preview.parentElement) preview.parentElement.style.minWidth = '0';
+
+      // Widen the dialog surface itself too, so both columns actually have
+      // extra room to grow into rather than fighting each other for a
+      // capped width.
+      const surface = dialog.shadowRoot.querySelector('ha-dialog')?.shadowRoot?.querySelector('.mdc-dialog__surface')
+        || dialog.shadowRoot.querySelector('.mdc-dialog__surface');
+      if (surface) { surface.style.maxWidth = 'min(96vw, 1700px)'; surface.style.width = 'min(96vw, 1700px)'; }
+
+      // Make the preview column and card consume the available right-hand
+      // space via flex-grow rather than a viewport-relative width, so it
+      // scales with the dialog's actual available width instead of the
+      // browser window's.
       preview.style.minWidth='0';
-      preview.style.width='min(62vw, 980px)';
+      preview.style.width='auto';
       preview.style.maxWidth='none';
-      preview.style.flex='1 1 0';
+      preview.style.flex='2 1 420px';
       preview.style.overflow='auto';
       preview.style.boxSizing='border-box';
       previewCard.style.maxWidth='none';
@@ -599,7 +629,7 @@
       const dialogStyle=dialog.shadowRoot.querySelector('style[data-home-power-flow-preview]') || document.createElement('style');
       dialogStyle.setAttribute('data-home-power-flow-preview','');
       dialogStyle.textContent=`
-        .element-preview { flex:1 1 0 !important; width:min(62vw,980px) !important; max-width:none !important; min-width:0 !important; }
+        .element-preview { flex:2 1 420px !important; width:auto !important; max-width:none !important; min-width:0 !important; }
         .element-preview > * { width:100% !important; max-width:none !important; min-width:0 !important; box-sizing:border-box !important; }
         .element-preview hui-card { display:block !important; width:100% !important; max-width:none !important; min-width:0 !important; }
       `;
@@ -617,7 +647,7 @@
     _render(){
       const c=this._config;
       this.shadowRoot.innerHTML=`<style>
-        :host{display:block;width:min(680px,calc(100vw - 24px));max-width:680px}.wrap{padding:4px 0;font-family:var(--primary-font-family,Arial)}h3{margin:18px 0 8px}.hint{opacity:.65;font-size:12px;margin-bottom:12px}.row{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin:8px 0}.field{display:flex;flex-direction:column;gap:5px}.field.full{grid-column:1/-1}.entity-id{font:11px/1.35 ui-monospace,SFMono-Regular,Consolas,monospace;opacity:.72;word-break:break-all;margin-top:2px}.section{padding:14px 16px;margin:12px 0;border:1px solid var(--divider-color,#ddd);border-radius:14px}.section h3{margin-top:0}label{font-size:12px;opacity:.75}input,select{width:100%;padding:10px;border:1px solid var(--divider-color,#ddd);border-radius:8px;background:var(--card-background-color,#fff);color:var(--primary-text-color,#111)}.stat-sort-item{cursor:grab}.stat-drag-handle{font-size:24px;cursor:grab;margin-right:10px}.stat-sort-item.dragging{opacity:.5}.device{padding:13px;margin:10px 0;border:1px solid var(--divider-color,#ddd);border-radius:12px;background:var(--secondary-background-color,rgba(0,0,0,.03))}.device-head{display:flex;justify-content:space-between;align-items:center;font-weight:700}.device-title{cursor:pointer;display:flex;align-items:center;gap:6px;flex:1;min-width:0;user-select:none}.device-sub{font:11px/1 ui-monospace,SFMono-Regular,Consolas,monospace;font-weight:400;opacity:.6;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.device-head button{border:0;background:transparent;color:var(--error-color,#db4437);font-size:20px;cursor:pointer}.btn{border:0;border-radius:10px;padding:11px 14px;background:var(--primary-color,#03a9f4);color:#fff;cursor:pointer;font-weight:700}.small{font-size:11px;opacity:.6}.layout-editor{position:relative;width:100%;aspect-ratio:1.5/1;min-height:420px;border-radius:16px;overflow:hidden;border:1px solid var(--divider-color,#ddd);background:#10202c;touch-action:none}.layout-bg{position:absolute;inset:0;background-size:cover;background-position:center}.layout-node{position:absolute;transform:translate(-50%,-50%);min-width:112px;max-width:160px;padding:8px 10px;border-radius:11px;background:rgba(8,29,45,.9);border:1px solid rgba(255,255,255,.35);color:#fff;box-shadow:0 6px 16px rgba(0,0,0,.35);cursor:grab;user-select:none;touch-action:none;font-size:12px;z-index:2}.layout-node.dragging{cursor:grabbing;box-shadow:0 10px 24px rgba(0,0,0,.5);border-color:var(--primary-color,#03a9f4)}.layout-node .ln-top{font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.layout-node .ln-pos{font:10px ui-monospace,SFMono-Regular,Consolas,monospace;opacity:.65;margin-top:2px}.secondary-btn{margin-bottom:8px;background:var(--secondary-text-color,#607d8b)}.flow-colours{grid-template-columns:repeat(3,minmax(0,1fr))}.color-row{display:grid;grid-template-columns:42px 1fr;gap:6px;align-items:center}.color-row input[type=color]{height:40px;padding:3px}.ha-color-box{display:flex;align-items:center;gap:10px}.ha-color-picker{width:56px!important;height:40px!important;padding:2px!important;border-radius:8px}.color-preview{width:80px;height:36px;border-radius:8px;border:1px solid var(--divider-color,#ddd);display:inline-block}.color-row input[type=text]{padding:9px;font:12px ui-monospace,SFMono-Regular,Consolas,monospace}.upload-row{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:4px}.upload-row .btn{padding:9px 12px;font-size:12px}.upload-status{font-size:11px;opacity:.65;margin-bottom:6px}
+        :host{display:block;width:100%;max-width:680px;min-width:0;box-sizing:border-box;overflow-x:hidden}.wrap{padding:4px 0;font-family:var(--primary-font-family,Arial)}h3{margin:18px 0 8px}.hint{opacity:.65;font-size:12px;margin-bottom:12px}.row{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin:8px 0}.field{display:flex;flex-direction:column;gap:5px}.field.full{grid-column:1/-1}.entity-id{font:11px/1.35 ui-monospace,SFMono-Regular,Consolas,monospace;opacity:.72;word-break:break-all;margin-top:2px}.section{padding:14px 16px;margin:12px 0;border:1px solid var(--divider-color,#ddd);border-radius:14px}.section h3{margin-top:0}label{font-size:12px;opacity:.75}input,select{width:100%;padding:10px;border:1px solid var(--divider-color,#ddd);border-radius:8px;background:var(--card-background-color,#fff);color:var(--primary-text-color,#111)}.stat-sort-item{cursor:grab}.stat-drag-handle{font-size:24px;cursor:grab;margin-right:10px}.stat-sort-item.dragging{opacity:.5}.device{padding:13px;margin:10px 0;border:1px solid var(--divider-color,#ddd);border-radius:12px;background:var(--secondary-background-color,rgba(0,0,0,.03))}.device-head{display:flex;justify-content:space-between;align-items:center;font-weight:700}.device-title{cursor:pointer;display:flex;align-items:center;gap:6px;flex:1;min-width:0;user-select:none}.device-sub{font:11px/1 ui-monospace,SFMono-Regular,Consolas,monospace;font-weight:400;opacity:.6;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.device-head button{border:0;background:transparent;color:var(--error-color,#db4437);font-size:20px;cursor:pointer}.btn{border:0;border-radius:10px;padding:11px 14px;background:var(--primary-color,#03a9f4);color:#fff;cursor:pointer;font-weight:700}.small{font-size:11px;opacity:.6}.layout-editor{position:relative;width:100%;aspect-ratio:1.5/1;min-height:420px;border-radius:16px;overflow:hidden;border:1px solid var(--divider-color,#ddd);background:#10202c;touch-action:none}.layout-bg{position:absolute;inset:0;background-size:cover;background-position:center}.layout-node{position:absolute;transform:translate(-50%,-50%);min-width:112px;max-width:160px;padding:8px 10px;border-radius:11px;background:rgba(8,29,45,.9);border:1px solid rgba(255,255,255,.35);color:#fff;box-shadow:0 6px 16px rgba(0,0,0,.35);cursor:grab;user-select:none;touch-action:none;font-size:12px;z-index:2}.layout-node.dragging{cursor:grabbing;box-shadow:0 10px 24px rgba(0,0,0,.5);border-color:var(--primary-color,#03a9f4)}.layout-node .ln-top{font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.layout-node .ln-pos{font:10px ui-monospace,SFMono-Regular,Consolas,monospace;opacity:.65;margin-top:2px}.secondary-btn{margin-bottom:8px;background:var(--secondary-text-color,#607d8b)}.flow-colours{grid-template-columns:repeat(3,minmax(0,1fr))}.color-row{display:grid;grid-template-columns:42px 1fr;gap:6px;align-items:center}.color-row input[type=color]{height:40px;padding:3px}.ha-color-box{display:flex;align-items:center;gap:10px}.ha-color-picker{width:56px!important;height:40px!important;padding:2px!important;border-radius:8px}.color-preview{width:80px;height:36px;border-radius:8px;border:1px solid var(--divider-color,#ddd);display:inline-block}.color-row input[type=text]{padding:9px;font:12px ui-monospace,SFMono-Regular,Consolas,monospace}.upload-row{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:4px}.upload-row .btn{padding:9px 12px;font-size:12px}.upload-status{font-size:11px;opacity:.65;margin-bottom:6px}
       </style><div class="wrap"><h3>Home Power Flow</h3><div class="hint">Bidirectional power flow from live positive/negative values, dotted connections, single moving power dot, invertible device direction, dynamic flow colors and draggable layout. Entity IDs are shown in full below each picker.</div>
       <div class="row"><div class="field"><label>Title</label><input data-key="title" value="${esc(c.title||'Energy Flow')}"></div><div class="field"><label>Time format</label><select data-key="time_format"><option value="24h" ${(c.time_format||'24h')==='24h'?'selected':''}>24 hour</option><option value="12h" ${c.time_format==='12h'?'selected':''}>12 hour</option></select></div><div class="field full"><label>Weather entity</label><ha-entity-picker data-editor-key="weather_entity" allow-custom-entity></ha-entity-picker></div><div class="field full">${this._bgUploadField('day','Day background')}</div><div class="field full">${this._bgUploadField('night','Night background')}</div><div class="field full"><label>Sun entity (switches day/night background)</label><ha-entity-picker data-editor-key="sun_entity" allow-custom-entity></ha-entity-picker></div><div class="field"><label>Flow threshold (W)</label><input type="number" min="0" step="0.1" data-key="flow_threshold_watts" value="${esc((Number(c.flow_threshold ?? 0.0005)*1000).toFixed(1))}"></div><div class="field"><label>Flow animation speed (seconds)</label><input type="number" min="3" max="30" step="0.5" data-key="flow_speed" value="${esc(c.flow_speed??8)}"></div><div class="field"><label>Particle stagger (seconds)</label><input type="number" min="0.15" max="1.5" step="0.05" data-key="flow_stagger" value="${esc(c.flow_stagger??0.55)}"></div></div>
       <h3>Visual layout</h3><div class="hint">Drag the device boxes on the template to place them exactly where you want. Positions are saved automatically. New devices without a saved position use the automatic layout.</div><div class="layout-editor" id="layout-editor"><div class="layout-bg"></div>${(c.devices||[]).map((d,i)=>this._layoutNode(d,i)).join('')}${this._layoutSpecial('weather','Weather','🌤️',c.weather_position,82,10)}${this._layoutSpecial('stats','Daily Stats','📊',c.stats_position,17,86)}<button class="btn secondary-btn" id="reset-layout" style="position:absolute;right:10px;bottom:10px;z-index:5">Reset positions</button></div><button class="btn secondary-btn" id="reset-layout">↺ Reset positions to automatic</button>
