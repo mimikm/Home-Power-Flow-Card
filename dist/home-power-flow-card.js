@@ -1,6 +1,6 @@
 /* Home Power Flow Card V1 - standalone Lovelace custom element */
 (() => {
-  const VERSION = '0.6.9.7';
+  const VERSION = '0.6.8';
   const DEFAULT_BG = '/hacsfiles/Home-Power-Flow-Card/smart-home-energy-background.png';
   const DEFAULT_BG_NIGHT = '/hacsfiles/Home-Power-Flow-Card/smart-home-energy-background2.png';
   const TYPES = [
@@ -111,10 +111,10 @@
         sun_entity: 'sun.sun',
         devices: [
           { type: 'solar', name: 'Solar PV', power_entity: '' },
-          { type: 'inverter', name: 'Inverter 1', power_entity: '', temp_entity: '' },
-          { type: 'battery', name: 'Battery 1', power_entity: '', soc_entity: '', voltage_entity: '', temp_entity: '' },
+          { type: 'inverter', name: 'Inverter 1', power_entity: '' },
+          { type: 'battery', name: 'Battery 1', power_entity: '' },
           { type: 'house', name: 'House', power_entity: '' },
-          { type: 'grid', name: 'Grid', power_entity: '', voltage_entity: '', frequency_entity: '' }
+          { type: 'grid', name: 'Grid', power_entity: '' }
         ],
         statistics: { entities: [] },
         connections: [],
@@ -309,25 +309,13 @@
         if (!d) return;
         const st = state(this._hass, d.power_entity);
         const power = powerValue(this._hass, d.power_entity);
-        const soc = entityValue(this._hass, d.soc_entity);
-        const voltage = entityValue(this._hass, d.voltage_entity);
-        const temp = entityValue(this._hass, d.temp_entity);
-        const frequency = entityValue(this._hass, d.frequency_entity);
+
         const powerEl = node.querySelector('.power');
         const secEl = node.querySelector('.secondary');
         if (powerEl) powerEl.textContent = power == null ? '—' : fmtPower(power);
         if (secEl) {
-          if (d.type === 'battery') {
-            const parts=[];
-            if (soc != null) parts.push(`${soc.toFixed(0)}% SOC`);
-            if (voltage != null) parts.push(`${voltage.toFixed(1)} V`);
-            if (temp != null) parts.push(`${temp.toFixed(1)} °C`);
-            secEl.innerHTML = parts.map(esc).join('<br>') || 'Battery';
-          } else if (d.type === 'inverter') {
-            secEl.textContent = temp != null ? `${temp.toFixed(1)} °C` : 'Inverter';
-          } else if (d.type === 'grid') {
-            const parts=[]; if (voltage != null) parts.push(`${voltage.toFixed(1)} V`); if (frequency != null) parts.push(`${frequency.toFixed(2)} Hz`); secEl.innerHTML = parts.map(esc).join('<br>') || 'Grid';
-          } else secEl.textContent = st?.attributes?.unit_of_measurement || 'Power';
+          const extras=(d.extra_entities||[]).slice(0,5);
+          secEl.innerHTML = extras.map(e=>{ const v=state(this._hass,e.entity)?.state ?? '—'; return `<div>${esc(e.icon||'')} ${esc(e.name||'Entity')}: ${esc(v)}</div>`; }).join('') || '';
         }
       });
       const c = this._config;
@@ -394,107 +382,11 @@
     }
 
     _deviceHTML(d, i, p) {
-      const s = state(this._hass, d.power_entity);
       const power = powerValue(this._hass, d.power_entity);
-      const soc = entityValue(this._hass, d.soc_entity);
-      const voltage = entityValue(this._hass, d.voltage_entity);
-      const temp = entityValue(this._hass, d.temp_entity);
-        const frequency = entityValue(this._hass, d.frequency_entity);
       const powerText = power == null ? '—' : fmtPower(power);
-      let secHtml = '';
-      if (d.type === 'battery') {
-        const parts=[];
-        if (soc != null) parts.push(`${soc.toFixed(0)}% SOC`);
-        if (voltage != null) parts.push(`${voltage.toFixed(1)} V`);
-        if (temp != null) parts.push(`${temp.toFixed(1)} °C`);
-        secHtml = parts.length ? parts.map(esc).join('<br>') : 'Battery';
-      } else if (d.type === 'inverter') {
-        secHtml = temp != null ? `${temp.toFixed(1)} °C` : 'Inverter';
-      } else if (d.type === 'grid') {
-        const frequency = entityValue(this._hass, d.frequency_entity); const parts=[]; if (voltage != null) parts.push(`${voltage.toFixed(1)} V`); if (frequency != null) parts.push(`${frequency.toFixed(2)} Hz`); secHtml = parts.length ? parts.map(esc).join('<br>') : 'Grid';
-      } else {
-        secHtml = s?.attributes?.unit_of_measurement || 'Power';
-      }
+      const extras=(d.extra_entities||[]).slice(0,5);
+      const secHtml = extras.map(e=>{ const v=state(this._hass,e.entity)?.state ?? '—'; return `<div>${esc(e.icon||'')} ${esc(e.name||'Entity')}: ${esc(v)}</div>`; }).join('');
       return `<div class="node ${esc(d.type || 'load')}" data-device-index="${i}" data-entity-id="${esc(d.power_entity || '')}" title="${esc(d.power_entity ? 'Open ' + d.power_entity : '')}" style="left:${p.x}%;top:${p.y}%"><div class="top"><span class="icon">${esc(ICONS[d.type] || '⚙️')}</span><span class="name">${esc(d.name || LABELS[d.type] || 'Device')}</span></div><div class="power">${esc(powerText)}</div><div class="secondary">${secHtml}</div></div>`;
-    }
-
-    _flowDirection(a, b, va, vb) {
-      const ta = a.type || 'load', tb = b.type || 'load';
-      const threshold = Math.max(1, Number.isFinite(Number(this._config.flow_threshold_watts)) ? Number(this._config.flow_threshold_watts) : 1);
-
-      // Inverter is a junction only. It does not require a power entity.
-      // The connected device determines whether the flow exists and direction.
-      const source = ta === 'inverter' ? b : (tb === 'inverter' ? a : null);
-      const value = ta === 'inverter' ? vb : (tb === 'inverter' ? va : null);
-
-      if (source) {
-        if (value == null || !Number.isFinite(Number(value)) || Math.abs(Number(value)) < threshold)
-          return {active:false, reverse:false, magnitude:0};
-
-        let reverse = false;
-        const t = source.type;
-
-        if (t === 'solar') {
-          // solar -> inverter
-          reverse = tb === 'solar';
-        } else if (t === 'battery') {
-          // positive = charging (inverter -> battery)
-          reverse = Number(value) < 0 ? false : true;
-        } else if (t === 'grid') {
-          // positive = import (grid -> inverter)
-          reverse = Number(value) < 0 ? true : false;
-        } else {
-          // loads consume from inverter
-          reverse = ta === 'inverter' ? false : true;
-        }
-
-        if (source.invert_flow) reverse = !reverse;
-        return {active:true, reverse, magnitude:Math.abs(Number(value))};
-      }
-
-      const aa = Math.abs(Number(va || 0)), ab = Math.abs(Number(vb || 0));
-      if (Math.max(aa, ab) < threshold) return {active:false, reverse:false, magnitude:0};
-
-      return {active:true, reverse:false, magnitude:Math.max(aa,ab)};
-    }
-
-    _flowEdges(devices) {
-      const edges = [];
-      const valid = e => e && Number.isInteger(Number(e.from)) && Number.isInteger(Number(e.to)) && devices[e.from] && devices[e.to] && Number(e.from) !== Number(e.to);
-      if (Array.isArray(this._config.connections) && this._config.connections.length) {
-        this._config.connections.forEach(e => { if (valid(e)) edges.push([Number(e.from), Number(e.to), Number(e.direction || 0)]); });
-      } else {
-        const by = type => devices.map((d,i)=>({d,i})).filter(x=>(x.d.type||'load')===type);
-        const add=(a,b)=>{ if(a&&b) edges.push([a.i,b.i,0]); };
-        const inv=by('inverter')[0];
-        const solar=by('solar'), battery=by('battery'), grid=by('grid'), house=by('house'), ev=by('ev'), loads=by('load');
-
-        // Inverter is the hub only.
-        if (inv) {
-          solar.forEach(x=>add(x,inv));
-          battery.forEach(x=>add(inv,x));
-          grid.forEach(x=>add(inv,x));
-          if(house[0]) add(inv,house[0]);
-          ev.forEach(x=>add(inv,x));
-          loads.forEach(x=>add(inv,x));
-        }
-      }
-      return edges;
-    }
-
-    _flowStateKey(devices, snapshot) {
-      if (!devices.length) return '';
-      const seen = new Set();
-      return this._flowEdges(devices).map(([a,b,dir]) => {
-        const key=`${a}-${b}`;
-        if (seen.has(key)) return '';
-        seen.add(key);
-        const info=this._flowDirection(devices[a], devices[b], snapshot?.[a], snapshot?.[b]);
-        let reverse=info.reverse;
-        if(Number(dir)===1) reverse=false;
-        if(Number(dir)===2) reverse=true;
-        return `${key}:${info.active?1:0}:${info.active?Number(reverse):0}`;
-      }).join('|');
     }
 
     _flows(devices, pos) {
@@ -661,11 +553,7 @@
     _autoPreviewPosition(d,i){ const zones={solar:[18,23],inverter:[56,39],battery:[58,65],gateway:[48,78],house:[28,82],grid:[82,84],ev:[83,50],load:[76,67]}; const same=this._config.devices.filter(x=>(x.type||'load')===(d.type||'load')); const n=same.indexOf(d); const [cx,cy]=zones[d.type||'load']||[70,68]; const spacing=Math.min(15,70/Math.max(1,same.length)); let x=cx,y=cy;if(same.length>1)x=cx+(n-(same.length-1)/2)*spacing;if((d.type==='battery'&&same.length>3)){const col=n%3,row=Math.floor(n/3);x=48+col*12;y=64+row*12;}if(d.type==='solar'&&same.length>4){const col=n%4,row=Math.floor(n/4);x=33+col*12;y=22+row*11;}if(d.type==='ev'&&same.length>2){const col=n%2,row=Math.floor(n/2);x=78+col*10;y=45+row*13;}return{x,y}; }
     _enableLayoutDragging(){ const area=this.shadowRoot.querySelector('#layout-editor'); if(!area)return; area.querySelectorAll('.layout-node').forEach(node=>{ let dragging=false; const move=e=>{if(!dragging)return;const r=area.getBoundingClientRect();let x=((e.clientX-r.left)/r.width)*100;let y=((e.clientY-r.top)/r.height)*100;x=Math.max(5,Math.min(95,x));y=Math.max(6,Math.min(94,y));const kind=node.dataset.layoutKind; if(kind==='device'){const i=Number(node.dataset.layoutIndex);this._config.devices[i].position={x,y};} else if(kind==='weather') this._config.weather_position={x,y}; else if(kind==='stats') this._config.stats_position={x,y}; node.style.left=x+'%';node.style.top=y+'%';const pos=node.querySelector('.ln-pos');if(pos)pos.textContent=`${x.toFixed(1)}% × ${y.toFixed(1)}%`;}; const up=()=>{if(!dragging)return;dragging=false;node.classList.remove('dragging');window.removeEventListener('pointermove',move);window.removeEventListener('pointerup',up);this._emit(false);}; node.addEventListener('pointerdown',e=>{e.preventDefault();dragging=true;node.classList.add('dragging');node.setPointerCapture?.(e.pointerId);window.addEventListener('pointermove',move);window.addEventListener('pointerup',up);}); }); }
 
-    _extraEntitiesHTML(d,i){
-      const extras=(d.extra_entities||[]).slice(0,5);
-      return `<div class="field full"><label>Extra entities (max 5)</label>${extras.map((e,n)=>`<div class="extra-row"><span>⠿</span><input data-extra-name="${i}-${n}" value="${esc(e.name||'')}"><ha-icon-picker data-extra-icon="${i}-${n}" value="${esc(e.icon||'mdi:information')}"></ha-icon-picker><ha-entity-picker data-extra-entity="${i}-${n}" allow-custom-entity></ha-entity-picker></div>`).join('')}<button class="btn" type="button" data-add-extra="${i}">＋ Add extra entity</button></div>`;
-    }
-    _device(d,i){ const inverted=!!d.invert_flow; const entityField=(field,label,marker)=>`<div class="field full"><label>${label}</label><ha-entity-picker data-device-picker="${i}" data-field="${field}" allow-custom-entity></ha-entity-picker><div class="entity-id" ${marker}="${i}">${esc(d[field]||'Not selected')}</div></div>`; return `<div class="device"><div class="device-head"><span>${esc(ICONS[d.type]||'⚙️')} ${esc(d.name||'Device')}</span><button title="Remove" data-remove="${i}">×</button></div><div class="row"><div class="field"><label>Type</label><select data-device="${i}" data-field="type">${TYPES.map(t=>`<option value="${t[0]}" ${d.type===t[0]?'selected':''}>${esc(t[1])}</option>`).join('')}</select></div><div class="field"><label>Name</label><input data-device="${i}" data-field="name" value="${esc(d.name||'')}"></div>${entityField('power_entity','Power entity','data-entity-label')}${this._extraEntitiesHTML(d,i)}${d.type!=='inverter'?`<div class="field"><label>Flow colour</label><div class="ha-color-box"><input class="ha-color-picker" type="color" title="Choose flow colour" data-device="${i}" data-field="flow_color" value="${esc(d.flow_color || FLOW_COLORS[d.type] || FLOW_COLORS.neutral)}"><span class="color-preview" style="background:${esc(d.flow_color || FLOW_COLORS[d.type] || FLOW_COLORS.neutral)}"></span></div></div>`:''}<div class="field"><label>Flow direction</label><button class="btn ${inverted?'secondary-btn':''}" type="button" data-invert-flow="${i}">${inverted?'↔ Inverted':'↔ Normal'}<span class="small" style="display:block">Visual direction only</span></button></div></div></div>`; }
+    _device(d,i){ const inverted=!!d.invert_flow; const entityField=(field,label,marker)=>`<div class="field full"><label>${label}</label><ha-entity-picker data-device-picker="${i}" data-field="${field}" allow-custom-entity></ha-entity-picker><div class="entity-id" ${marker}="${i}">${esc(d[field]||'Not selected')}</div></div>`; return `<div class="device"><div class="device-head"><span>${esc(ICONS[d.type]||'⚙️')} ${esc(d.name||'Device')}</span><button title="Remove" data-remove="${i}">×</button></div><div class="row"><div class="field"><label>Type</label><select data-device="${i}" data-field="type">${TYPES.map(t=>`<option value="${t[0]}" ${d.type===t[0]?'selected':''}>${esc(t[1])}</option>`).join('')}</select></div><div class="field"><label>Name</label><input data-device="${i}" data-field="name" value="${esc(d.name||'')}"></div>${entityField('power_entity','Power entity','data-entity-label')}${d.type!=='inverter'?`<div class="field"><label>Flow colour</label><div class="ha-color-box"><input class="ha-color-picker" type="color" title="Choose flow colour" data-device="${i}" data-field="flow_color" value="${esc(d.flow_color || FLOW_COLORS[d.type] || FLOW_COLORS.neutral)}"><span class="color-preview" style="background:${esc(d.flow_color || FLOW_COLORS[d.type] || FLOW_COLORS.neutral)}"></span></div></div>`:''}<div class="field"><label>Flow direction</label><button class="btn ${inverted?'secondary-btn':''}" type="button" data-invert-flow="${i}">${inverted?'↔ Inverted':'↔ Normal'}<span class="small" style="display:block">Visual direction only</span></button></div></div></div>`; }
     _connectionsHTML(){
       const conns=this._config.connections||[];
       if(!conns.length) return '<div class="small" style="margin:8px 0">No custom connections — automatic topology is active.</div>';
