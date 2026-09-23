@@ -1,6 +1,6 @@
 /* Home Power Flow Card V1 - standalone Lovelace custom element */
 (() => {
-  const VERSION = '0.6.8';
+  const VERSION = '0.6.5.0';
   const DEFAULT_BG = '/hacsfiles/Home-Power-Flow-Card/smart-home-energy-background.png';
   const DEFAULT_BG_NIGHT = '/hacsfiles/Home-Power-Flow-Card/smart-home-energy-background2.png';
   const TYPES = [
@@ -313,6 +313,14 @@
         const voltage = entityValue(this._hass, d.voltage_entity);
         const temp = entityValue(this._hass, d.temp_entity);
         const frequency = entityValue(this._hass, d.frequency_entity);
+      let extraHtml = '';
+      if (Array.isArray(d.extra_entities)) {
+        extraHtml = d.extra_entities.slice(0,5).map(e => {
+          const val = entityValue(this._hass, e.entity);
+          const label = e.name || e.entity || '';
+          return `${esc(label)}: ${esc(val == null ? '—' : val)}`;
+        }).join('<br>');
+      }
         const powerEl = node.querySelector('.power');
         const secEl = node.querySelector('.secondary');
         if (powerEl) powerEl.textContent = power == null ? '—' : fmtPower(power);
@@ -415,6 +423,7 @@
       } else {
         secHtml = s?.attributes?.unit_of_measurement || 'Power';
       }
+      if (extraHtml) secHtml = secHtml ? secHtml + '<br>' + extraHtml : extraHtml;
       return `<div class="node ${esc(d.type || 'load')}" data-device-index="${i}" data-entity-id="${esc(d.power_entity || '')}" title="${esc(d.power_entity ? 'Open ' + d.power_entity : '')}" style="left:${p.x}%;top:${p.y}%"><div class="top"><span class="icon">${esc(ICONS[d.type] || '⚙️')}</span><span class="name">${esc(d.name || LABELS[d.type] || 'Device')}</span></div><div class="power">${esc(powerText)}</div><div class="secondary">${secHtml}</div></div>`;
     }
 
