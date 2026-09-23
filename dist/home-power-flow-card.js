@@ -10,7 +10,7 @@
  * Issues & feature requests: https://github.com/mimikm/Home-Power-Flow-Card/issues
  */
 (() => {
-  const VERSION = '0.8.3';
+  const VERSION = '0.6.9.9.9';
   const DEFAULT_BG = '/hacsfiles/Home-Power-Flow-Card/smart-home-energy-background.png';
   const DEFAULT_BG_NIGHT = '/hacsfiles/Home-Power-Flow-Card/smart-home-energy-background2.png';
   const TYPES = [
@@ -68,6 +68,61 @@
 
   function fire(el, type, detail) {
     el.dispatchEvent(new CustomEvent(type, { detail, bubbles: true, composed: true }));
+  }
+
+  function genDeviceId() {
+    return 'd' + Math.random().toString(36).slice(2, 9);
+  }
+
+  // Devices are referenced elsewhere (connects_to, and the manual
+  // connections list's from/to) by a stable id, never by their position in
+  // the devices array - so deleting or reordering a device can never
+  // silently rewire a link onto the wrong one; a dangling reference just
+  // falls back to automatic topology instead. This function is idempotent:
+  // it assigns an id to any device that doesn't already have a unique one,
+  // and migrates legacy configs (where connects_to / from / to were plain
+  // array indices) into id references exactly once, using the array order
+  // they were given in.
+  function migrateDeviceIdsAndLinks(config) {
+    if (!Array.isArray(config.devices)) config.devices = [];
+    if (!Array.isArray(config.connections)) config.connections = [];
+
+    const usedIds = new Set();
+    config.devices.forEach(d => {
+      if (d && typeof d.id === 'string' && d.id && !usedIds.has(d.id)) { usedIds.add(d.id); return; }
+      let id; do { id = genDeviceId(); } while (usedIds.has(id));
+      if (d) d.id = id;
+      usedIds.add(id);
+    });
+
+    // Snapshot: old array index -> newly-assigned id, for migrating legacy
+    // numeric references below (must happen before any index can drift).
+    const idByOldIndex = config.devices.map(d => d.id);
+
+    config.devices.forEach((d, i) => {
+      if (!d) return;
+      const raw = d.connects_to;
+      if (typeof raw === 'number' || (typeof raw === 'string' && /^\d+$/.test(raw))) {
+        const oldIdx = Number(raw);
+        const resolved = (oldIdx >= 0 && oldIdx < idByOldIndex.length && oldIdx !== i) ? idByOldIndex[oldIdx] : undefined;
+        if (resolved) d.connects_to = resolved; else delete d.connects_to;
+      } else if (typeof raw === 'string') {
+        if (!usedIds.has(raw) || raw === d.id) delete d.connects_to;
+      } else if (raw !== undefined) {
+        delete d.connects_to;
+      }
+    });
+
+    config.connections = config.connections.map(e => {
+      if (!e) return null;
+      let from = e.from, to = e.to;
+      if (typeof from === 'number') from = idByOldIndex[from];
+      if (typeof to === 'number') to = idByOldIndex[to];
+      if (typeof from !== 'string' || typeof to !== 'string' || !usedIds.has(from) || !usedIds.has(to) || from === to) return null;
+      return { from, to, direction: Number(e.direction || 0) };
+    }).filter(Boolean);
+
+    return config;
   }
 
   function state(hass, entity) {
@@ -148,7 +203,10 @@
       this._flowSnapshot = null;
       if (!Array.isArray(this._config.devices)) this._config.devices = [];
       if (!Array.isArray(this._config.connections)) this._config.connections = [];
-      this._config.devices = this._config.devices.map((d, i, arr) => {
+      // Assigns stable ids and migrates any legacy index-based
+      // connects_to/connections references onto them (see function).
+      migrateDeviceIdsAndLinks(this._config);
+      this._config.devices = this._config.devices.map(d => {
         const copy={...d};
         copy.invert_flow = Boolean(copy.invert_flow || copy.power_sign === 'negative_output');
         delete copy.power_sign;
@@ -158,12 +216,6 @@
         copy.extra_entities = Array.isArray(copy.extra_entities)
           ? copy.extra_entities.filter(e => e && typeof e === 'object').slice(0, 5).map(e => ({ entity: e.entity || '', icon: e.icon || '' }))
           : [];
-        // Optional explicit parent link (see _flowEdges). Drop anything that
-        // can't possibly be valid; a stale index pointing at a device that no
-        // longer exists is handled gracefully at render time either way.
-        const parent = Number(copy.connects_to);
-        if (Number.isInteger(parent) && parent >= 0 && parent < arr.length && parent !== i) copy.connects_to = parent;
-        else delete copy.connects_to;
         return copy;
       });
       this._config.flow_colors = { ...FLOW_COLORS, ...(this._config.flow_colors || {}) };
@@ -498,11 +550,22 @@
 
     _flowEdges(devices) {
       const edges = [];
-      const valid = e => e && Number.isInteger(Number(e.from)) && Number.isInteger(Number(e.to)) && devices[e.from] && devices[e.to] && Number(e.from) !== Number(e.to);
+      // Devices are referenced by id, never by array position (see
+      // migrateDeviceIdsAndLinks) - resolve to a current index here, so a
+      // deleted/reordered device either resolves correctly or, if it no
+      // longer exists, is simply treated as unset rather than silently
+      // pointing at whatever now occupies its old slot.
+      const idxOfId = id => (typeof id === 'string' ? devices.findIndex(x => x.id === id) : -1);
+
       if (Array.isArray(this._config.connections) && this._config.connections.length) {
         // "To" is treated as the child/consumer side for the same
-        // both-metered tie-break _flowEdges uses below.
-        this._config.connections.forEach(e => { if (valid(e)) edges.push([Number(e.from), Number(e.to), Number(e.direction || 0), Number(e.to)]); });
+        // both-metered tie-break used below.
+        this._config.connections.forEach(e => {
+          if (!e) return;
+          const from = idxOfId(e.from), to = idxOfId(e.to);
+          if (from === -1 || to === -1 || from === to) return;
+          edges.push([from, to, Number(e.direction || 0), to]);
+        });
         return edges;
       }
 
@@ -511,8 +574,8 @@
       const gatewayIdx = devices.findIndex(d => typeOf(d) === 'gateway');
       // A device's explicit "Connects to" link, if it points at another real device.
       const parentOf = (d, i) => {
-        const p = Number(d.connects_to);
-        return Number.isInteger(p) && devices[p] && p !== i ? p : null;
+        const p = idxOfId(d.connects_to);
+        return p !== -1 && p !== i ? p : null;
       };
 
       // Every non-inverter device: use its explicit link if set, otherwise
@@ -606,18 +669,21 @@
 
   class HomePowerFlowEditor extends HTMLElement {
     constructor(){ super(); this._config={}; this._hass=null; this._extrasOpen=new Map(); this._devicesOpen=new Map(); this.attachShadow({mode:'open'}); }
-    // Whether device i's editor body is expanded. Defaults to open so existing
-    // behaviour is unchanged until the user collapses one explicitly.
-    _isDeviceOpen(i){ return this._devicesOpen.has(i) ? this._devicesOpen.get(i) : false; }
-    // Whether device i's extras section is open. Defaults to open when the
-    // device already has extra entities, but an explicit toggle always wins
-    // over that default so the section can be collapsed even when non-empty.
-    _isExtrasOpen(i,extrasLen){ return this._extrasOpen.has(i) ? this._extrasOpen.get(i) : extrasLen>0; }
+    // Whether the device with this id has its editor body expanded. Keyed by
+    // id (not index) so deleting an earlier device never scrambles which
+    // other device appears open/closed. Defaults to closed for a clean list.
+    _isDeviceOpen(id){ return this._devicesOpen.has(id) ? this._devicesOpen.get(id) : false; }
+    // Whether the device with this id has its extras section open. Defaults
+    // to open when the device already has extra entities, but an explicit
+    // toggle always wins over that default so it can be collapsed even when
+    // non-empty.
+    _isExtrasOpen(id,extrasLen){ return this._extrasOpen.has(id) ? this._extrasOpen.get(id) : extrasLen>0; }
     setConfig(config){
       const next=JSON.parse(JSON.stringify(config||{}));
       next.devices ||= [];
       next.connections ||= [];
       next.statistics ||= {};
+      migrateDeviceIdsAndLinks(next);
       const changed=JSON.stringify(next)!==JSON.stringify(this._config);
       this._config=next;
       if(changed || !this.shadowRoot.firstElementChild) this._render();
@@ -748,14 +814,14 @@
         });
       });
       this.shadowRoot.querySelectorAll('[data-toggle-device]').forEach(el=>el.addEventListener('click',()=>{
-        const i=Number(el.dataset.toggleDevice);
-        this._devicesOpen.set(i, !this._isDeviceOpen(i));
+        const id=el.dataset.toggleDevice;
+        this._devicesOpen.set(id, !this._isDeviceOpen(id));
         this._render();
       }));
       this.shadowRoot.querySelectorAll('[data-toggle-extras]').forEach(b=>b.addEventListener('click',()=>{
-        const i=Number(b.dataset.toggleExtras);
-        const extrasLen=(this._config.devices[i]?.extra_entities||[]).length;
-        this._extrasOpen.set(i, !this._isExtrasOpen(i,extrasLen));
+        const id=b.dataset.toggleExtras;
+        const extrasLen=(this._config.devices.find(d=>d.id===id)?.extra_entities||[]).length;
+        this._extrasOpen.set(id, !this._isExtrasOpen(id,extrasLen));
         this._render();
       }));
       this.shadowRoot.querySelectorAll('[data-add-extra]').forEach(b=>b.addEventListener('click',()=>{
@@ -764,23 +830,33 @@
         d.extra_entities = Array.isArray(d.extra_entities) ? d.extra_entities : [];
         if (d.extra_entities.length>=5) return;
         d.extra_entities.push({entity:'',icon:''});
-        this._extrasOpen.set(i, true);
+        this._extrasOpen.set(d.id, true);
         this._emit(false);
         this._render();
       }));
       this.shadowRoot.querySelectorAll('[data-remove-extra]').forEach(b=>b.addEventListener('click',()=>{
         const di=Number(b.dataset.removeExtra), ei=Number(b.dataset.extraIndex);
         this._config.devices[di].extra_entities.splice(ei,1);
-        this._extrasOpen.set(di, true);
+        this._extrasOpen.set(this._config.devices[di].id, true);
         this._emit(false);
         this._render();
       }));
       this.shadowRoot.querySelectorAll('[data-key]').forEach(el=>el.addEventListener('change',e=>{ const k=e.target.dataset.key; if(k==='flow_threshold_watts'){ const watts=Math.max(0,parseFloat(e.target.value)||0); this._config.flow_threshold=watts/1000; this._config.flow_threshold_watts=watts; } else { this._config[k]=e.target.value; if(['flow_threshold','flow_speed','flow_stagger'].includes(k))this._config[k]=parseFloat(e.target.value)||0; } this._emit(false); }));
-      this.shadowRoot.querySelector('#add')?.addEventListener('click',()=>{this._config.devices.push({type:'solar',name:`Device ${this._config.devices.length+1}`,power_entity:''});this._devicesOpen.set(this._config.devices.length-1,true);this._emit(false);this._render();});
+      this.shadowRoot.querySelector('#add')?.addEventListener('click',()=>{
+        const id=genDeviceId();
+        this._config.devices.push({id,type:'solar',name:`Device ${this._config.devices.length+1}`,power_entity:''});
+        this._devicesOpen.set(id,true);
+        this._emit(false);
+        this._render();
+      });
       this.shadowRoot.querySelectorAll('[data-remove]').forEach(b=>b.addEventListener('click',()=>{this._config.devices.splice(Number(b.dataset.remove),1);this._emit(false);this._render();}));
       this.shadowRoot.querySelectorAll('[data-conn-remove]').forEach(b=>b.addEventListener('click',()=>{this._config.connections.splice(Number(b.dataset.connRemove),1);this._emit(false);this._render();}));
-      this.shadowRoot.querySelectorAll('[data-conn]').forEach(el=>el.addEventListener('change',e=>{const i=Number(el.dataset.conn),k=el.dataset.field;this._config.connections[i][k]=Number(e.target.value);this._emit(false);}));
-      this.shadowRoot.querySelector('#add-connection')?.addEventListener('click',()=>{if(this._config.devices.length<2)return;this._config.connections.push({from:0,to:1});this._emit(false);this._render();});
+      this.shadowRoot.querySelectorAll('[data-conn]').forEach(el=>el.addEventListener('change',e=>{
+        const i=Number(el.dataset.conn),k=el.dataset.field;
+        this._config.connections[i][k] = k==='direction' ? Number(e.target.value) : e.target.value;
+        this._emit(false);
+      }));
+      this.shadowRoot.querySelector('#add-connection')?.addEventListener('click',()=>{if(this._config.devices.length<2)return;this._config.connections.push({from:this._config.devices[0].id,to:this._config.devices[1].id});this._emit(false);this._render();});
       this.shadowRoot.querySelector('#add-stat')?.addEventListener('click',()=>{this._config.statistics ||= {}; this._config.statistics.entities ||= []; if(this._config.statistics.entities.length<20){this._config.statistics.entities.push({name:'Statistic',entity:'',icon:'mdi:chart-line',custom_icon:''});this._emit(false);this._render();}});
       this.shadowRoot.querySelectorAll('[data-remove-stat]').forEach(b=>b.addEventListener('click',()=>{this._config.statistics.entities.splice(Number(b.dataset.removeStat),1);this._emit(false);this._render();}));
       let draggedStat=null;
@@ -798,7 +874,7 @@
         if (k==='connects_to') {
           const v=e.target.value;
           if (v==='') delete this._config.devices[i].connects_to;
-          else this._config.devices[i].connects_to = Number(v);
+          else this._config.devices[i].connects_to = v; // device id, not an index
         } else {
           this._config.devices[i][k]=e.target.value;
         }
@@ -822,11 +898,10 @@
 
     _connectsToOptions(i){
       const cur = this._config.devices[i]?.connects_to;
-      const curNum = Number.isInteger(Number(cur)) ? Number(cur) : null;
       const opts=['<option value="">Automatic</option>'];
       this._config.devices.forEach((d,idx)=>{
         if (idx===i) return;
-        opts.push(`<option value="${idx}" ${curNum===idx?'selected':''}>${idx+1}. ${esc(d.name||LABELS[d.type]||'Device')}</option>`);
+        opts.push(`<option value="${esc(d.id)}" ${cur===d.id?'selected':''}>${idx+1}. ${esc(d.name||LABELS[d.type]||'Device')}</option>`);
       });
       return opts.join('');
     }
@@ -834,12 +909,12 @@
       const inverted=!!d.invert_flow;
       const entityField=(field,label,marker)=>`<div class="field full"><label>${label}</label><ha-entity-picker data-device-picker="${i}" data-field="${field}" allow-custom-entity></ha-entity-picker><div class="entity-id" ${marker}="${i}">${esc(d[field]||'Not selected')}</div></div>`;
       const extras=Array.isArray(d.extra_entities)?d.extra_entities:[];
-      const expanded=this._isExtrasOpen(i,extras.length);
+      const expanded=this._isExtrasOpen(d.id,extras.length);
       const extrasBody = expanded ? `<div class="extras-editor">${extras.map((ex,ei)=>this._extraEntityField(i,ei,ex)).join('')}${extras.length<5?`<button class="btn secondary-btn" type="button" data-add-extra="${i}">＋ Add extra entity</button>`:'<div class="small">Maximum of 5 extra entities reached.</div>'}</div>` : '';
-      const deviceOpen=this._isDeviceOpen(i);
+      const deviceOpen=this._isDeviceOpen(d.id);
       const connectsToField=`<div class="field full"><label>Connects to</label><select data-device="${i}" data-field="connects_to">${this._connectsToOptions(i)}</select><span class="small" style="display:block">Automatic = the (first) inverter, or a Gateway/Distribution Board device for extra inverters. Override this for multi-inverter or custom topologies.</span></div>`;
-      const body = deviceOpen ? `<div class="row"><div class="field"><label>Type</label><select data-device="${i}" data-field="type">${TYPES.map(t=>`<option value="${t[0]}" ${d.type===t[0]?'selected':''}>${esc(t[1])}</option>`).join('')}</select></div><div class="field"><label>Name</label><input data-device="${i}" data-field="name" value="${esc(d.name||'')}"></div>${entityField('power_entity','Power entity','data-entity-label')}${connectsToField}<div class="field"><label>Flow colour</label><div class="ha-color-box"><input class="ha-color-picker" type="color" title="Choose flow colour" data-device="${i}" data-field="flow_color" value="${esc(d.flow_color || FLOW_COLORS[d.type] || FLOW_COLORS.neutral)}"><span class="color-preview" style="background:${esc(d.flow_color || FLOW_COLORS[d.type] || FLOW_COLORS.neutral)}"></span></div><span class="small" style="display:block">Only used if this device has its own power entity.</span></div><div class="field"><label>Flow direction</label><button class="btn ${inverted?'secondary-btn':''}" type="button" data-invert-flow="${i}">${inverted?'↔ Inverted':'↔ Normal'}<span class="small" style="display:block">Visual direction only</span></button></div></div><button class="btn secondary-btn" type="button" data-toggle-extras="${i}">${expanded?'▾':'▸'} Extra entities${extras.length?` (${extras.length}/5)`:' (optional)'}</button>${extrasBody}` : '';
-      return `<div class="device"><div class="device-head"><span class="device-title" data-toggle-device="${i}">${deviceOpen?'▾':'▸'} ${esc(ICONS[d.type]||'⚙️')} ${esc(d.name||'Device')}${!deviceOpen && d.power_entity ? `<span class="device-sub">${esc(d.power_entity)}</span>`:''}</span><button title="Remove" data-remove="${i}">×</button></div>${body}</div>`;
+      const body = deviceOpen ? `<div class="row"><div class="field"><label>Type</label><select data-device="${i}" data-field="type">${TYPES.map(t=>`<option value="${t[0]}" ${d.type===t[0]?'selected':''}>${esc(t[1])}</option>`).join('')}</select></div><div class="field"><label>Name</label><input data-device="${i}" data-field="name" value="${esc(d.name||'')}"></div>${entityField('power_entity','Power entity','data-entity-label')}${connectsToField}<div class="field"><label>Flow colour</label><div class="ha-color-box"><input class="ha-color-picker" type="color" title="Choose flow colour" data-device="${i}" data-field="flow_color" value="${esc(d.flow_color || FLOW_COLORS[d.type] || FLOW_COLORS.neutral)}"><span class="color-preview" style="background:${esc(d.flow_color || FLOW_COLORS[d.type] || FLOW_COLORS.neutral)}"></span></div><span class="small" style="display:block">Only used if this device has its own power entity.</span></div><div class="field"><label>Flow direction</label><button class="btn ${inverted?'secondary-btn':''}" type="button" data-invert-flow="${i}">${inverted?'↔ Inverted':'↔ Normal'}<span class="small" style="display:block">Visual direction only</span></button></div></div><button class="btn secondary-btn" type="button" data-toggle-extras="${esc(d.id)}">${expanded?'▾':'▸'} Extra entities${extras.length?` (${extras.length}/5)`:' (optional)'}</button>${extrasBody}` : '';
+      return `<div class="device"><div class="device-head"><span class="device-title" data-toggle-device="${esc(d.id)}">${deviceOpen?'▾':'▸'} ${esc(ICONS[d.type]||'⚙️')} ${esc(d.name||'Device')}${!deviceOpen && d.power_entity ? `<span class="device-sub">${esc(d.power_entity)}</span>`:''}</span><button title="Remove" data-remove="${i}">×</button></div>${body}</div>`;
     }
     _extraEntityField(di,ei,ex){
       return `<div class="device" style="padding:10px"><div class="device-head"><span>🔎 Extra entity ${ei+1}</span><button title="Remove" data-remove-extra="${di}" data-extra-index="${ei}">×</button></div><div class="row"><div class="field full"><label>Entity</label><ha-entity-picker data-extra-picker data-device-index="${di}" data-extra-index="${ei}" allow-custom-entity></ha-entity-picker><div class="entity-id">${esc(ex?.entity||'Not selected')}</div></div><div class="field full"><label>Icon (Material Design Icons)</label><ha-icon-picker data-extra-icon data-device-index="${di}" data-extra-index="${ei}" value="${esc(ex?.icon||'')}"></ha-icon-picker></div></div></div>`;
@@ -847,7 +922,7 @@
     _connectionsHTML(){
       const conns=this._config.connections||[];
       if(!conns.length) return '<div class="small" style="margin:8px 0">No custom connections — automatic topology is active.</div>';
-      const opts=(selected)=>this._config.devices.map((d,i)=>`<option value="${i}" ${Number(selected)===i?'selected':''}>${i+1}. ${esc(d.name||LABELS[d.type]||'Device')}</option>`).join('');
+      const opts=(selected)=>this._config.devices.map((d,i)=>`<option value="${esc(d.id)}" ${selected===d.id?'selected':''}>${i+1}. ${esc(d.name||LABELS[d.type]||'Device')}</option>`).join('');
       return conns.map((e,i)=>`<div class="device" style="padding:10px"><div class="row"><div class="field"><label>From</label><select data-conn="${i}" data-field="from">${opts(e.from)}</select></div><div class="field"><label>To</label><select data-conn="${i}" data-field="to">${opts(e.to)}</select></div><div class="field full"><label>Flow direction</label><select data-conn="${i}" data-field="direction"><option value="0" ${Number(e.direction||0)===0?'selected':''}>Auto — use live power signs</option><option value="1" ${Number(e.direction||0)===1?'selected':''}>From → To</option><option value="2" ${Number(e.direction||0)===2?'selected':''}>To → From</option></select></div></div><button class="btn" style="background:var(--error-color,#db4437);padding:7px 10px" data-conn-remove="${i}">Remove connection</button></div>`).join('');
     }
 
