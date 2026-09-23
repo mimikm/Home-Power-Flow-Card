@@ -529,8 +529,9 @@
       const list = Array.isArray(s.entities) ? s.entities.slice(0,20) : [];
       if (!list.length) return '';
       return `<div class="stats"><h3>${esc(s.title || 'Today')}</h3>${list.map(r=>{
-        const icon = r.icon || '📊';
-        return `<div class="stat"><span class="ico">${esc(icon)}</span><span>${esc(r.name || 'Statistic')}</span><span class="value">${esc(this._energyEntity(r.entity))}</span></div>`;
+        const icon = r.custom_icon || r.icon || 'mdi:chart-line';
+        const iconHtml = icon.startsWith('mdi:') ? `<ha-icon icon="${esc(icon)}"></ha-icon>` : esc(icon);
+        return `<div class="stat"><span class="ico">${iconHtml}</span><span>${esc(r.name || 'Statistic')}</span><span class="value">${esc(this._energyEntity(r.entity))}</span></div>`;
       }).join('')}</div>`;
     }
 
@@ -633,7 +634,7 @@
       this.shadowRoot.querySelectorAll('[data-conn-remove]').forEach(b=>b.addEventListener('click',()=>{this._config.connections.splice(Number(b.dataset.connRemove),1);this._emit(false);this._render();}));
       this.shadowRoot.querySelectorAll('[data-conn]').forEach(el=>el.addEventListener('change',e=>{const i=Number(el.dataset.conn),k=el.dataset.field;this._config.connections[i][k]=Number(e.target.value);this._emit(false);}));
       this.shadowRoot.querySelector('#add-connection')?.addEventListener('click',()=>{if(this._config.devices.length<2)return;this._config.connections.push({from:0,to:1});this._emit(false);this._render();});
-      this.shadowRoot.querySelector('#add-stat')?.addEventListener('click',()=>{this._config.statistics ||= {}; this._config.statistics.entities ||= []; if(this._config.statistics.entities.length<20){this._config.statistics.entities.push({name:'Statistic',entity:'',icon:'📊'});this._emit(false);this._render();}});
+      this.shadowRoot.querySelector('#add-stat')?.addEventListener('click',()=>{this._config.statistics ||= {}; this._config.statistics.entities ||= []; if(this._config.statistics.entities.length<20){this._config.statistics.entities.push({name:'Statistic',entity:'',icon:'mdi:chart-line',custom_icon:''});this._emit(false);this._render();}});
       this.shadowRoot.querySelectorAll('[data-remove-stat]').forEach(b=>b.addEventListener('click',()=>{this._config.statistics.entities.splice(Number(b.dataset.removeStat),1);this._emit(false);this._render();}));
       this.shadowRoot.querySelectorAll('[data-stat-up]').forEach(b=>b.addEventListener('click',()=>{const i=Number(b.dataset.statUp); if(i>0){const a=this._config.statistics.entities; [a[i-1],a[i]]=[a[i],a[i-1]]; this._emit(false); this._render();}}));
       this.shadowRoot.querySelectorAll('[data-stat-down]').forEach(b=>b.addEventListener('click',()=>{const i=Number(b.dataset.statDown); const a=this._config.statistics.entities; if(i<a.length-1){[a[i+1],a[i]]=[a[i],a[i+1]]; this._emit(false); this._render();}}));
@@ -722,7 +723,7 @@
 
     _statsEditorHTML(){
       const list=this._config.statistics?.entities || [];
-      return list.map((r,i)=>`<div class="device"><div class="device-head"><span>📊 Statistic ${i+1}</span><button data-stat-up="${i}">☰↑</button><button data-stat-down="${i}">☰↓</button><button data-remove-stat="${i}">×</button></div><div class="row"><div class="field"><label>Name</label><input data-stat-field="name" data-index="${i}" value="${esc(r.name||'')}"></div><div class="field"><label>Icon (MDI or custom)</label><input data-stat-field="icon" data-index="${i}" value="${esc(r.icon||'mdi:chart-line')}"></div><div class="field full"><label>Entity</label><ha-entity-picker data-stat-picker data-index="${i}" allow-custom-entity></ha-entity-picker></div></div></div>`).join('') || '<div class="small">No statistics added.</div>';
+      return list.map((r,i)=>`<div class="device"><div class="device-head"><span>📊 Statistic ${i+1}</span><button data-stat-up="${i}">☰↑</button><button data-stat-down="${i}">☰↓</button><button data-remove-stat="${i}">×</button></div><div class="row"><div class="field"><label>Name</label><input data-stat-field="name" data-index="${i}" value="${esc(r.name||'')}"></div><div class="field"><label>Material Design Icon</label><select data-stat-field="icon" data-index="${i}">${['mdi:chart-line','mdi:solar-power','mdi:battery','mdi:battery-charging','mdi:home','mdi:flash','mdi:transmission-tower','mdi:car-electric','mdi:leaf','mdi:currency-gbp'].map(x=>`<option value="${x}" ${r.icon===x?'selected':''}>${x}</option>`).join('')}</select></div><div class="field"><label>Custom icon override</label><input data-stat-field="custom_icon" data-index="${i}" value="${esc(r.custom_icon||'')}"></div><div class="field full"><label>Entity</label><ha-entity-picker data-stat-picker data-index="${i}" allow-custom-entity></ha-entity-picker></div></div></div>`).join('') || '<div class="small">No statistics added.</div>';
     }
 
     _statField(key,label){const s=this._config.statistics||{};return `<div class="field"><label>${label}</label><ha-entity-picker data-stat="${key}" allow-custom-entity></ha-entity-picker></div>`;}
