@@ -1,6 +1,6 @@
 /* Home Power Flow Card V1 - standalone Lovelace custom element */
 (() => {
-  const VERSION = '0.6.8';
+  const VERSION = '0.7.0';
   const DEFAULT_BG = '/hacsfiles/Home-Power-Flow-Card/smart-home-energy-background.png';
   const DEFAULT_BG_NIGHT = '/hacsfiles/Home-Power-Flow-Card/smart-home-energy-background2.png';
   const TYPES = [
@@ -111,7 +111,7 @@
         sun_entity: 'sun.sun',
         devices: [
           { type: 'solar', name: 'Solar PV', power_entity: '' },
-          { type: 'inverter', name: 'Inverter 1', power_entity: '', temp_entity: '' },
+          { type: 'inverter', name: 'Inverter 1', power_entity: '' },
           { type: 'battery', name: 'Battery 1', power_entity: '' },
           { type: 'house', name: 'House', power_entity: '' },
           { type: 'grid', name: 'Grid', power_entity: '' }
@@ -131,7 +131,18 @@
       this._flowSnapshot = null;
       if (!Array.isArray(this._config.devices)) this._config.devices = [];
       if (!Array.isArray(this._config.connections)) this._config.connections = [];
-      this._config.devices = this._config.devices.map(d => { const copy={...d}; copy.invert_flow = Boolean(copy.invert_flow || copy.power_sign === 'negative_output'); delete copy.power_sign; return copy; });
+      this._config.devices = this._config.devices.map(d => {
+        const copy={...d};
+        copy.invert_flow = Boolean(copy.invert_flow || copy.power_sign === 'negative_output');
+        delete copy.power_sign;
+        // Legacy per-type secondary entities (soc/voltage/temp/frequency) are
+        // superseded by the generic, user-defined extra_entities list.
+        delete copy.soc_entity; delete copy.voltage_entity; delete copy.temp_entity; delete copy.frequency_entity;
+        copy.extra_entities = Array.isArray(copy.extra_entities)
+          ? copy.extra_entities.filter(e => e && typeof e === 'object').slice(0, 5).map(e => ({ entity: e.entity || '', icon: e.icon || '' }))
+          : [];
+        return copy;
+      });
       this._config.flow_colors = { ...FLOW_COLORS, ...(this._config.flow_colors || {}) };
       // V4.3.10 stores the threshold canonically in watts. Migrate older configs
       // where flow_threshold was stored in kW.
@@ -206,11 +217,11 @@
           .flow-path { fill:none; stroke-linecap:round; filter:url(#glow); opacity:.92; }
           .flow-dot { filter:url(#dotglow); }
           .node { position:absolute; transform:translate(-50%,-50%); width:clamp(135px,13vw,205px); min-height:74px; padding:11px 13px; border-radius:15px; z-index:10; background:linear-gradient(145deg,rgba(9,25,40,.87),rgba(15,30,44,.73)); border:1px solid rgba(255,255,255,.17); box-shadow:0 8px 22px rgba(0,0,0,.32); backdrop-filter:blur(10px); }
-          .node .top { display:flex; align-items:center; gap:8px; }.node .icon { font-size:24px; line-height:1; }.node .name { font-weight:700; font-size:14px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }.node .power { margin-top:5px; font-size:19px; font-weight:750; }.node .secondary { margin-top:2px; font-size:11px; opacity:.76; }.node.battery { border-color:rgba(123,255,158,.28); }.node.grid { border-color:rgba(93,191,255,.3); }.node.ev { border-color:rgba(151,255,103,.28); }
+          .node .top { display:flex; align-items:center; gap:8px; }.node .icon { font-size:24px; line-height:1; }.node .name { font-weight:700; font-size:14px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }.node .power { margin-top:5px; font-size:19px; font-weight:750; }.node .extras { margin-top:4px; display:flex; flex-direction:column; gap:2px; }.node .extras:empty { display:none; margin:0; }.node .extra-row { display:flex; align-items:center; gap:5px; font-size:10px; line-height:1.3; opacity:.78; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }.node .extra-row ha-icon { --mdc-icon-size:12px; width:12px; height:12px; flex:none; }.node.battery { border-color:rgba(123,255,158,.28); }.node.grid { border-color:rgba(93,191,255,.3); }.node.ev { border-color:rgba(151,255,103,.28); }
           .legend { position:absolute; right:2.6%; bottom:3.2%; z-index:18; padding:9px 12px; border-radius:12px; background:rgba(4,15,25,.55); font-size:11px; opacity:.8; backdrop-filter:blur(8px); }
           .empty { position:absolute; inset:0; display:flex; align-items:center; justify-content:center; z-index:30; }.empty > div { padding:24px 30px; background:rgba(10,25,38,.82); border-radius:18px; border:1px solid rgba(255,255,255,.18); text-align:center; backdrop-filter:blur(10px); }.empty b{display:block;font-size:20px;margin-bottom:6px}.empty span{opacity:.75}
           @media (max-width: 800px) { .card{aspect-ratio:auto; min-height:760px}.weather{min-width:190px;padding:10px 12px}.header{top:2%;left:2%}.stats{width:46%;min-width:260px}.node{width:130px}.legend{display:none} }
-          @media (max-width: 560px) { .card{min-height:900px}.title{font-size:27px}.subtitle{font-size:12px}.weather{max-width:45%;min-width:150px}.date{font-size:10px}.clock{font-size:19px}.temp{font-size:17px}.wicon{font-size:25px}.stats{width:62%;min-width:230px}.node{width:120px;padding:9px}.node .power{font-size:16px}.node .name{font-size:12px} }
+          @media (max-width: 560px) { .card{min-height:900px}.title{font-size:27px}.subtitle{font-size:12px}.weather{max-width:45%;min-width:150px}.date{font-size:10px}.clock{font-size:19px}.temp{font-size:17px}.wicon{font-size:25px}.stats{width:62%;min-width:230px}.node{width:120px;padding:9px}.node .power{font-size:16px}.node .name{font-size:12px}.node .extra-row{font-size:9px} }
         </style>
         <div class="card">
           <div class="bg"></div><div class="vignette"></div>
@@ -307,28 +318,11 @@
         const i = Number(node.dataset.deviceIndex);
         const d = devices[i];
         if (!d) return;
-        const st = state(this._hass, d.power_entity);
         const power = powerValue(this._hass, d.power_entity);
-        const soc = entityValue(this._hass, d.soc_entity);
-        const voltage = entityValue(this._hass, d.voltage_entity);
-        const temp = entityValue(this._hass, d.temp_entity);
-        const frequency = entityValue(this._hass, d.frequency_entity);
         const powerEl = node.querySelector('.power');
-        const secEl = node.querySelector('.secondary');
         if (powerEl) powerEl.textContent = power == null ? '—' : fmtPower(power);
-        if (secEl) {
-          if (d.type === 'battery') {
-            const parts=[];
-            if (soc != null) parts.push(`${soc.toFixed(0)}% SOC`);
-            if (voltage != null) parts.push(`${voltage.toFixed(1)} V`);
-            if (temp != null) parts.push(`${temp.toFixed(1)} °C`);
-            secEl.innerHTML = parts.map(esc).join('<br>') || 'Battery';
-          } else if (d.type === 'inverter') {
-            secEl.textContent = temp != null ? `${temp.toFixed(1)} °C` : 'Inverter';
-          } else if (d.type === 'grid') {
-            const parts=[]; if (voltage != null) parts.push(`${voltage.toFixed(1)} V`); if (frequency != null) parts.push(`${frequency.toFixed(2)} Hz`); secEl.innerHTML = parts.map(esc).join('<br>') || 'Grid';
-          } else secEl.textContent = st?.attributes?.unit_of_measurement || 'Power';
-        }
+        const extrasEl = node.querySelector('.extras');
+        if (extrasEl) extrasEl.innerHTML = this._extraEntitiesRows(d);
       });
       const c = this._config;
       const weather = state(this._hass, c.weather_entity);
@@ -393,29 +387,24 @@
       });
     }
 
+    // Extra entities are purely informational: display-only readouts the user
+    // picks per device. They never feed _flowDirection/_flowEdges/_flows, which
+    // read only d.power_entity, so they cannot affect flow logic or animation.
+    _extraEntitiesRows(d) {
+      const list = Array.isArray(d.extra_entities) ? d.extra_entities.slice(0, 5) : [];
+      return list.filter(ex => ex && ex.entity).map(ex => {
+        const st = state(this._hass, ex.entity);
+        const icon = ex.icon || 'mdi:information-outline';
+        const val = st ? friendlyState(st) : '—';
+        const unit = st?.attributes?.unit_of_measurement || '';
+        return `<div class="extra-row"><ha-icon icon="${esc(icon)}"></ha-icon><span>${esc(val)}${unit ? esc(' ' + unit) : ''}</span></div>`;
+      }).join('');
+    }
+
     _deviceHTML(d, i, p) {
-      const s = state(this._hass, d.power_entity);
       const power = powerValue(this._hass, d.power_entity);
-      const soc = entityValue(this._hass, d.soc_entity);
-      const voltage = entityValue(this._hass, d.voltage_entity);
-      const temp = entityValue(this._hass, d.temp_entity);
-        const frequency = entityValue(this._hass, d.frequency_entity);
       const powerText = power == null ? '—' : fmtPower(power);
-      let secHtml = '';
-      if (d.type === 'battery') {
-        const parts=[];
-        if (soc != null) parts.push(`${soc.toFixed(0)}% SOC`);
-        if (voltage != null) parts.push(`${voltage.toFixed(1)} V`);
-        if (temp != null) parts.push(`${temp.toFixed(1)} °C`);
-        secHtml = parts.length ? parts.map(esc).join('<br>') : 'Battery';
-      } else if (d.type === 'inverter') {
-        secHtml = temp != null ? `${temp.toFixed(1)} °C` : 'Inverter';
-      } else if (d.type === 'grid') {
-        const frequency = entityValue(this._hass, d.frequency_entity); const parts=[]; if (voltage != null) parts.push(`${voltage.toFixed(1)} V`); if (frequency != null) parts.push(`${frequency.toFixed(2)} Hz`); secHtml = parts.length ? parts.map(esc).join('<br>') : 'Grid';
-      } else {
-        secHtml = s?.attributes?.unit_of_measurement || 'Power';
-      }
-      return `<div class="node ${esc(d.type || 'load')}" data-device-index="${i}" data-entity-id="${esc(d.power_entity || '')}" title="${esc(d.power_entity ? 'Open ' + d.power_entity : '')}" style="left:${p.x}%;top:${p.y}%"><div class="top"><span class="icon">${esc(ICONS[d.type] || '⚙️')}</span><span class="name">${esc(d.name || LABELS[d.type] || 'Device')}</span></div><div class="power">${esc(powerText)}</div><div class="secondary">${secHtml}</div></div>`;
+      return `<div class="node ${esc(d.type || 'load')}" data-device-index="${i}" data-entity-id="${esc(d.power_entity || '')}" title="${esc(d.power_entity ? 'Open ' + d.power_entity : '')}" style="left:${p.x}%;top:${p.y}%"><div class="top"><span class="icon">${esc(ICONS[d.type] || '⚙️')}</span><span class="name">${esc(d.name || LABELS[d.type] || 'Device')}</span></div><div class="power">${esc(powerText)}</div><div class="extras">${this._extraEntitiesRows(d)}</div></div>`;
     }
 
     _flowDirection(a, b, va, vb) {
@@ -541,7 +530,7 @@
   }
 
   class HomePowerFlowEditor extends HTMLElement {
-    constructor(){ super(); this._config={}; this._hass=null; this.attachShadow({mode:'open'}); }
+    constructor(){ super(); this._config={}; this._hass=null; this._expandedExtras=new Set(); this.attachShadow({mode:'open'}); }
     setConfig(config){
       const next=JSON.parse(JSON.stringify(config||{}));
       next.devices ||= [];
@@ -620,6 +609,17 @@
       </div>`;
       this.shadowRoot.querySelectorAll('ha-entity-picker').forEach(el=>{
         el.hass=this._hass;
+        if (el.hasAttribute('data-extra-picker')) {
+          const di=Number(el.dataset.deviceIndex), ei=Number(el.dataset.extraIndex);
+          el.value = this._config.devices[di]?.extra_entities?.[ei]?.entity || '';
+          el.addEventListener('value-changed', e=>{
+            this._config.devices[di].extra_entities[ei].entity = e.detail.value || '';
+            const lab = el.parentElement?.querySelector('.entity-id');
+            if (lab) lab.textContent = e.detail.value || 'Not selected';
+            this._emit();
+          });
+          return;
+        }
         el.value = el.dataset.editorKey ? (this._config[el.dataset.editorKey] || '') : el.dataset.devicePicker ? (this._config.devices[Number(el.dataset.devicePicker)][el.dataset.field] || '') : (this._config.statistics?.[el.dataset.stat] || '');
         el.addEventListener('value-changed', e=>{
           if (el.dataset.editorKey) this._config[el.dataset.editorKey]=e.detail.value || '';
@@ -628,6 +628,35 @@
           this._emit();
         });
       });
+      this.shadowRoot.querySelectorAll('[data-extra-icon]').forEach(el=>{
+        el.addEventListener('value-changed', e=>{
+          const di=Number(el.dataset.deviceIndex), ei=Number(el.dataset.extraIndex);
+          this._config.devices[di].extra_entities[ei].icon = e.detail.value || '';
+          this._emit(false);
+        });
+      });
+      this.shadowRoot.querySelectorAll('[data-toggle-extras]').forEach(b=>b.addEventListener('click',()=>{
+        const i=Number(b.dataset.toggleExtras);
+        if (this._expandedExtras.has(i)) this._expandedExtras.delete(i); else this._expandedExtras.add(i);
+        this._render();
+      }));
+      this.shadowRoot.querySelectorAll('[data-add-extra]').forEach(b=>b.addEventListener('click',()=>{
+        const i=Number(b.dataset.addExtra);
+        const d=this._config.devices[i];
+        d.extra_entities = Array.isArray(d.extra_entities) ? d.extra_entities : [];
+        if (d.extra_entities.length>=5) return;
+        d.extra_entities.push({entity:'',icon:''});
+        this._expandedExtras.add(i);
+        this._emit(false);
+        this._render();
+      }));
+      this.shadowRoot.querySelectorAll('[data-remove-extra]').forEach(b=>b.addEventListener('click',()=>{
+        const di=Number(b.dataset.removeExtra), ei=Number(b.dataset.extraIndex);
+        this._config.devices[di].extra_entities.splice(ei,1);
+        this._expandedExtras.add(di);
+        this._emit(false);
+        this._render();
+      }));
       this.shadowRoot.querySelectorAll('[data-key]').forEach(el=>el.addEventListener('change',e=>{ const k=e.target.dataset.key; if(k==='flow_threshold_watts'){ const watts=Math.max(0,parseFloat(e.target.value)||0); this._config.flow_threshold=watts/1000; this._config.flow_threshold_watts=watts; } else { this._config[k]=e.target.value; if(['flow_threshold','flow_speed','flow_stagger'].includes(k))this._config[k]=parseFloat(e.target.value)||0; } this._emit(false); }));
       this.shadowRoot.querySelector('#add')?.addEventListener('click',()=>{this._config.devices.push({type:'solar',name:`Device ${this._config.devices.length+1}`,power_entity:''});this._emit(false);this._render();});
       this.shadowRoot.querySelectorAll('[data-remove]').forEach(b=>b.addEventListener('click',()=>{this._config.devices.splice(Number(b.dataset.remove),1);this._emit(false);this._render();}));
@@ -661,7 +690,17 @@
     _autoPreviewPosition(d,i){ const zones={solar:[18,23],inverter:[56,39],battery:[58,65],gateway:[48,78],house:[28,82],grid:[82,84],ev:[83,50],load:[76,67]}; const same=this._config.devices.filter(x=>(x.type||'load')===(d.type||'load')); const n=same.indexOf(d); const [cx,cy]=zones[d.type||'load']||[70,68]; const spacing=Math.min(15,70/Math.max(1,same.length)); let x=cx,y=cy;if(same.length>1)x=cx+(n-(same.length-1)/2)*spacing;if((d.type==='battery'&&same.length>3)){const col=n%3,row=Math.floor(n/3);x=48+col*12;y=64+row*12;}if(d.type==='solar'&&same.length>4){const col=n%4,row=Math.floor(n/4);x=33+col*12;y=22+row*11;}if(d.type==='ev'&&same.length>2){const col=n%2,row=Math.floor(n/2);x=78+col*10;y=45+row*13;}return{x,y}; }
     _enableLayoutDragging(){ const area=this.shadowRoot.querySelector('#layout-editor'); if(!area)return; area.querySelectorAll('.layout-node').forEach(node=>{ let dragging=false; const move=e=>{if(!dragging)return;const r=area.getBoundingClientRect();let x=((e.clientX-r.left)/r.width)*100;let y=((e.clientY-r.top)/r.height)*100;x=Math.max(5,Math.min(95,x));y=Math.max(6,Math.min(94,y));const kind=node.dataset.layoutKind; if(kind==='device'){const i=Number(node.dataset.layoutIndex);this._config.devices[i].position={x,y};} else if(kind==='weather') this._config.weather_position={x,y}; else if(kind==='stats') this._config.stats_position={x,y}; node.style.left=x+'%';node.style.top=y+'%';const pos=node.querySelector('.ln-pos');if(pos)pos.textContent=`${x.toFixed(1)}% × ${y.toFixed(1)}%`;}; const up=()=>{if(!dragging)return;dragging=false;node.classList.remove('dragging');window.removeEventListener('pointermove',move);window.removeEventListener('pointerup',up);this._emit(false);}; node.addEventListener('pointerdown',e=>{e.preventDefault();dragging=true;node.classList.add('dragging');node.setPointerCapture?.(e.pointerId);window.addEventListener('pointermove',move);window.addEventListener('pointerup',up);}); }); }
 
-    _device(d,i){ const inverted=!!d.invert_flow; const entityField=(field,label,marker)=>`<div class="field full"><label>${label}</label><ha-entity-picker data-device-picker="${i}" data-field="${field}" allow-custom-entity></ha-entity-picker><div class="entity-id" ${marker}="${i}">${esc(d[field]||'Not selected')}</div></div>`; return `<div class="device"><div class="device-head"><span>${esc(ICONS[d.type]||'⚙️')} ${esc(d.name||'Device')}</span><button title="Remove" data-remove="${i}">×</button></div><div class="row"><div class="field"><label>Type</label><select data-device="${i}" data-field="type">${TYPES.map(t=>`<option value="${t[0]}" ${d.type===t[0]?'selected':''}>${esc(t[1])}</option>`).join('')}</select></div><div class="field"><label>Name</label><input data-device="${i}" data-field="name" value="${esc(d.name||'')}"></div>${entityField('power_entity','Power entity','data-entity-label')}${d.type!=='inverter'?`<div class="field"><label>Flow colour</label><div class="ha-color-box"><input class="ha-color-picker" type="color" title="Choose flow colour" data-device="${i}" data-field="flow_color" value="${esc(d.flow_color || FLOW_COLORS[d.type] || FLOW_COLORS.neutral)}"><span class="color-preview" style="background:${esc(d.flow_color || FLOW_COLORS[d.type] || FLOW_COLORS.neutral)}"></span></div></div>`:''}<div class="field"><label>Flow direction</label><button class="btn ${inverted?'secondary-btn':''}" type="button" data-invert-flow="${i}">${inverted?'↔ Inverted':'↔ Normal'}<span class="small" style="display:block">Visual direction only</span></button></div></div></div>`; }
+    _device(d,i){
+      const inverted=!!d.invert_flow;
+      const entityField=(field,label,marker)=>`<div class="field full"><label>${label}</label><ha-entity-picker data-device-picker="${i}" data-field="${field}" allow-custom-entity></ha-entity-picker><div class="entity-id" ${marker}="${i}">${esc(d[field]||'Not selected')}</div></div>`;
+      const extras=Array.isArray(d.extra_entities)?d.extra_entities:[];
+      const expanded=this._expandedExtras.has(i) || extras.length>0;
+      const extrasBody = expanded ? `<div class="extras-editor">${extras.map((ex,ei)=>this._extraEntityField(i,ei,ex)).join('')}${extras.length<5?`<button class="btn secondary-btn" type="button" data-add-extra="${i}">＋ Add extra entity</button>`:'<div class="small">Maximum of 5 extra entities reached.</div>'}</div>` : '';
+      return `<div class="device"><div class="device-head"><span>${esc(ICONS[d.type]||'⚙️')} ${esc(d.name||'Device')}</span><button title="Remove" data-remove="${i}">×</button></div><div class="row"><div class="field"><label>Type</label><select data-device="${i}" data-field="type">${TYPES.map(t=>`<option value="${t[0]}" ${d.type===t[0]?'selected':''}>${esc(t[1])}</option>`).join('')}</select></div><div class="field"><label>Name</label><input data-device="${i}" data-field="name" value="${esc(d.name||'')}"></div>${entityField('power_entity','Power entity','data-entity-label')}${d.type!=='inverter'?`<div class="field"><label>Flow colour</label><div class="ha-color-box"><input class="ha-color-picker" type="color" title="Choose flow colour" data-device="${i}" data-field="flow_color" value="${esc(d.flow_color || FLOW_COLORS[d.type] || FLOW_COLORS.neutral)}"><span class="color-preview" style="background:${esc(d.flow_color || FLOW_COLORS[d.type] || FLOW_COLORS.neutral)}"></span></div></div>`:''}<div class="field"><label>Flow direction</label><button class="btn ${inverted?'secondary-btn':''}" type="button" data-invert-flow="${i}">${inverted?'↔ Inverted':'↔ Normal'}<span class="small" style="display:block">Visual direction only</span></button></div></div><button class="btn secondary-btn" type="button" data-toggle-extras="${i}">${expanded?'▾':'▸'} Extra entities${extras.length?` (${extras.length}/5)`:' (optional)'}</button>${extrasBody}</div>`;
+    }
+    _extraEntityField(di,ei,ex){
+      return `<div class="device" style="padding:10px"><div class="device-head"><span>🔎 Extra entity ${ei+1}</span><button title="Remove" data-remove-extra="${di}" data-extra-index="${ei}">×</button></div><div class="row"><div class="field full"><label>Entity</label><ha-entity-picker data-extra-picker data-device-index="${di}" data-extra-index="${ei}" allow-custom-entity></ha-entity-picker><div class="entity-id">${esc(ex?.entity||'Not selected')}</div></div><div class="field full"><label>Icon (Material Design Icons)</label><ha-icon-picker data-extra-icon data-device-index="${di}" data-extra-index="${ei}" value="${esc(ex?.icon||'')}"></ha-icon-picker></div></div></div>`;
+    }
     _connectionsHTML(){
       const conns=this._config.connections||[];
       if(!conns.length) return '<div class="small" style="margin:8px 0">No custom connections — automatic topology is active.</div>';
