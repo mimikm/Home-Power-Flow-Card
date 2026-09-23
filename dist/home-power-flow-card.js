@@ -1,6 +1,6 @@
 /* Home Power Flow Card V1 - standalone Lovelace custom element */
 (() => {
-  const VERSION = '0.6.5.0';
+  const VERSION = '0.6.9.6';
   const DEFAULT_BG = '/hacsfiles/Home-Power-Flow-Card/smart-home-energy-background.png';
   const DEFAULT_BG_NIGHT = '/hacsfiles/Home-Power-Flow-Card/smart-home-energy-background2.png';
   const TYPES = [
@@ -131,7 +131,7 @@
       this._flowSnapshot = null;
       if (!Array.isArray(this._config.devices)) this._config.devices = [];
       if (!Array.isArray(this._config.connections)) this._config.connections = [];
-      this._config.devices = this._config.devices.map(d => { const copy={...d}; copy.invert_flow = Boolean(copy.invert_flow || copy.power_sign === 'negative_output'); delete copy.power_sign; return copy; });
+      this._config.devices = this._config.devices.map(d => { const copy={...d}; copy.invert_flow = Boolean(copy.invert_flow || copy.power_sign === 'negative_output'); delete copy.power_sign; copy.extra_entities = Array.isArray(copy.extra_entities) ? copy.extra_entities.slice(0,5) : []; return copy; });
       this._config.flow_colors = { ...FLOW_COLORS, ...(this._config.flow_colors || {}) };
       // V4.3.10 stores the threshold canonically in watts. Migrate older configs
       // where flow_threshold was stored in kW.
@@ -313,14 +313,6 @@
         const voltage = entityValue(this._hass, d.voltage_entity);
         const temp = entityValue(this._hass, d.temp_entity);
         const frequency = entityValue(this._hass, d.frequency_entity);
-      let extraHtml = '';
-      if (Array.isArray(d.extra_entities)) {
-        extraHtml = d.extra_entities.slice(0,5).map(e => {
-          const val = entityValue(this._hass, e.entity);
-          const label = e.name || e.entity || '';
-          return `${esc(label)}: ${esc(val == null ? '—' : val)}`;
-        }).join('<br>');
-      }
         const powerEl = node.querySelector('.power');
         const secEl = node.querySelector('.secondary');
         if (powerEl) powerEl.textContent = power == null ? '—' : fmtPower(power);
@@ -423,7 +415,6 @@
       } else {
         secHtml = s?.attributes?.unit_of_measurement || 'Power';
       }
-      if (extraHtml) secHtml = secHtml ? secHtml + '<br>' + extraHtml : extraHtml;
       return `<div class="node ${esc(d.type || 'load')}" data-device-index="${i}" data-entity-id="${esc(d.power_entity || '')}" title="${esc(d.power_entity ? 'Open ' + d.power_entity : '')}" style="left:${p.x}%;top:${p.y}%"><div class="top"><span class="icon">${esc(ICONS[d.type] || '⚙️')}</span><span class="name">${esc(d.name || LABELS[d.type] || 'Device')}</span></div><div class="power">${esc(powerText)}</div><div class="secondary">${secHtml}</div></div>`;
     }
 
@@ -656,6 +647,11 @@
       this.shadowRoot.querySelectorAll('[data-stat-icon]').forEach(el=>{el.addEventListener('value-changed',e=>{const i=Number(el.dataset.index);this._config.statistics.entities[i].icon=e.detail.value||'mdi:chart-line';this._emit(false);});});
       this.shadowRoot.querySelectorAll('[data-stat-picker]').forEach(el=>{el.hass=this._hass; el.value=this._config.statistics.entities[Number(el.dataset.index)]?.entity||''; el.addEventListener('value-changed',e=>{this._config.statistics.entities[Number(el.dataset.index)].entity=e.detail.value||'';this._emit(false);});});
       this.shadowRoot.querySelectorAll('[data-device]').forEach(el=>el.addEventListener('change',e=>{const i=Number(el.dataset.device),k=el.dataset.field;this._config.devices[i][k]=e.target.value;this._emit(false);if(k==='type')this._render();}));this.shadowRoot.querySelectorAll('[data-invert-flow]').forEach(b=>b.addEventListener('click',()=>{const i=Number(b.dataset.invertFlow);this._config.devices[i].invert_flow=!this._config.devices[i].invert_flow;this._emit(false);this._render();}));
+this.shadowRoot.querySelectorAll('[data-extra-add]').forEach(b=>b.addEventListener('click',()=>{const i=Number(b.dataset.extraAdd);this._config.devices[i].extra_entities ||= []; if(this._config.devices[i].extra_entities.length<5){this._config.devices[i].extra_entities.push({name:'Entity',entity:'',icon:'mdi:information-outline',custom_icon:''});this._emit(false);this._render();}}));
+      this.shadowRoot.querySelectorAll('[data-extra-remove]').forEach(b=>b.addEventListener('click',()=>{const d=Number(b.dataset.extraRemove),e=Number(b.dataset.extraIndex);this._config.devices[d].extra_entities.splice(e,1);this._emit(false);this._render();}));
+      this.shadowRoot.querySelectorAll('[data-extra-field]').forEach(el=>el.addEventListener('change',e=>{const d=Number(el.dataset.device),x=Number(el.dataset.extra);this._config.devices[d].extra_entities[x][el.dataset.extraField]=e.target.value;this._emit(false);}));
+      this.shadowRoot.querySelectorAll('[data-extra-picker]').forEach(el=>{el.hass=this._hass;const d=Number(el.dataset.extraPicker),x=Number(el.dataset.extraIndex);el.value=this._config.devices[d].extra_entities[x].entity||'';el.addEventListener('value-changed',e=>{this._config.devices[d].extra_entities[x].entity=e.detail.value||'';this._emit(false);});});
+
       this._enableLayoutDragging();
       this._applyLayoutBg();
       this.shadowRoot.querySelectorAll('[data-bg-upload-btn]').forEach(b=>b.addEventListener('click',()=>{this.shadowRoot.querySelector(`[data-bg-file="${b.dataset.bgUploadBtn}"]`)?.click();}));
@@ -670,7 +666,23 @@
     _autoPreviewPosition(d,i){ const zones={solar:[18,23],inverter:[56,39],battery:[58,65],gateway:[48,78],house:[28,82],grid:[82,84],ev:[83,50],load:[76,67]}; const same=this._config.devices.filter(x=>(x.type||'load')===(d.type||'load')); const n=same.indexOf(d); const [cx,cy]=zones[d.type||'load']||[70,68]; const spacing=Math.min(15,70/Math.max(1,same.length)); let x=cx,y=cy;if(same.length>1)x=cx+(n-(same.length-1)/2)*spacing;if((d.type==='battery'&&same.length>3)){const col=n%3,row=Math.floor(n/3);x=48+col*12;y=64+row*12;}if(d.type==='solar'&&same.length>4){const col=n%4,row=Math.floor(n/4);x=33+col*12;y=22+row*11;}if(d.type==='ev'&&same.length>2){const col=n%2,row=Math.floor(n/2);x=78+col*10;y=45+row*13;}return{x,y}; }
     _enableLayoutDragging(){ const area=this.shadowRoot.querySelector('#layout-editor'); if(!area)return; area.querySelectorAll('.layout-node').forEach(node=>{ let dragging=false; const move=e=>{if(!dragging)return;const r=area.getBoundingClientRect();let x=((e.clientX-r.left)/r.width)*100;let y=((e.clientY-r.top)/r.height)*100;x=Math.max(5,Math.min(95,x));y=Math.max(6,Math.min(94,y));const kind=node.dataset.layoutKind; if(kind==='device'){const i=Number(node.dataset.layoutIndex);this._config.devices[i].position={x,y};} else if(kind==='weather') this._config.weather_position={x,y}; else if(kind==='stats') this._config.stats_position={x,y}; node.style.left=x+'%';node.style.top=y+'%';const pos=node.querySelector('.ln-pos');if(pos)pos.textContent=`${x.toFixed(1)}% × ${y.toFixed(1)}%`;}; const up=()=>{if(!dragging)return;dragging=false;node.classList.remove('dragging');window.removeEventListener('pointermove',move);window.removeEventListener('pointerup',up);this._emit(false);}; node.addEventListener('pointerdown',e=>{e.preventDefault();dragging=true;node.classList.add('dragging');node.setPointerCapture?.(e.pointerId);window.addEventListener('pointermove',move);window.addEventListener('pointerup',up);}); }); }
 
-    _device(d,i){ const inverted=!!d.invert_flow; const entityField=(field,label,marker)=>`<div class="field full"><label>${label}</label><ha-entity-picker data-device-picker="${i}" data-field="${field}" allow-custom-entity></ha-entity-picker><div class="entity-id" ${marker}="${i}">${esc(d[field]||'Not selected')}</div></div>`; return `<div class="device"><div class="device-head"><span>${esc(ICONS[d.type]||'⚙️')} ${esc(d.name||'Device')}</span><button title="Remove" data-remove="${i}">×</button></div><div class="row"><div class="field"><label>Type</label><select data-device="${i}" data-field="type">${TYPES.map(t=>`<option value="${t[0]}" ${d.type===t[0]?'selected':''}>${esc(t[1])}</option>`).join('')}</select></div><div class="field"><label>Name</label><input data-device="${i}" data-field="name" value="${esc(d.name||'')}"></div>${entityField('power_entity','Power entity','data-entity-label')}${d.type==='battery'?entityField('soc_entity','Battery SOC entity','data-soc-label'):''}${d.type==='battery'?entityField('voltage_entity','Battery voltage entity','data-voltage-label'):''}${(d.type==='battery'||d.type==='inverter')?entityField('temp_entity',d.type==='battery'?'Battery temperature entity':'Inverter temperature entity','data-temp-label'):''}${d.type==='grid'?entityField('voltage_entity','Grid voltage entity','data-voltage-label'):''}${d.type==='grid'?entityField('frequency_entity','Grid frequency entity','data-frequency-label'):''}${d.type!=='inverter'?`<div class="field"><label>Flow colour</label><div class="ha-color-box"><input class="ha-color-picker" type="color" title="Choose flow colour" data-device="${i}" data-field="flow_color" value="${esc(d.flow_color || FLOW_COLORS[d.type] || FLOW_COLORS.neutral)}"><span class="color-preview" style="background:${esc(d.flow_color || FLOW_COLORS[d.type] || FLOW_COLORS.neutral)}"></span></div></div>`:''}<div class="field"><label>Flow direction</label><button class="btn ${inverted?'secondary-btn':''}" type="button" data-invert-flow="${i}">${inverted?'↔ Inverted':'↔ Normal'}<span class="small" style="display:block">Visual direction only</span></button></div></div></div>`; }
+
+    _extraEntitiesEditor(d,i){
+      const list=Array.isArray(d.extra_entities)?d.extra_entities.slice(0,5):[];
+      return `<div class="field full"><label>Extra entities (display only, max 5)</label>
+      ${list.map((e,n)=>`<div class="device extra-entity-item" draggable="true" data-extra-device="${i}" data-extra-index="${n}">
+      <span class="stat-drag-handle">⠿</span>
+      <input data-extra-field="name" data-device="${i}" data-extra="${n}" value="${esc(e.name||'')}">
+      <ha-entity-picker data-extra-picker="${i}" data-extra-index="${n}" allow-custom-entity></ha-entity-picker>
+      <input data-extra-field="icon" data-device="${i}" data-extra="${n}" value="${esc(e.icon||'mdi:information-outline')}">
+      <input data-extra-field="custom_icon" data-device="${i}" data-extra="${n}" value="${esc(e.custom_icon||'')}">
+      <button class="btn" type="button" data-extra-remove="${i}" data-extra-index="${n}">×</button>
+      </div>`).join('')}
+      ${list.length<5?`<button class="btn" type="button" data-extra-add="${i}">＋ Add entity</button>`:''}
+      </div>`;
+    }
+
+    _device(d,i){ const inverted=!!d.invert_flow; const entityField=(field,label,marker)=>`<div class="field full"><label>${label}</label><ha-entity-picker data-device-picker="${i}" data-field="${field}" allow-custom-entity></ha-entity-picker><div class="entity-id" ${marker}="${i}">${esc(d[field]||'Not selected')}</div></div>`; return `<div class="device"><div class="device-head"><span>${esc(ICONS[d.type]||'⚙️')} ${esc(d.name||'Device')}</span><button title="Remove" data-remove="${i}">×</button></div><div class="row"><div class="field"><label>Type</label><select data-device="${i}" data-field="type">${TYPES.map(t=>`<option value="${t[0]}" ${d.type===t[0]?'selected':''}>${esc(t[1])}</option>`).join('')}</select></div><div class="field"><label>Name</label><input data-device="${i}" data-field="name" value="${esc(d.name||'')}"></div>${entityField('power_entity','Power entity','data-entity-label')}${d.type==='battery'?entityField('soc_entity','Battery SOC entity','data-soc-label'):''}${d.type==='battery'?entityField('voltage_entity','Battery voltage entity','data-voltage-label'):''}${(d.type==='battery'||d.type==='inverter')?entityField('temp_entity',d.type==='battery'?'Battery temperature entity':'Inverter temperature entity','data-temp-label'):''}${d.type==='grid'?entityField('voltage_entity','Grid voltage entity','data-voltage-label'):''}${d.type==='grid'?entityField('frequency_entity','Grid frequency entity','data-frequency-label'):''}${this._extraEntitiesEditor(d,i)}${d.type!=='inverter'?`<div class="field"><label>Flow colour</label><div class="ha-color-box"><input class="ha-color-picker" type="color" title="Choose flow colour" data-device="${i}" data-field="flow_color" value="${esc(d.flow_color || FLOW_COLORS[d.type] || FLOW_COLORS.neutral)}"><span class="color-preview" style="background:${esc(d.flow_color || FLOW_COLORS[d.type] || FLOW_COLORS.neutral)}"></span></div></div>`:''}<div class="field"><label>Flow direction</label><button class="btn ${inverted?'secondary-btn':''}" type="button" data-invert-flow="${i}">${inverted?'↔ Inverted':'↔ Normal'}<span class="small" style="display:block">Visual direction only</span></button></div></div></div>`; }
     _connectionsHTML(){
       const conns=this._config.connections||[];
       if(!conns.length) return '<div class="small" style="margin:8px 0">No custom connections — automatic topology is active.</div>';
