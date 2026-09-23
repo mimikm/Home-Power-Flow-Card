@@ -92,7 +92,7 @@ Export your entire card configuration — devices, connections, layout, backgrou
 Click any device on the card to open its Home Assistant "more info" dialog directly.
 
 ### 📱 Responsive
-The layout adapts down to mobile screen widths, scaling text, nodes and panels accordingly.
+The layout is designed for larger screens. (mobile screen support in roadmap).
 
 ---
 
