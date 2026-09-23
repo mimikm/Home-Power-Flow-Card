@@ -10,7 +10,7 @@
  * Issues & feature requests: https://github.com/mimikm/Home-Power-Flow-Card/issues
  */
 (() => {
-  const VERSION = '0.9.11';
+  const VERSION = '0.7.3';
   const DEFAULT_BG = '/hacsfiles/Home-Power-Flow-Card/smart-home-energy-background.png';
   const DEFAULT_BG_NIGHT = '/hacsfiles/Home-Power-Flow-Card/smart-home-energy-background2.png';
   const TYPES = [
@@ -451,9 +451,11 @@
       const dateEl=this.shadowRoot.querySelector('.date'), timeEl=this.shadowRoot.querySelector('.clock'), tempEl=this.shadowRoot.querySelector('.temp'), stateEl=this.shadowRoot.querySelector('.wstate'), iconEl=this.shadowRoot.querySelector('.wicon');
       if(dateEl) dateEl.textContent=date; if(timeEl) timeEl.textContent=time; if(tempEl) tempEl.textContent=weatherTemp != null ? `${weatherTemp}${weatherUnit}` : '—'; if(stateEl) stateEl.textContent=weatherText; if(iconEl) iconEl.textContent=weatherIcon;
 
-      // Flow direction/activity is derived from the CURRENT entity values.
-      // Rebuild only when active/inactive state or direction changes, so normal
-      // value changes do not restart the travelling-dot animation.
+      // Rebuild only when active/inactive state, direction, or a meaningful
+      // (roughly doubling/halving) change in load occurs - see
+      // _flowStateKey. Minor value fluctuations do not restart the
+      // travelling-dot animation, but a real load change now updates its
+      // speed.
       const currentSnapshot = {};
       devices.forEach((d, i) => { currentSnapshot[i] = powerValue(this._hass, d.power_entity); });
       const nextFlowKey = this._flowStateKey(devices, currentSnapshot);
@@ -688,7 +690,12 @@
         let reverse=info.reverse;
         if(Number(dir)===1) reverse=false;
         if(Number(dir)===2) reverse=true;
-        return `${key}:${info.active?1:0}:${info.active?Number(reverse):0}`;
+        // Coarse log2 bucket of magnitude (roughly: changes only when load
+        // doubles/halves) - included so the load-based dot speed actually
+        // updates over time, without rebuilding (and restarting the dot's
+        // animation) on every minor fluctuation in a live sensor reading.
+        const bucket = info.active ? Math.round(Math.log2(Math.max(1, info.magnitude))) : 0;
+        return `${key}:${info.active?1:0}:${info.active?Number(reverse):0}:${bucket}`;
       }).join('|');
     }
 
@@ -715,7 +722,14 @@
         // do NOT re-apply invert_flow a second time, or it cancels itself out.
         let reverse=info.reverse;
         if(Number(dir)===1)reverse=false; if(Number(dir)===2)reverse=true;
-        const id=`flow${a}_${b}_${idx}`,duration=speed.toFixed(2)+'s';
+        const id=`flow${a}_${b}_${idx}`;
+        // Faster dots for higher-power connections, slower for lighter ones -
+        // the configured "Flow animation speed" is the baseline duration at
+        // a 1000W reference load; sqrt-scaling keeps it responsive without
+        // letting a multi-kW flow flicker unreadably fast, and the min/max
+        // clamp keeps every connection within a sane, comparable range.
+        const loadFactor = Math.sqrt(1000 / Math.max(50, info.magnitude));
+        const duration = Math.max(speed * 0.4, Math.min(speed * 2.5, speed * loadFactor)).toFixed(2) + 's';
         const stroke=flowColor(da,db,reverse,true,this._config.flow_colors);
         const width=2.1;
         const delay=(idx*stagger).toFixed(2)+'s';
