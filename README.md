@@ -10,7 +10,7 @@ Visualise your home's whole energy ecosystem — solar, battery, grid, EV, and e
 
 ## 🧪 Public Test Release
 
-This is a **public test release (v0.9)** — the card is feature-complete for most setups and I'd love for more people to try it on their own Home Assistant instance before calling it stable.
+This is a **public test release (v0.6.9.9.9.1)** — the card is feature-complete for most setups and I'd love for more people to try it on their own Home Assistant instance before calling it stable.
 
 Please **back up your dashboard config before installing** (Settings → System → Backups, or just export your existing card config if you're replacing an older version — see [Backup & Restore](#-backup--restore) below).
 
