@@ -10,7 +10,7 @@
  * Issues & feature requests: https://github.com/mimikm/Home-Power-Flow-Card/issues
  */
 (() => {
-  const VERSION = '0.9.7';
+  const VERSION = '0.9.9';
   const DEFAULT_BG = '/hacsfiles/Home-Power-Flow-Card/smart-home-energy-background.png';
   const DEFAULT_BG_NIGHT = '/hacsfiles/Home-Power-Flow-Card/smart-home-energy-background2.png';
   const TYPES = [
@@ -717,7 +717,7 @@
         const stroke=flowColor(da,db,reverse,true,this._config.flow_colors);
         const width=2.1;
         const delay=(idx*stagger).toFixed(2)+'s';
-        return `<path id="${id}" class="flow-path" d="${path}" stroke="${stroke}" stroke-width="${width}" stroke-dasharray="0.12 1.75" pathLength="100" opacity=".92"></path><circle class="flow-dot" r="2.4" fill="${stroke}"><animateMotion dur="${duration}" begin="-${delay}" repeatCount="indefinite" rotate="auto" ${reverse?'keyPoints="1;0" keyTimes="0;1"':''}><mpath href="#${id}"/></animateMotion></circle>`;
+        return `<path id="${id}" class="flow-path" d="${path}" stroke="${stroke}" stroke-width="${width}" stroke-dasharray="2 14" opacity=".92"></path><circle class="flow-dot" r="2.4" fill="${stroke}"><animateMotion dur="${duration}" begin="-${delay}" repeatCount="indefinite" rotate="auto" ${reverse?'keyPoints="1;0" keyTimes="0;1"':''}><mpath href="#${id}"/></animateMotion><animate attributeName="r" values="1.8;3.4;1.8" dur="1.1s" repeatCount="indefinite"/><animate attributeName="opacity" values=".55;1;.55" dur="1.1s" repeatCount="indefinite"/></circle>`;
       }).join('');
     }
 
