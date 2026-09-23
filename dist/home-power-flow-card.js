@@ -1,6 +1,6 @@
 /* Home Power Flow Card V1 - standalone Lovelace custom element */
 (() => {
-  const VERSION = '0.7.0';
+  const VERSION = '0.7.1';
   const DEFAULT_BG = '/hacsfiles/Home-Power-Flow-Card/smart-home-energy-background.png';
   const DEFAULT_BG_NIGHT = '/hacsfiles/Home-Power-Flow-Card/smart-home-energy-background2.png';
   const TYPES = [
@@ -217,7 +217,7 @@
           .flow-path { fill:none; stroke-linecap:round; filter:url(#glow); opacity:.92; }
           .flow-dot { filter:url(#dotglow); }
           .node { position:absolute; transform:translate(-50%,-50%); width:clamp(135px,13vw,205px); min-height:74px; padding:11px 13px; border-radius:15px; z-index:10; background:linear-gradient(145deg,rgba(9,25,40,.87),rgba(15,30,44,.73)); border:1px solid rgba(255,255,255,.17); box-shadow:0 8px 22px rgba(0,0,0,.32); backdrop-filter:blur(10px); }
-          .node .top { display:flex; align-items:center; gap:8px; }.node .icon { font-size:24px; line-height:1; }.node .name { font-weight:700; font-size:14px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }.node .power { margin-top:5px; font-size:19px; font-weight:750; }.node .extras { margin-top:4px; display:flex; flex-direction:column; gap:2px; }.node .extras:empty { display:none; margin:0; }.node .extra-row { display:flex; align-items:center; gap:5px; font-size:10px; line-height:1.3; opacity:.78; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }.node .extra-row ha-icon { --mdc-icon-size:12px; width:12px; height:12px; flex:none; }.node.battery { border-color:rgba(123,255,158,.28); }.node.grid { border-color:rgba(93,191,255,.3); }.node.ev { border-color:rgba(151,255,103,.28); }
+          .node .top { display:flex; align-items:center; gap:8px; }.node .icon { font-size:24px; line-height:1; }.node .name { font-weight:700; font-size:14px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }.node .power { margin-top:5px; font-size:19px; font-weight:750; }.node .extras { margin-top:4px; display:flex; flex-wrap:wrap; gap:2px 8px; }.node .extras:empty { display:none; margin:0; }.node .extra-row { display:inline-flex; align-items:center; gap:3px; font-size:10px; line-height:1.3; opacity:.78; white-space:nowrap; max-width:100%; overflow:hidden; text-overflow:ellipsis; }.node .extra-row ha-icon { --mdc-icon-size:12px; width:12px; height:12px; flex:none; }.node.battery { border-color:rgba(123,255,158,.28); }.node.grid { border-color:rgba(93,191,255,.3); }.node.ev { border-color:rgba(151,255,103,.28); }
           .legend { position:absolute; right:2.6%; bottom:3.2%; z-index:18; padding:9px 12px; border-radius:12px; background:rgba(4,15,25,.55); font-size:11px; opacity:.8; backdrop-filter:blur(8px); }
           .empty { position:absolute; inset:0; display:flex; align-items:center; justify-content:center; z-index:30; }.empty > div { padding:24px 30px; background:rgba(10,25,38,.82); border-radius:18px; border:1px solid rgba(255,255,255,.18); text-align:center; backdrop-filter:blur(10px); }.empty b{display:block;font-size:20px;margin-bottom:6px}.empty span{opacity:.75}
           @media (max-width: 800px) { .card{aspect-ratio:auto; min-height:760px}.weather{min-width:190px;padding:10px 12px}.header{top:2%;left:2%}.stats{width:46%;min-width:260px}.node{width:130px}.legend{display:none} }
@@ -530,7 +530,11 @@
   }
 
   class HomePowerFlowEditor extends HTMLElement {
-    constructor(){ super(); this._config={}; this._hass=null; this._expandedExtras=new Set(); this.attachShadow({mode:'open'}); }
+    constructor(){ super(); this._config={}; this._hass=null; this._extrasOpen=new Map(); this.attachShadow({mode:'open'}); }
+    // Whether device i's extras section is open. Defaults to open when the
+    // device already has extra entities, but an explicit toggle always wins
+    // over that default so the section can be collapsed even when non-empty.
+    _isExtrasOpen(i,extrasLen){ return this._extrasOpen.has(i) ? this._extrasOpen.get(i) : extrasLen>0; }
     setConfig(config){
       const next=JSON.parse(JSON.stringify(config||{}));
       next.devices ||= [];
@@ -637,7 +641,8 @@
       });
       this.shadowRoot.querySelectorAll('[data-toggle-extras]').forEach(b=>b.addEventListener('click',()=>{
         const i=Number(b.dataset.toggleExtras);
-        if (this._expandedExtras.has(i)) this._expandedExtras.delete(i); else this._expandedExtras.add(i);
+        const extrasLen=(this._config.devices[i]?.extra_entities||[]).length;
+        this._extrasOpen.set(i, !this._isExtrasOpen(i,extrasLen));
         this._render();
       }));
       this.shadowRoot.querySelectorAll('[data-add-extra]').forEach(b=>b.addEventListener('click',()=>{
@@ -646,14 +651,14 @@
         d.extra_entities = Array.isArray(d.extra_entities) ? d.extra_entities : [];
         if (d.extra_entities.length>=5) return;
         d.extra_entities.push({entity:'',icon:''});
-        this._expandedExtras.add(i);
+        this._extrasOpen.set(i, true);
         this._emit(false);
         this._render();
       }));
       this.shadowRoot.querySelectorAll('[data-remove-extra]').forEach(b=>b.addEventListener('click',()=>{
         const di=Number(b.dataset.removeExtra), ei=Number(b.dataset.extraIndex);
         this._config.devices[di].extra_entities.splice(ei,1);
-        this._expandedExtras.add(di);
+        this._extrasOpen.set(di, true);
         this._emit(false);
         this._render();
       }));
@@ -694,7 +699,7 @@
       const inverted=!!d.invert_flow;
       const entityField=(field,label,marker)=>`<div class="field full"><label>${label}</label><ha-entity-picker data-device-picker="${i}" data-field="${field}" allow-custom-entity></ha-entity-picker><div class="entity-id" ${marker}="${i}">${esc(d[field]||'Not selected')}</div></div>`;
       const extras=Array.isArray(d.extra_entities)?d.extra_entities:[];
-      const expanded=this._expandedExtras.has(i) || extras.length>0;
+      const expanded=this._isExtrasOpen(i,extras.length);
       const extrasBody = expanded ? `<div class="extras-editor">${extras.map((ex,ei)=>this._extraEntityField(i,ei,ex)).join('')}${extras.length<5?`<button class="btn secondary-btn" type="button" data-add-extra="${i}">＋ Add extra entity</button>`:'<div class="small">Maximum of 5 extra entities reached.</div>'}</div>` : '';
       return `<div class="device"><div class="device-head"><span>${esc(ICONS[d.type]||'⚙️')} ${esc(d.name||'Device')}</span><button title="Remove" data-remove="${i}">×</button></div><div class="row"><div class="field"><label>Type</label><select data-device="${i}" data-field="type">${TYPES.map(t=>`<option value="${t[0]}" ${d.type===t[0]?'selected':''}>${esc(t[1])}</option>`).join('')}</select></div><div class="field"><label>Name</label><input data-device="${i}" data-field="name" value="${esc(d.name||'')}"></div>${entityField('power_entity','Power entity','data-entity-label')}${d.type!=='inverter'?`<div class="field"><label>Flow colour</label><div class="ha-color-box"><input class="ha-color-picker" type="color" title="Choose flow colour" data-device="${i}" data-field="flow_color" value="${esc(d.flow_color || FLOW_COLORS[d.type] || FLOW_COLORS.neutral)}"><span class="color-preview" style="background:${esc(d.flow_color || FLOW_COLORS[d.type] || FLOW_COLORS.neutral)}"></span></div></div>`:''}<div class="field"><label>Flow direction</label><button class="btn ${inverted?'secondary-btn':''}" type="button" data-invert-flow="${i}">${inverted?'↔ Inverted':'↔ Normal'}<span class="small" style="display:block">Visual direction only</span></button></div></div><button class="btn secondary-btn" type="button" data-toggle-extras="${i}">${expanded?'▾':'▸'} Extra entities${extras.length?` (${extras.length}/5)`:' (optional)'}</button>${extrasBody}</div>`;
     }
