@@ -10,7 +10,7 @@
  * Issues & feature requests: https://github.com/mimikm/Home-Power-Flow-Card/issues
  */
 (() => {
-  const VERSION = '0.6.9.9.5';
+  const VERSION = '0.6.9.9.6';
   const DEFAULT_BG = '/hacsfiles/Home-Power-Flow-Card/smart-home-energy-background.png';
   const DEFAULT_BG_NIGHT = '/hacsfiles/Home-Power-Flow-Card/smart-home-energy-background2.png';
   const TYPES = [
@@ -141,7 +141,7 @@
       this._flowSnapshot = null;
       if (!Array.isArray(this._config.devices)) this._config.devices = [];
       if (!Array.isArray(this._config.connections)) this._config.connections = [];
-      this._config.devices = this._config.devices.map(d => {
+      this._config.devices = this._config.devices.map((d, i, arr) => {
         const copy={...d};
         copy.invert_flow = Boolean(copy.invert_flow || copy.power_sign === 'negative_output');
         delete copy.power_sign;
@@ -151,6 +151,12 @@
         copy.extra_entities = Array.isArray(copy.extra_entities)
           ? copy.extra_entities.filter(e => e && typeof e === 'object').slice(0, 5).map(e => ({ entity: e.entity || '', icon: e.icon || '' }))
           : [];
+        // Optional explicit parent link (see _flowEdges). Drop anything that
+        // can't possibly be valid; a stale index pointing at a device that no
+        // longer exists is handled gracefully at render time either way.
+        const parent = Number(copy.connects_to);
+        if (Number.isInteger(parent) && parent >= 0 && parent < arr.length && parent !== i) copy.connects_to = parent;
+        else delete copy.connects_to;
         return copy;
       });
       this._config.flow_colors = { ...FLOW_COLORS, ...(this._config.flow_colors || {}) };
@@ -417,14 +423,18 @@
       return `<div class="node ${esc(d.type || 'load')}" data-device-index="${i}" data-entity-id="${esc(d.power_entity || '')}" title="${esc(d.power_entity ? 'Open ' + d.power_entity : '')}" style="left:${p.x}%;top:${p.y}%"><div class="top"><span class="icon">${esc(ICONS[d.type] || '⚙️')}</span><span class="name">${esc(d.name || LABELS[d.type] || 'Device')}</span></div><div class="power">${esc(powerText)}</div><div class="extras">${this._extraEntitiesRows(d)}</div></div>`;
     }
 
+    // Generic junction model: a device with no power_entity configured acts
+    // as a pass-through hub (direction/magnitude derived entirely from the
+    // metered side) - this used to only apply to type 'inverter'; now it
+    // applies to any bare device, so a second metered inverter, a Gateway,
+    // or a Distribution Board can equally act as - or be driven by - a hub.
     _flowDirection(a, b, va, vb) {
-      const ta = a.type || 'load', tb = b.type || 'load';
       const threshold = Math.max(1, Number.isFinite(Number(this._config.flow_threshold_watts)) ? Number(this._config.flow_threshold_watts) : 1);
 
-      // Inverter is a junction only. It does not require a power entity.
-      // The connected device determines whether the flow exists and direction.
-      const source = ta === 'inverter' ? b : (tb === 'inverter' ? a : null);
-      const value = ta === 'inverter' ? vb : (tb === 'inverter' ? va : null);
+      const aHas = !!(a.power_entity && String(a.power_entity).trim());
+      const bHas = !!(b.power_entity && String(b.power_entity).trim());
+      const source = (aHas && !bHas) ? a : (bHas && !aHas) ? b : null;
+      const value = source === a ? va : source === b ? vb : null;
 
       if (source) {
         if (value == null || !Number.isFinite(Number(value)) || Math.abs(Number(value)) < threshold)
@@ -432,19 +442,31 @@
 
         let reverse = false;
         const t = source.type;
+        // "a is the hub side" here means a is NOT the metered device - true
+        // regardless of which literal position an automatic or explicit
+        // (connects_to) edge happened to place it in.
+        const aIsHub = a !== source;
 
         if (t === 'solar') {
-          // solar -> inverter
-          reverse = tb === 'solar';
+          // Solar always exports toward the rest of the system.
+          reverse = (b === source);
         } else if (t === 'battery') {
-          // positive = charging (inverter -> battery)
+          // positive = charging (hub -> battery). Position-independent: the
+          // automatic/explicit builder always places the hub first.
           reverse = Number(value) < 0 ? false : true;
         } else if (t === 'grid') {
-          // positive = import (grid -> inverter)
+          // positive = import (grid -> hub).
           reverse = Number(value) < 0 ? true : false;
         } else {
-          // loads consume from inverter
-          reverse = ta === 'inverter' ? false : true;
+          // Generic bidirectional convention for every other device type
+          // (house, EV, load, gateway, or a second inverter reporting its
+          // own load): positive = hub -> device (consuming/importing),
+          // negative = device -> hub (exporting back). A magnitude-only
+          // sensor (house/EV/load - always positive) simply always renders
+          // hub -> device, exactly as before. Wrong polarity or orientation
+          // for your sensor? Use that device's Invert Flow toggle.
+          const physicalHubToDevice = Number(value) >= 0;
+          reverse = physicalHubToDevice !== aIsHub;
         }
 
         if (source.invert_flow) reverse = !reverse;
@@ -462,22 +484,41 @@
       const valid = e => e && Number.isInteger(Number(e.from)) && Number.isInteger(Number(e.to)) && devices[e.from] && devices[e.to] && Number(e.from) !== Number(e.to);
       if (Array.isArray(this._config.connections) && this._config.connections.length) {
         this._config.connections.forEach(e => { if (valid(e)) edges.push([Number(e.from), Number(e.to), Number(e.direction || 0)]); });
-      } else {
-        const by = type => devices.map((d,i)=>({d,i})).filter(x=>(x.d.type||'load')===type);
-        const add=(a,b)=>{ if(a&&b) edges.push([a.i,b.i,0]); };
-        const inv=by('inverter')[0];
-        const solar=by('solar'), battery=by('battery'), grid=by('grid'), house=by('house'), ev=by('ev'), loads=by('load');
-
-        // Inverter is the hub only.
-        if (inv) {
-          solar.forEach(x=>add(x,inv));
-          battery.forEach(x=>add(inv,x));
-          grid.forEach(x=>add(inv,x));
-          if(house[0]) add(inv,house[0]);
-          ev.forEach(x=>add(inv,x));
-          loads.forEach(x=>add(inv,x));
-        }
+        return edges;
       }
+
+      const typeOf = d => d.type || 'load';
+      const inverterIdx = devices.findIndex(d => typeOf(d) === 'inverter');
+      const gatewayIdx = devices.findIndex(d => typeOf(d) === 'gateway');
+      // A device's explicit "Connects to" link, if it points at another real device.
+      const parentOf = (d, i) => {
+        const p = Number(d.connects_to);
+        return Number.isInteger(p) && devices[p] && p !== i ? p : null;
+      };
+
+      // Every non-inverter device: use its explicit link if set, otherwise
+      // fall back to the (first) inverter - unchanged single-inverter
+      // behaviour for anyone who hasn't touched this setting.
+      devices.forEach((d, i) => {
+        if (typeOf(d) === 'inverter') return;
+        const parent = parentOf(d, i) ?? (inverterIdx !== -1 ? inverterIdx : null);
+        if (parent === null) return;
+        // Solar keeps its historical child-first edge order ([solar, hub]);
+        // everything else is hub-first ([hub, device]).
+        edges.push(typeOf(d) === 'solar' ? [i, parent, 0] : [parent, i, 0]);
+      });
+
+      // Every inverter beyond the first: use its explicit link if set,
+      // otherwise a Gateway/Distribution Board device if one exists,
+      // otherwise the first inverter - so a multi-inverter setup is never
+      // silently orphaned even with zero explicit configuration.
+      devices.forEach((d, i) => {
+        if (typeOf(d) !== 'inverter' || i === inverterIdx) return;
+        const parent = parentOf(d, i) ?? (gatewayIdx !== -1 ? gatewayIdx : (inverterIdx !== -1 ? inverterIdx : null));
+        if (parent === null) return;
+        edges.push([parent, i, 0]);
+      });
+
       return edges;
     }
 
@@ -543,7 +584,7 @@
     constructor(){ super(); this._config={}; this._hass=null; this._extrasOpen=new Map(); this._devicesOpen=new Map(); this.attachShadow({mode:'open'}); }
     // Whether device i's editor body is expanded. Defaults to open so existing
     // behaviour is unchanged until the user collapses one explicitly.
-    _isDeviceOpen(i){ return this._devicesOpen.has(i) ? this._devicesOpen.get(i) : true; }
+    _isDeviceOpen(i){ return this._devicesOpen.has(i) ? this._devicesOpen.get(i) : false; }
     // Whether device i's extras section is open. Defaults to open when the
     // device already has extra entities, but an explicit toggle always wins
     // over that default so the section can be collapsed even when non-empty.
@@ -711,7 +752,7 @@
         this._render();
       }));
       this.shadowRoot.querySelectorAll('[data-key]').forEach(el=>el.addEventListener('change',e=>{ const k=e.target.dataset.key; if(k==='flow_threshold_watts'){ const watts=Math.max(0,parseFloat(e.target.value)||0); this._config.flow_threshold=watts/1000; this._config.flow_threshold_watts=watts; } else { this._config[k]=e.target.value; if(['flow_threshold','flow_speed','flow_stagger'].includes(k))this._config[k]=parseFloat(e.target.value)||0; } this._emit(false); }));
-      this.shadowRoot.querySelector('#add')?.addEventListener('click',()=>{this._config.devices.push({type:'solar',name:`Device ${this._config.devices.length+1}`,power_entity:''});this._emit(false);this._render();});
+      this.shadowRoot.querySelector('#add')?.addEventListener('click',()=>{this._config.devices.push({type:'solar',name:`Device ${this._config.devices.length+1}`,power_entity:''});this._devicesOpen.set(this._config.devices.length-1,true);this._emit(false);this._render();});
       this.shadowRoot.querySelectorAll('[data-remove]').forEach(b=>b.addEventListener('click',()=>{this._config.devices.splice(Number(b.dataset.remove),1);this._emit(false);this._render();}));
       this.shadowRoot.querySelectorAll('[data-conn-remove]').forEach(b=>b.addEventListener('click',()=>{this._config.connections.splice(Number(b.dataset.connRemove),1);this._emit(false);this._render();}));
       this.shadowRoot.querySelectorAll('[data-conn]').forEach(el=>el.addEventListener('change',e=>{const i=Number(el.dataset.conn),k=el.dataset.field;this._config.connections[i][k]=Number(e.target.value);this._emit(false);}));
@@ -728,7 +769,19 @@
       this.shadowRoot.querySelectorAll('[data-stat-field]').forEach(el=>el.addEventListener('change',e=>{const i=Number(el.dataset.index); const k=el.dataset.statField; this._config.statistics.entities[i][k]=e.target.value; this._emit(false);}));
       this.shadowRoot.querySelectorAll('[data-stat-icon]').forEach(el=>{el.addEventListener('value-changed',e=>{const i=Number(el.dataset.index);this._config.statistics.entities[i].icon=e.detail.value||'mdi:chart-line';this._emit(false);});});
       this.shadowRoot.querySelectorAll('[data-stat-picker]').forEach(el=>{el.hass=this._hass; el.value=this._config.statistics.entities[Number(el.dataset.index)]?.entity||''; el.addEventListener('value-changed',e=>{this._config.statistics.entities[Number(el.dataset.index)].entity=e.detail.value||'';this._emit(false);});});
-      this.shadowRoot.querySelectorAll('[data-device]').forEach(el=>el.addEventListener('change',e=>{const i=Number(el.dataset.device),k=el.dataset.field;this._config.devices[i][k]=e.target.value;this._emit(false);if(k==='type')this._render();}));this.shadowRoot.querySelectorAll('[data-invert-flow]').forEach(b=>b.addEventListener('click',()=>{const i=Number(b.dataset.invertFlow);this._config.devices[i].invert_flow=!this._config.devices[i].invert_flow;this._emit(false);this._render();}));
+      this.shadowRoot.querySelectorAll('[data-device]').forEach(el=>el.addEventListener('change',e=>{
+        const i=Number(el.dataset.device),k=el.dataset.field;
+        if (k==='connects_to') {
+          const v=e.target.value;
+          if (v==='') delete this._config.devices[i].connects_to;
+          else this._config.devices[i].connects_to = Number(v);
+        } else {
+          this._config.devices[i][k]=e.target.value;
+        }
+        this._emit(false);
+        if(k==='type')this._render();
+      }));
+      this.shadowRoot.querySelectorAll('[data-invert-flow]').forEach(b=>b.addEventListener('click',()=>{const i=Number(b.dataset.invertFlow);this._config.devices[i].invert_flow=!this._config.devices[i].invert_flow;this._emit(false);this._render();}));
       this._enableLayoutDragging();
       this._applyLayoutBg();
       this.shadowRoot.querySelectorAll('[data-bg-upload-btn]').forEach(b=>b.addEventListener('click',()=>{this.shadowRoot.querySelector(`[data-bg-file="${b.dataset.bgUploadBtn}"]`)?.click();}));
@@ -743,6 +796,16 @@
     _autoPreviewPosition(d,i){ const zones={solar:[18,23],inverter:[56,39],battery:[58,65],gateway:[48,78],house:[28,82],grid:[82,84],ev:[83,50],load:[76,67]}; const same=this._config.devices.filter(x=>(x.type||'load')===(d.type||'load')); const n=same.indexOf(d); const [cx,cy]=zones[d.type||'load']||[70,68]; const spacing=Math.min(15,70/Math.max(1,same.length)); let x=cx,y=cy;if(same.length>1)x=cx+(n-(same.length-1)/2)*spacing;if((d.type==='battery'&&same.length>3)){const col=n%3,row=Math.floor(n/3);x=48+col*12;y=64+row*12;}if(d.type==='solar'&&same.length>4){const col=n%4,row=Math.floor(n/4);x=33+col*12;y=22+row*11;}if(d.type==='ev'&&same.length>2){const col=n%2,row=Math.floor(n/2);x=78+col*10;y=45+row*13;}return{x,y}; }
     _enableLayoutDragging(){ const area=this.shadowRoot.querySelector('#layout-editor'); if(!area)return; area.querySelectorAll('.layout-node').forEach(node=>{ let dragging=false; const move=e=>{if(!dragging)return;const r=area.getBoundingClientRect();let x=((e.clientX-r.left)/r.width)*100;let y=((e.clientY-r.top)/r.height)*100;x=Math.max(5,Math.min(95,x));y=Math.max(6,Math.min(94,y));const kind=node.dataset.layoutKind; if(kind==='device'){const i=Number(node.dataset.layoutIndex);this._config.devices[i].position={x,y};} else if(kind==='weather') this._config.weather_position={x,y}; else if(kind==='stats') this._config.stats_position={x,y}; node.style.left=x+'%';node.style.top=y+'%';const pos=node.querySelector('.ln-pos');if(pos)pos.textContent=`${x.toFixed(1)}% × ${y.toFixed(1)}%`;}; const up=()=>{if(!dragging)return;dragging=false;node.classList.remove('dragging');window.removeEventListener('pointermove',move);window.removeEventListener('pointerup',up);this._emit(false);}; node.addEventListener('pointerdown',e=>{e.preventDefault();dragging=true;node.classList.add('dragging');node.setPointerCapture?.(e.pointerId);window.addEventListener('pointermove',move);window.addEventListener('pointerup',up);}); }); }
 
+    _connectsToOptions(i){
+      const cur = this._config.devices[i]?.connects_to;
+      const curNum = Number.isInteger(Number(cur)) ? Number(cur) : null;
+      const opts=['<option value="">Automatic</option>'];
+      this._config.devices.forEach((d,idx)=>{
+        if (idx===i) return;
+        opts.push(`<option value="${idx}" ${curNum===idx?'selected':''}>${idx+1}. ${esc(d.name||LABELS[d.type]||'Device')}</option>`);
+      });
+      return opts.join('');
+    }
     _device(d,i){
       const inverted=!!d.invert_flow;
       const entityField=(field,label,marker)=>`<div class="field full"><label>${label}</label><ha-entity-picker data-device-picker="${i}" data-field="${field}" allow-custom-entity></ha-entity-picker><div class="entity-id" ${marker}="${i}">${esc(d[field]||'Not selected')}</div></div>`;
@@ -750,7 +813,8 @@
       const expanded=this._isExtrasOpen(i,extras.length);
       const extrasBody = expanded ? `<div class="extras-editor">${extras.map((ex,ei)=>this._extraEntityField(i,ei,ex)).join('')}${extras.length<5?`<button class="btn secondary-btn" type="button" data-add-extra="${i}">＋ Add extra entity</button>`:'<div class="small">Maximum of 5 extra entities reached.</div>'}</div>` : '';
       const deviceOpen=this._isDeviceOpen(i);
-      const body = deviceOpen ? `<div class="row"><div class="field"><label>Type</label><select data-device="${i}" data-field="type">${TYPES.map(t=>`<option value="${t[0]}" ${d.type===t[0]?'selected':''}>${esc(t[1])}</option>`).join('')}</select></div><div class="field"><label>Name</label><input data-device="${i}" data-field="name" value="${esc(d.name||'')}"></div>${entityField('power_entity','Power entity','data-entity-label')}${d.type!=='inverter'?`<div class="field"><label>Flow colour</label><div class="ha-color-box"><input class="ha-color-picker" type="color" title="Choose flow colour" data-device="${i}" data-field="flow_color" value="${esc(d.flow_color || FLOW_COLORS[d.type] || FLOW_COLORS.neutral)}"><span class="color-preview" style="background:${esc(d.flow_color || FLOW_COLORS[d.type] || FLOW_COLORS.neutral)}"></span></div></div>`:''}<div class="field"><label>Flow direction</label><button class="btn ${inverted?'secondary-btn':''}" type="button" data-invert-flow="${i}">${inverted?'↔ Inverted':'↔ Normal'}<span class="small" style="display:block">Visual direction only</span></button></div></div><button class="btn secondary-btn" type="button" data-toggle-extras="${i}">${expanded?'▾':'▸'} Extra entities${extras.length?` (${extras.length}/5)`:' (optional)'}</button>${extrasBody}` : '';
+      const connectsToField=`<div class="field full"><label>Connects to</label><select data-device="${i}" data-field="connects_to">${this._connectsToOptions(i)}</select><span class="small" style="display:block">Automatic = the (first) inverter, or a Gateway/Distribution Board device for extra inverters. Override this for multi-inverter or custom topologies.</span></div>`;
+      const body = deviceOpen ? `<div class="row"><div class="field"><label>Type</label><select data-device="${i}" data-field="type">${TYPES.map(t=>`<option value="${t[0]}" ${d.type===t[0]?'selected':''}>${esc(t[1])}</option>`).join('')}</select></div><div class="field"><label>Name</label><input data-device="${i}" data-field="name" value="${esc(d.name||'')}"></div>${entityField('power_entity','Power entity','data-entity-label')}${connectsToField}${d.type!=='inverter'?`<div class="field"><label>Flow colour</label><div class="ha-color-box"><input class="ha-color-picker" type="color" title="Choose flow colour" data-device="${i}" data-field="flow_color" value="${esc(d.flow_color || FLOW_COLORS[d.type] || FLOW_COLORS.neutral)}"><span class="color-preview" style="background:${esc(d.flow_color || FLOW_COLORS[d.type] || FLOW_COLORS.neutral)}"></span></div></div>`:''}<div class="field"><label>Flow direction</label><button class="btn ${inverted?'secondary-btn':''}" type="button" data-invert-flow="${i}">${inverted?'↔ Inverted':'↔ Normal'}<span class="small" style="display:block">Visual direction only</span></button></div></div><button class="btn secondary-btn" type="button" data-toggle-extras="${i}">${expanded?'▾':'▸'} Extra entities${extras.length?` (${extras.length}/5)`:' (optional)'}</button>${extrasBody}` : '';
       return `<div class="device"><div class="device-head"><span class="device-title" data-toggle-device="${i}">${deviceOpen?'▾':'▸'} ${esc(ICONS[d.type]||'⚙️')} ${esc(d.name||'Device')}${!deviceOpen && d.power_entity ? `<span class="device-sub">${esc(d.power_entity)}</span>`:''}</span><button title="Remove" data-remove="${i}">×</button></div>${body}</div>`;
     }
     _extraEntityField(di,ei,ex){
