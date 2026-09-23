@@ -10,7 +10,7 @@
  * Issues & feature requests: https://github.com/mimikm/Home-Power-Flow-Card/issues
  */
 (() => {
-  const VERSION = '0.6.9.9.6';
+  const VERSION = '0.8.2';
   const DEFAULT_BG = '/hacsfiles/Home-Power-Flow-Card/smart-home-energy-background.png';
   const DEFAULT_BG_NIGHT = '/hacsfiles/Home-Power-Flow-Card/smart-home-energy-background2.png';
   const TYPES = [
@@ -45,9 +45,16 @@
   function flowColor(a, b, reverse, active, customColors = {}) {
     const colors = { ...FLOW_COLORS, ...(customColors || {}) };
     if (!active) return colors.neutral || FLOW_COLORS.neutral;
-    // Colour is owned by the device. Direction only changes animation direction.
+    // Colour is owned by the metered device (the one with a power_entity),
+    // never by a bare pass-through hub - regardless of its type. A metered
+    // second inverter or Gateway owns its colour just like any other device;
+    // a bare inverter/gateway/junction never does.
     let source = reverse ? b : a;
-    if (source?.type === 'inverter') source = source === a ? b : a;
+    const hasEntity = d => !!(d?.power_entity && String(d.power_entity).trim());
+    if (!hasEntity(source)) {
+      const other = source === a ? b : a;
+      if (hasEntity(other)) source = other;
+    }
     return source?.flow_color || colors[source?.type || 'neutral'] || colors.neutral || FLOW_COLORS.neutral;
   }
 
@@ -428,12 +435,22 @@
     // metered side) - this used to only apply to type 'inverter'; now it
     // applies to any bare device, so a second metered inverter, a Gateway,
     // or a Distribution Board can equally act as - or be driven by - a hub.
-    _flowDirection(a, b, va, vb) {
+    // preferChild: when the edge builder knows which side is structurally
+    // the child (via an explicit connects_to link or the automatic
+    // hub/gateway fallback), that device's own reading is always
+    // authoritative for whether ITS edge is active - even if the hub/parent
+    // side also happens to have its own power_entity. Without this, two
+    // metered endpoints (e.g. a metered second inverter feeding an EV
+    // charger that also has its own sensor) fall back to "either side
+    // active", which can show a flow into a device reading 0W just because
+    // its parent is busy elsewhere.
+    _flowDirection(a, b, va, vb, preferChild) {
       const threshold = Math.max(1, Number.isFinite(Number(this._config.flow_threshold_watts)) ? Number(this._config.flow_threshold_watts) : 1);
 
       const aHas = !!(a.power_entity && String(a.power_entity).trim());
       const bHas = !!(b.power_entity && String(b.power_entity).trim());
-      const source = (aHas && !bHas) ? a : (bHas && !aHas) ? b : null;
+      let source = (aHas && !bHas) ? a : (bHas && !aHas) ? b : null;
+      if (!source && aHas && bHas && (preferChild === a || preferChild === b)) source = preferChild;
       const value = source === a ? va : source === b ? vb : null;
 
       if (source) {
@@ -483,7 +500,9 @@
       const edges = [];
       const valid = e => e && Number.isInteger(Number(e.from)) && Number.isInteger(Number(e.to)) && devices[e.from] && devices[e.to] && Number(e.from) !== Number(e.to);
       if (Array.isArray(this._config.connections) && this._config.connections.length) {
-        this._config.connections.forEach(e => { if (valid(e)) edges.push([Number(e.from), Number(e.to), Number(e.direction || 0)]); });
+        // "To" is treated as the child/consumer side for the same
+        // both-metered tie-break _flowEdges uses below.
+        this._config.connections.forEach(e => { if (valid(e)) edges.push([Number(e.from), Number(e.to), Number(e.direction || 0), Number(e.to)]); });
         return edges;
       }
 
@@ -504,8 +523,9 @@
         const parent = parentOf(d, i) ?? (inverterIdx !== -1 ? inverterIdx : null);
         if (parent === null) return;
         // Solar keeps its historical child-first edge order ([solar, hub]);
-        // everything else is hub-first ([hub, device]).
-        edges.push(typeOf(d) === 'solar' ? [i, parent, 0] : [parent, i, 0]);
+        // everything else is hub-first ([hub, device]). 4th element (i) is
+        // the known child index, used to break both-metered ties.
+        edges.push(typeOf(d) === 'solar' ? [i, parent, 0, i] : [parent, i, 0, i]);
       });
 
       // Every inverter beyond the first: use its explicit link if set,
@@ -516,7 +536,7 @@
         if (typeOf(d) !== 'inverter' || i === inverterIdx) return;
         const parent = parentOf(d, i) ?? (gatewayIdx !== -1 ? gatewayIdx : (inverterIdx !== -1 ? inverterIdx : null));
         if (parent === null) return;
-        edges.push([parent, i, 0]);
+        edges.push([parent, i, 0, i]);
       });
 
       return edges;
@@ -525,11 +545,12 @@
     _flowStateKey(devices, snapshot) {
       if (!devices.length) return '';
       const seen = new Set();
-      return this._flowEdges(devices).map(([a,b,dir]) => {
+      return this._flowEdges(devices).map(([a,b,dir,child]) => {
         const key=`${a}-${b}`;
         if (seen.has(key)) return '';
         seen.add(key);
-        const info=this._flowDirection(devices[a], devices[b], snapshot?.[a], snapshot?.[b]);
+        const childDevice = Number.isInteger(child) ? devices[child] : null;
+        const info=this._flowDirection(devices[a], devices[b], snapshot?.[a], snapshot?.[b], childDevice);
         let reverse=info.reverse;
         if(Number(dir)===1) reverse=false;
         if(Number(dir)===2) reverse=true;
@@ -543,20 +564,23 @@
       const seen=new Set();
       const speed=Math.max(3,Math.min(30,num(this._config.flow_speed)||8));
       const stagger=Math.max(.15,Math.min(1.5,num(this._config.flow_stagger)||.55));
-      return edges.map(([a,b,dir],idx)=>{
+      return edges.map(([a,b,dir,child],idx)=>{
         const key=`${a}-${b}`; if(seen.has(key))return ''; seen.add(key);
         const A=pos[a],B=pos[b]; if(!A||!B)return '';
         const x1=A.x*10,y1=A.y*6.67,x2=B.x*10,y2=B.y*6.67,dx=(x2-x1)*.38;
         const path=`M ${x1} ${y1} C ${x1+dx} ${y1}, ${x2-dx} ${y2}, ${x2} ${y2}`;
         const da=devices[a],db=devices[b],va=this._flowSnapshot?.[a],vb=this._flowSnapshot?.[b];
-        const info=this._flowDirection(da,db,va,vb);
+        const childDevice = Number.isInteger(child) ? devices[child] : null;
+        const info=this._flowDirection(da,db,va,vb,childDevice);
         // No valid entity value = no visible connection. Zero/below threshold
         // also remains completely hidden until meaningful power exists.
         if (!info.active) return '';
+        // info.reverse already includes each device's Invert Flow toggle
+        // (applied once, inside _flowDirection). Only a manual connection's
+        // forced direction (1 = From->To, 2 = To->From) overrides it here -
+        // do NOT re-apply invert_flow a second time, or it cancels itself out.
         let reverse=info.reverse;
         if(Number(dir)===1)reverse=false; if(Number(dir)===2)reverse=true;
-        const visualSource = reverse ? db : da;
-        if(visualSource?.invert_flow) reverse = !reverse;
         const id=`flow${a}_${b}_${idx}`,duration=speed.toFixed(2)+'s';
         const stroke=flowColor(da,db,reverse,true,this._config.flow_colors);
         const width=2.1;
