@@ -10,7 +10,7 @@
  * Issues & feature requests: https://github.com/mimikm/Home-Power-Flow-Card/issues
  */
 (() => {
-  const VERSION = '0.7.5.1';
+  const VERSION = '0.7.5.2';
   const DEFAULT_BG = '/hacsfiles/Home-Power-Flow-Card/smart-home-energy-background.png';
   const DEFAULT_BG_NIGHT = '/hacsfiles/Home-Power-Flow-Card/smart-home-energy-background2.png';
   const TYPES = [
@@ -323,7 +323,7 @@
           <div class="bg"></div><div class="vignette"></div>
           <div class="header"><div class="title">${esc(c.title || 'Energy Flow')}</div>${c.subtitle ? `<div class="subtitle">${esc(c.subtitle)}</div>` : ''}</div>
           <div class="weather" style="--weather-x:${this._uiPosition(c.weather_position, 82, 10).x}%;--weather-y:${this._uiPosition(c.weather_position, 82, 10).y}%"><div class="date">${esc(date)}</div><div class="clock">${esc(time)}</div><div class="wicon">${weatherIcon}</div><div class="temp">${weatherTemp != null ? esc(weatherTemp) + esc(weatherUnit) : '—'}</div><div class="wstate">${esc(weatherText)}</div></div>
-          <div class="canvas"><svg class="flows" viewBox="0 0 1000 667" preserveAspectRatio="none">${flows}</svg>${nodes}</div>
+          <div class="canvas"><svg class="flows" viewBox="0 0 1000 667" preserveAspectRatio="none">${this._svgFilterDefs()}${flows}</svg>${nodes}</div>
           ${stats ? stats.replace('<div class="stats">', `<div class="stats" style="--stats-x:${this._uiPosition(c.stats_position, 17, 86).x}%;--stats-y:${this._uiPosition(c.stats_position, 17, 86).y}%">`) : ''}
           ${devices.length ? '' : '<div class="empty"><div><b>Add your first device</b><span>Open the card editor and add Solar, Inverter, Battery, Grid or House.</span></div></div>'}
         </div>`;
@@ -463,7 +463,7 @@
         const svg = this.shadowRoot.querySelector('svg.flows');
         if (svg) {
           const layout = this._layout(devices);
-          svg.innerHTML = this._flows(devices, layout);
+          svg.innerHTML = this._svgFilterDefs() + this._flows(devices, layout);
         }
       } else {
         this._flowSnapshot = currentSnapshot;
@@ -697,6 +697,17 @@
       }).join('|');
     }
 
+    // Glow filters for .flow-path/.flow-dot (see CSS). These must be present
+    // inside the SVG every time its content is set - Chrome/Firefox quietly
+    // ignore a filter:url(#id) reference to a missing filter, but WebKit
+    // (Safari, and therefore the iOS Home Assistant app) treats it as
+    // "paint nothing", making flow lines invisible there specifically until
+    // the filters actually exist. Shared here so the full render and the
+    // incremental live-update path (which replaces the SVG's own innerHTML)
+    // can never drift out of sync and lose them again.
+    _svgFilterDefs() {
+      return `<defs><filter id="glow" x="-60%" y="-60%" width="220%" height="220%"><feGaussianBlur stdDeviation="1.4" result="blur"/><feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge></filter><filter id="dotglow" x="-150%" y="-150%" width="400%" height="400%"><feGaussianBlur stdDeviation="1.6" result="blur"/><feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge></filter></defs>`;
+    }
     _flows(devices, pos) {
       if (!devices.length) return '';
       const edges = this._flowEdges(devices);
