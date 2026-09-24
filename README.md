@@ -1,177 +1,153 @@
 # ⚡ Home Power Flow Card
 
-A beautiful, animated real-time energy flow card for Home Assistant Lovelace dashboards — built by **Dom** ([@mimikm](https://github.com/mimikm)).
+[![HACS Custom](https://img.shields.io/badge/HACS-Custom-41BDF5.svg)](https://github.com/hacs/integration)
+[![GitHub Release](https://img.shields.io/github/v/release/mimikm/Home-Power-Flow-Card)](https://github.com/mimikm/Home-Power-Flow-Card/releases)
+[![Validate](https://github.com/mimikm/Home-Power-Flow-Card/actions/workflows/validate.yml/badge.svg)](https://github.com/mimikm/Home-Power-Flow-Card/actions/workflows/validate.yml)
 
-Visualise your home's whole energy ecosystem — solar, battery, grid, EV, and even multi-inverter setups — as a living diagram, with power flowing between devices exactly as your sensors report it.
+An animated, real-time energy flow card for Home Assistant dashboards, built by **Dom** ([@mimikm](https://github.com/mimikm)).
 
-**Repository:** https://github.com/mimikm/Home-Power-Flow-Card
+Show your whole home energy system (solar, batteries, grid, EV chargers, even multi-inverter setups) as a living picture of your home, with power flowing between devices exactly as your sensors report it.
+
+![Home Power Flow Card](images/preview.png)
 
 ---
 
-## 🧪 Public Test Release
+## 🧪 Public test release
 
-This is a **public test release v0.7.3** — the card is feature-complete for most setups and I'd love for more people to try it on their own Home Assistant instance before calling it stable.
+The card is feature-complete for most setups and actively developed. It's my **first open-source project**, and it keeps improving thanks to feedback from testers.
 
-Please **back up your dashboard config before installing** (Settings → System → Backups, or just export your existing card config if you're replacing an older version — see [Backup & Restore](#-backup--restore) below).
+**Back up your dashboard before installing** (or export your existing card config, see [Backup & Restore](#-backup--restore)).
 
-If something looks wrong or breaks, please [open an issue](https://github.com/mimikm/Home-Power-Flow-Card/issues) with:
+Found a problem? [Open an issue](https://github.com/mimikm/Home-Power-Flow-Card/issues) and include:
 - Home Assistant version
-- Card version (shown in the browser console on load, and in your config)
-- Your card configuration (the YAML, or an exported config file — see below)
-- The affected entities and what you expected to see instead
+- Card version (shown in the browser console on load)
+- Your card configuration (YAML or an exported config file)
+- The affected entities and what you expected to see
 
-This is my **first open-source project**, and it's actively developed based on my own setup and on feedback from testers like you. Thank you for helping shape it. ❤️
+Don't worry if your issue comes in as ticket #195,941. I'll get through them all. Eventually. Possibly with coffee. ☕
 
 ---
 
-## ☕ Support the Project
+## ☕ Support the project
 
-If you enjoy this card and want to support future development:
+If you enjoy the card and want to support its development:
 
 **[☕ Buy me a coffee](https://buymeacoffee.com/mimikm)**
-
----
-
-## ✨ Features
-
-### 🌊 Animated Energy Flows
-Real-time, animated power movement between every device on the diagram. A moving dot only appears once power exceeds your configured threshold, so idle connections stay quiet.
-
-### 🔌 Multi-Inverter & Multi-Hub Support
-Add as many inverters as you have, and wire them however your system is actually built:
-- Each device gets an optional **"Connects to"** link, so you can say exactly what feeds what — Solar 2 → Inverter 2, a battery → a specific inverter, anything.
-- Add a **Gateway / Distribution Board** device to act as the meeting point between multiple inverters, instead of forcing everything through one.
-- Leave it on **Automatic** and it still works sensibly out of the box: every device falls back to the (first) inverter, and any extra inverter falls back to your Gateway if you've added one — nothing is ever silently dropped.
-- A device with its own power sensor is correctly treated as genuinely metered (bidirectional, sign-aware) wherever it sits in the topology — not just when it's the "final" device on an edge.
-
-### 🔗 Custom Connections
-Prefer full manual control? Leave "Connects to" alone and define explicit From → To connections instead, each with its own direction mode (auto from live values, forced forward, or forced reverse).
-
-### 🔋 Any Number of Devices, Any Type
-☀️ Solar PV, ⚡ Inverter, 🔋 Battery, 🧠 Gateway, 🏠 House, 🌐 Grid, 🚗 EV Charger, or ⚙️ Extra Load — add as many of each as your setup needs. Every device has its own name, icon, power entity and flow colour.
-
-### 🧩 Extra Entities *(optional, per device)*
-Attach up to **5 extra entities** to any device — battery SOC, voltage, temperature, cost, anything you like. Each one:
-- is picked from a native Home Assistant entity dropdown
-- gets its own icon from the full Material Design Icon library
-- is shown compactly, side-by-side, in a smaller font directly under the device's power value
-- is purely informational — extras never affect flow direction, animation, or any calculation
-
-The section is collapsible in the editor, so devices without extras stay tidy.
-
-### 🔄 Per-Device Invert Flow
-Every device can invert its own *visual* flow direction — useful since manufacturers report power direction differently. This only changes animation direction; it never touches sensor values, calculations, or readings.
-
-### 🎨 Custom Flow Colours
-Give each device its own flow colour, which stays attached to that device regardless of which way power is currently flowing — including a metered inverter in a multi-inverter setup.
-
-### 🖱️ Drag-and-Drop Visual Layout
-Position every device, the weather widget, and the daily-stats panel exactly where you want them by dragging them on a live preview. Positions save automatically, and a one-click reset restores the automatic layout.
-
-### 🖼️ Custom Backgrounds
-- Separate day and night background images
-- Upload directly to your Home Assistant media library, or link any image URL
-- Automatically switches between them based on a sun entity (defaults to `sun.sun`)
-
-### 🌤️ Weather & Clock Header
-An optional weather panel shows the date, time (12h or 24h), temperature and current conditions from any weather entity.
-
-### 📊 Daily Statistics Panel
-Add up to 20 custom statistic rows — daily solar yield, grid import/export, CO₂ saved, anything with a number — each with its own name, entity and Material Design icon, and drag-to-reorder.
-
-### ⚙️ Fully Visual, No-YAML Configurator
-Everything above is configurable through the built-in editor, using native Home Assistant pickers throughout (entity dropdowns, icon pickers, colour pickers):
-- Device cards are **collapsed by default** for a clean list, showing just the icon, name and power entity — click to expand and edit
-- Add, remove, and reorder devices, connections and statistics without writing YAML
-- Flow animation speed, particle stagger, and the noise threshold are all adjustable fields
-
-### 💾 Backup & Restore
-Export your entire card configuration — devices, connections, layout, backgrounds, statistics, everything — as a JSON file with one click, and re-import it just as easily. Handy before a big topology change, or for sharing a working setup with someone else.
-
-### 🖱️ Click-Through to Entities
-Click any device on the card to open its Home Assistant "more info" dialog directly.
-
-### 📱 Responsive
-The layout is designed for larger screens. (mobile screen support in roadmap).
 
 ---
 
 ## 📦 Installation
 
 ### HACS (recommended)
-1. Open **HACS**
-2. Go to **Frontend**
-3. Add this repository as a **custom repository**: `https://github.com/mimikm/Home-Power-Flow-Card`
-4. Install **Home Power Flow Card**
-5. Restart Home Assistant
-6. Add the card through the Lovelace UI (search for "Home Power Flow Card")
+
+[![Open your Home Assistant instance and open this repository in HACS.](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=mimikm&repository=Home-Power-Flow-Card&category=plugin)
+
+Or manually in HACS:
+1. Open **HACS** in Home Assistant
+2. Open the **⋮** menu → **Custom repositories**
+3. Add `https://github.com/mimikm/Home-Power-Flow-Card` with the type **Dashboard**
+4. Search for **Home Power Flow Card** and download it
+5. Reload your browser
+6. Add the card to a dashboard (search for "Home Power Flow Card")
 
 ### Manual
-1. Download `home-power-flow-card.js` from the [latest release](https://github.com/mimikm/Home-Power-Flow-Card/releases)
-2. Copy it into `/config/www/`
-3. Add it as a Lovelace resource: **Settings → Dashboards → Resources** → `/local/home-power-flow-card.js`, type **JavaScript Module**
+
+1. Download `home-power-flow-card.js` and the background images from the [latest release](https://github.com/mimikm/Home-Power-Flow-Card/releases)
+2. Copy them into `/config/www/`
+3. Add a dashboard resource: **Settings → Dashboards → ⋮ → Resources** → `/local/home-power-flow-card.js`, type **JavaScript module**
 4. Add the card to a dashboard
 
-If you don't see your changes after updating, browsers cache this file aggressively — hard-refresh (Ctrl/Cmd+Shift+R) or bump the `?v=` on the resource URL.
+> **Not seeing an update?** Browsers cache card files aggressively. Hard-refresh (Ctrl/Cmd+Shift+R), and on phones fully close and reopen the Home Assistant app.
 
 ---
 
-## ⚡ Flow Threshold
+## ✨ Features
 
-To avoid flow lines flickering from sensor noise, a device's power must exceed a configurable threshold before its flow line becomes visible.
+### 🌊 Animated energy flows
+- Live animated flow lines between every device, with a moving, softly pulsing dot showing the direction of power
+- Dots move **faster on high-power connections** and slower on light ones
+- Evenly spaced flow lines, whatever the distance between devices
+- A configurable **noise threshold** keeps idle connections quiet
 
-| Power | Result |
-|---|---|
-| Below threshold | No flow line |
-| At or above threshold | Flow visible, animated |
+### 🔌 Any setup, including multi-inverter
+- Device types: ☀️ Solar, ⚡ Inverter, 🔋 Battery, 🧠 Gateway / distribution board, 🏠 House, 🌐 Grid, 🚗 EV charger and ⚙️ Extra load, as many of each as you need
+- **"Connects to"** links let you describe your real wiring (e.g. Solar 2 → Inverter 2)
+- A **Gateway** device can act as the meeting point between several inverters
+- Left on **Automatic**, everything still connects sensibly out of the box
+- Optional **manual connections** for full control over what flows where
 
-Default: **1 W**, adjustable in the editor. This is checked against each edge's own metered device — a device reading 0 W stays inactive even if whatever it's connected to is busy.
+### 🎨 Per-device customisation
+- Own name, power entity and **flow colour** for every device
+- **Invert flow** per device, for sensors that report power the other way round
+- Up to **5 extra entities** per device (SoC, voltage, temperature...) with their own icons, shown in small text under the power value
+- **Battery glow**: batteries pulse green when charging and amber when discharging (can be turned off per battery)
+
+### 🖱️ Flexible layout
+- **Drag and drop** devices, the title, the weather box, the Today panel and the grid mix box to exactly where you want them
+- **Custom backgrounds**: separate day and night images, switched automatically by the sun
+- **Title and subtitle** with your own text and colour, or leave them blank
+- **Sizing controls** for the title, device boxes, weather box, Today panel and grid mix box
+
+### 📱 Fits every screen
+- The whole card scales to the available width, so it looks the same on a monitor, a tablet or a phone
+- It never grows taller than your screen
+- Text is boosted automatically on phones so it stays readable
+- Full support for Home Assistant's **Sections** dashboards
+- Tested on desktop browsers and the iOS app
+
+### 🌤️ Weather, stats and grid
+- **Weather & clock** box from any weather entity (12 or 24 hour)
+- **Today panel** with up to 20 statistics (solar yield, grid import/export, anything with a number), each with its own icon
+- **UK grid mix** box (optional): live carbon intensity with a colour-coded rating, plus the current generation mix by source, for your region or all of Great Britain
+
+### ⚙️ Fully visual editor
+- Everything is configurable without YAML, using Home Assistant's own entity, icon and colour pickers
+- Collapsible, **drag-to-reorder** devices and statistics
+- A live preview that always shows the whole card
+- Click any device on the card to open its Home Assistant details
+
+### 💾 Backup & Restore
+Export your whole card configuration as a JSON file with one click, and import it again later. Handy before big changes, or to share a working setup.
 
 ---
 
-## 🔌 Multi-Inverter Setups
+## ⚡ Flow threshold
 
-If you only have one inverter, you don't need to configure anything here — it just works, same as before.
+A device's power must reach the threshold before its flow line appears, so sensor noise doesn't cause flickering. Default: **1 W**, adjustable in the editor.
 
-If you have **two or more inverters**:
-
-1. **Nothing wired manually?** Every device still auto-attaches to the first inverter, and any extra inverter auto-attaches to a **Gateway** device if you've added one (or to the first inverter if you haven't). Nothing is orphaned.
-2. **Want it accurate to your real wiring?** Add a Gateway/Distribution Board device (type "🧠 Gateway"), and set each device's **"Connects to"** field to whatever it actually connects to — a specific inverter, or the Gateway.
-3. **Direction looks backwards?** Use that device's **Invert Flow** toggle — it corrects for however your specific inverter or meter reports its sign.
+Each line is judged by its own device: a device reading 0 W stays quiet even if whatever it's connected to is busy.
 
 ---
 
-## 🛠 Example Configuration
+## 🔌 Multi-inverter setups
+
+With a single inverter there is nothing to configure.
+
+With two or more inverters:
+1. **Nothing wired manually?** Devices attach to the first inverter, and extra inverters attach to a Gateway device if you have one. Nothing is left disconnected.
+2. **Want it to match your real wiring?** Add a **Gateway** device and set each device's **Connects to** field.
+3. **Direction backwards?** Use that device's **Invert flow** toggle.
+
+> Devices set to Automatic connect to the *first* inverter in the list, so reordering inverters changes which one is the main hub.
+
+---
+
+## 🛠 Example configuration
+
+Everything below can also be set up in the visual editor.
 
 ```yaml
 type: custom:home-power-flow-card
-
 title: Energy Flow
-
+subtitle: Live power
 devices:
   - type: solar
     name: Solar PV
-    power_entity: sensor.solar_power_1
+    power_entity: sensor.solar_power
     connects_to: inv1
-
   - type: inverter
-    name: Inverter 1
+    name: Inverter
     id: inv1
-
-  - type: solar
-    name: Solar PV 2
-    power_entity: sensor.solar_power_2
-    connects_to: inv2
-
-  - type: inverter
-    name: Inverter 2
-    power_entity: sensor.inverter_2_power
-    id: inv2
-
-  - type: gateway
-    name: Distribution Board
-    id: gw1
-
   - type: battery
     name: Battery
     power_entity: sensor.battery_power
@@ -179,67 +155,112 @@ devices:
     extra_entities:
       - entity: sensor.battery_soc
         icon: mdi:battery-charging
-      - entity: sensor.battery_voltage
-        icon: mdi:lightning-bolt
-
   - type: grid
     name: Grid
     power_entity: sensor.grid_power
-
   - type: house
     name: House
     power_entity: sensor.house_power
-
   - type: ev
     name: EV Charger
     power_entity: sensor.ev_power
+statistics:
+  entities:
+    - name: Solar today
+      entity: sensor.solar_energy_today
+      icon: mdi:solar-power
+grid_mix_enabled: true
+grid_mix_postcode: SW1A
 ```
 
-Everything above — devices, links, extra entities, colours, connections, layout, backgrounds and statistics — can also be configured entirely through the visual editor, without touching YAML. Every device is assigned a stable internal id automatically the first time you save; `connects_to` references that id, not a position in the list, so reordering or deleting devices later never silently rewires a connection onto the wrong one.
+Each device gets a stable internal `id` automatically. `connects_to` refers to that id rather than a position in the list, so reordering or deleting devices never rewires a connection by mistake.
 
 ---
 
-## 🤝 Contributing
+## 📋 Configuration options
 
-Suggestions, bug reports and improvements are very welcome — please [open an issue](https://github.com/mimikm/Home-Power-Flow-Card/issues).
+### Card
 
-Testing on real-world multi-inverter, gateway, or otherwise non-standard setups is especially valuable right now.
+| Option | Default | Description |
+|---|---|---|
+| `title` | `Energy Flow` | Card title. Set to `""` for no title |
+| `subtitle` | — | Optional second line under the title |
+| `title_color` | `#ffffff` | Colour of the title and subtitle |
+| `time_format` | `24h` | `24h` or `12h` for the clock |
+| `weather_entity` | — | Weather entity for the weather box |
+| `sun_entity` | `sun.sun` | Switches between the day and night backgrounds |
+| `background` | built-in | Day background image URL |
+| `background_night` | built-in | Night background image URL |
+| `flow_threshold_watts` | `1` | Minimum power (W) before a flow line shows |
+| `flow_speed` | `8` | Base animation duration in seconds (at 1 kW) |
+| `grid_mix_enabled` | `false` | Show the UK grid mix box |
+| `grid_mix_postcode` | — | Outward postcode for regional data (e.g. `SW1A`); blank = all of GB |
+
+### Sizing
+
+| Option | Default | Description |
+|---|---|---|
+| `title_scale` | `1` | Title and subtitle size |
+| `device_scale` | `1` | Device box size |
+| `weather_scale` | `1` | Weather box size |
+| `stats_scale` | `0.8` | Today panel size (also shrinks automatically if too tall) |
+| `grid_mix_scale` | `1` | Grid mix box size |
+| `mobile_scale` | `1.4` | Extra size for boxes on phones |
+| `max_width` | `0` | Maximum card width in px (`0` = fill the available width) |
+
+### Devices
+
+| Option | Description |
+|---|---|
+| `type` | `solar`, `inverter`, `battery`, `gateway`, `house`, `grid`, `ev` or `load` |
+| `name` | Display name |
+| `power_entity` | Power sensor (W) |
+| `connects_to` | `id` of the device it's wired to (blank = Automatic) |
+| `flow_color` | Flow line colour, e.g. `#ffd54f` |
+| `invert_flow` | `true` to reverse the flow direction |
+| `battery_glow` | Batteries only: `false` to turn off the charge/discharge glow |
+| `extra_entities` | Up to 5 extra readings, each with `entity` and `icon` |
+
+Positions and sizes are easiest to set by dragging in the editor's **Visual layout**.
 
 ---
 
 ## 🗺️ Roadmap
 
-Planned and possible future updates. Ideas and feedback are welcome, so feel free to [open an issue](https://github.com/mimikm/Home-Power-Flow-Card/issues) if there's something you'd like to see.
+Ideas and feedback are welcome, so [open an issue](https://github.com/mimikm/Home-Power-Flow-Card/issues) if there's something you'd like to see.
 
-### 🔧 Stability & polish
-- Proper sizing support for Home Assistant's **Sections** dashboard layout
-- Cross-platform testing before each release (Chrome, Safari, Firefox, iOS & Android apps)
+**Stability & polish**
 - Editor warnings for misconfigured devices and broken "Connects to" links
-- Respect the system "reduce motion" setting for traveling flow dots
+- Respect the system "reduce motion" setting for flow dots
+- Separate phone layout (different positions on small screens)
 
-### ⚙️ Editor improvements
-- **Duplicate device** button for faster multi-inverter / multi-string setups
-- **Drag to reorder** devices in the editor
-- Live **flow direction indicator** next to each device's Invert Flow toggle
+**Editor**
+- Duplicate device button
+- Live flow direction indicator next to each Invert flow toggle
 
-### ✨ New features
-- Automatic **kW formatting** for large values (e.g. `3.2 kW` instead of `3200 W`)
-- Configurable **tap actions** per device (more-info, navigate, toggle)
-- **Battery time remaining** estimate based on current power and capacity
-- **Self-sufficiency %** and other computed stats in the Today panel
-- **Light theme** support
+**Features**
+- Automatic kW formatting for large values (e.g. `3.2 kW` instead of `3200 W`)
+- Configurable tap actions per device (more-info, navigate, toggle)
+- Battery time remaining (to full / to reserve). *Waiting on feedback, let me know if you'd use it!*
+- Self-sufficiency % and other computed stats
+- Light theme support
 
-### 📦 Project
-- Automated checks on GitHub (syntax + HACS validation)
-- Tagged releases that match the card version, for reliable HACS updates
-- **Translations** of the editor for non-English users
+**Project**
+- Translations of the editor
 
+---
+
+## 🤝 Contributing
+
+Suggestions, bug reports and improvements are very welcome, so please [open an issue](https://github.com/mimikm/Home-Power-Flow-Card/issues). Testing on multi-inverter, gateway or other unusual setups is especially valuable.
 
 ---
 
 ## ❤️ Thanks
 
-This project started as a personal Home Assistant dashboard improvement and is growing into a community project. Thank you to everyone testing it, suggesting improvements, and helping make it better.
+This project started as a personal dashboard improvement and is growing into a community project. Thank you to everyone testing it, suggesting improvements and helping make it better.
+
+Grid mix data: [Carbon Intensity API](https://carbonintensity.org.uk/) by the National Energy System Operator (NESO).
 
 ---
 
