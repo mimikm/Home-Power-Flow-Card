@@ -10,7 +10,7 @@
  * Issues & feature requests: https://github.com/mimikm/Home-Power-Flow-Card/issues
  */
 (() => {
-  const VERSION = '0.7.4';
+  const VERSION = '0.9.14';
   const DEFAULT_BG = '/hacsfiles/Home-Power-Flow-Card/smart-home-energy-background.png';
   const DEFAULT_BG_NIGHT = '/hacsfiles/Home-Power-Flow-Card/smart-home-energy-background2.png';
   const TYPES = [
@@ -853,7 +853,33 @@
         const inner=previewCard.querySelector('home-power-flow-card');
         if(inner?.shadowRoot){
           const card=inner.shadowRoot.querySelector('.card');
-          if(card){ card.style.minHeight='0'; card.style.height='auto'; }
+          if(card){
+            card.style.minHeight='0'; card.style.height='auto';
+            // Reset any previous fit-scaling before measuring the card's
+            // natural (unscaled) size, so repeated calls don't compound.
+            card.style.transform=''; card.style.transformOrigin='';
+            inner.style.height=''; inner.style.overflow='';
+            const naturalW=card.offsetWidth, naturalH=card.offsetHeight;
+            if(naturalW && naturalH){
+              // The dialog only gives the preview a limited height (that's
+              // what was clipping/zooming the card into a cropped view).
+              // Shrink the whole card - as one rigid thumbnail, not by
+              // reflowing its internals - to fit entirely within whatever
+              // space is actually available, both width and height.
+              const availW=preview.clientWidth||naturalW;
+              const availH=Math.max(320, preview.clientHeight || (surface?.clientHeight ? surface.clientHeight*0.62 : window.innerHeight*0.6));
+              const scale=Math.min(1, availW/naturalW, availH/naturalH);
+              if(scale<1){
+                card.style.transform=`scale(${scale})`;
+                card.style.transformOrigin='top left';
+                inner.style.display='block';
+                inner.style.width=(naturalW*scale)+'px';
+                inner.style.height=(naturalH*scale)+'px';
+                inner.style.overflow='hidden';
+                inner.style.margin='0 auto';
+              }
+            }
+          }
         }
       };
       applyInner();
