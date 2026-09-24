@@ -10,7 +10,7 @@
  * Issues & feature requests: https://github.com/mimikm/Home-Power-Flow-Card/issues
  */
 (() => {
-  const VERSION = '0.7.3';
+  const VERSION = '0.7.4';
   const DEFAULT_BG = '/hacsfiles/Home-Power-Flow-Card/smart-home-energy-background.png';
   const DEFAULT_BG_NIGHT = '/hacsfiles/Home-Power-Flow-Card/smart-home-energy-background2.png';
   const TYPES = [
@@ -315,18 +315,16 @@
           .node .top { display:flex; align-items:center; gap:8px; }.node .icon { font-size:24px; line-height:1; }.node .name { font-weight:700; font-size:14px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }.node .power { margin-top:5px; font-size:19px; font-weight:750; }.node .extras { margin-top:4px; display:flex; flex-wrap:wrap; gap:2px 8px; }.node .extras:empty { display:none; margin:0; }.node .extra-row { display:inline-flex; align-items:center; gap:3px; font-size:10px; line-height:1.3; opacity:.78; white-space:nowrap; max-width:100%; overflow:hidden; text-overflow:ellipsis; }.node .extra-row ha-icon { --mdc-icon-size:12px; width:12px; height:12px; flex:none; }.node.battery { border-color:rgba(123,255,158,.28); }.node.grid { border-color:rgba(93,191,255,.3); }.node.ev { border-color:rgba(151,255,103,.28); }
           @keyframes hpf-charge-pulse { 0%,100% { box-shadow:0 8px 22px rgba(0,0,0,.32), 0 0 0 0 var(--pulse-color); } 50% { box-shadow:0 8px 22px rgba(0,0,0,.32), 0 0 30px 8px var(--pulse-color); } }
           @media (prefers-reduced-motion: reduce) { .node[data-batt-state="charging"], .node[data-batt-state="discharging"] { animation:none !important; } }
-          .legend { position:absolute; right:2.6%; bottom:3.2%; z-index:18; padding:9px 12px; border-radius:12px; background:rgba(4,15,25,.55); font-size:11px; opacity:.8; backdrop-filter:blur(8px); }
           .empty { position:absolute; inset:0; display:flex; align-items:center; justify-content:center; z-index:30; }.empty > div { padding:24px 30px; background:rgba(10,25,38,.82); border-radius:18px; border:1px solid rgba(255,255,255,.18); text-align:center; backdrop-filter:blur(10px); }.empty b{display:block;font-size:20px;margin-bottom:6px}.empty span{opacity:.75}
-          @media (max-width: 800px) { .card{aspect-ratio:auto; min-height:760px}.weather{min-width:190px;padding:10px 12px}.header{top:2%;left:2%}.stats{width:46%;min-width:260px}.node{width:130px}.legend{display:none} }
+          @media (max-width: 800px) { .card{aspect-ratio:auto; min-height:760px}.weather{min-width:190px;padding:10px 12px}.header{top:2%;left:2%}.stats{width:46%;min-width:260px}.node{width:130px} }
           @media (max-width: 560px) { .card{min-height:900px}.title{font-size:27px}.subtitle{font-size:12px}.weather{max-width:45%;min-width:150px}.date{font-size:10px}.clock{font-size:19px}.temp{font-size:17px}.wicon{font-size:25px}.stats{width:62%;min-width:230px}.node{width:120px;padding:9px}.node .power{font-size:16px}.node .name{font-size:12px}.node .extra-row{font-size:9px} }
         </style>
         <div class="card">
           <div class="bg"></div><div class="vignette"></div>
-          <div class="header"><div class="title">${esc(c.title || 'Energy Flow')}</div><div class="subtitle">${esc(c.subtitle || 'Live • Efficient • Sustainable')}</div></div>
+          <div class="header"><div class="title">${esc(c.title || 'Energy Flow')}</div>${c.subtitle ? `<div class="subtitle">${esc(c.subtitle)}</div>` : ''}</div>
           <div class="weather" style="--weather-x:${this._uiPosition(c.weather_position, 82, 10).x}%;--weather-y:${this._uiPosition(c.weather_position, 82, 10).y}%"><div class="date">${esc(date)}</div><div class="clock">${esc(time)}</div><div class="wicon">${weatherIcon}</div><div class="temp">${weatherTemp != null ? esc(weatherTemp) + esc(weatherUnit) : '—'}</div><div class="wstate">${esc(weatherText)}</div></div>
           <div class="canvas"><svg class="flows" viewBox="0 0 1000 667" preserveAspectRatio="none">${flows}</svg>${nodes}</div>
           ${stats ? stats.replace('<div class="stats">', `<div class="stats" style="--stats-x:${this._uiPosition(c.stats_position, 17, 86).x}%;--stats-y:${this._uiPosition(c.stats_position, 17, 86).y}%">`) : ''}
-          <div class="legend">Single moving dot = active power &nbsp;•&nbsp; Flow color follows source</div>
           ${devices.length ? '' : '<div class="empty"><div><b>Add your first device</b><span>Open the card editor and add Solar, Inverter, Battery, Grid or House.</span></div></div>'}
         </div>`;
 
