@@ -207,6 +207,36 @@ Testing on real-world multi-inverter, gateway, or otherwise non-standard setups 
 
 ---
 
+## 🗺️ Roadmap
+
+Planned and possible future updates. Ideas and feedback are welcome, so feel free to [open an issue](https://github.com/mimikm/Home-Power-Flow-Card/issues) if there's something you'd like to see.
+
+### 🔧 Stability & polish
+- Proper sizing support for Home Assistant's **Sections** dashboard layout
+- Cross-platform testing before each release (Chrome, Safari, Firefox, iOS & Android apps)
+- Editor warnings for misconfigured devices and broken "Connects to" links
+- Respect the system "reduce motion" setting for traveling flow dots
+
+### ⚙️ Editor improvements
+- **Duplicate device** button for faster multi-inverter / multi-string setups
+- **Drag to reorder** devices in the editor
+- Live **flow direction indicator** next to each device's Invert Flow toggle
+
+### ✨ New features
+- Automatic **kW formatting** for large values (e.g. `3.2 kW` instead of `3200 W`)
+- Configurable **tap actions** per device (more-info, navigate, toggle)
+- **Battery time remaining** estimate based on current power and capacity
+- **Self-sufficiency %** and other computed stats in the Today panel
+- **Light theme** support
+
+### 📦 Project
+- Automated checks on GitHub (syntax + HACS validation)
+- Tagged releases that match the card version, for reliable HACS updates
+- **Translations** of the editor for non-English users
+
+
+---
+
 ## ❤️ Thanks
 
 This project started as a personal Home Assistant dashboard improvement and is growing into a community project. Thank you to everyone testing it, suggesting improvements, and helping make it better.
