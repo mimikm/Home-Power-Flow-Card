@@ -10,7 +10,7 @@
  * Issues & feature requests: https://github.com/mimikm/Home-Power-Flow-Card/issues
  */
 (() => {
-  const VERSION = '0.9.15';
+  const VERSION = 'DEBUG-preview-dom';
   const DEFAULT_BG = '/hacsfiles/Home-Power-Flow-Card/smart-home-energy-background.png';
   const DEFAULT_BG_NIGHT = '/hacsfiles/Home-Power-Flow-Card/smart-home-energy-background2.png';
   const TYPES = [
@@ -804,10 +804,26 @@
         root=host.getRootNode?.();
         host=root?.host;
       }
-      if(!dialog?.shadowRoot) return;
+      console.log('[HPFC-DEBUG] dialog found:', !!dialog, dialog?.tagName);
+      if(!dialog?.shadowRoot) { console.log('[HPFC-DEBUG] no dialog.shadowRoot, bailing'); return; }
       const preview=dialog.shadowRoot.querySelector('.element-preview');
+      console.log('[HPFC-DEBUG] preview found:', !!preview);
       const previewCard=preview?.querySelector('hui-card');
-      if(!preview || !previewCard) return;
+      console.log('[HPFC-DEBUG] previewCard (hui-card via light-DOM querySelector) found:', !!previewCard);
+      if (preview && !previewCard) {
+        console.log('[HPFC-DEBUG] preview.innerHTML snippet:', preview.innerHTML.slice(0, 500));
+        console.log('[HPFC-DEBUG] preview children tag names:', Array.from(preview.children).map(c=>c.tagName));
+      }
+      if(!preview || !previewCard) { console.log('[HPFC-DEBUG] bailing: missing preview or previewCard'); return; }
+      const innerViaLight = previewCard.querySelector('home-power-flow-card');
+      console.log('[HPFC-DEBUG] inner via previewCard.querySelector (light DOM):', !!innerViaLight);
+      console.log('[HPFC-DEBUG] previewCard.shadowRoot exists:', !!previewCard.shadowRoot);
+      if (previewCard.shadowRoot) {
+        const innerViaShadow = previewCard.shadowRoot.querySelector('home-power-flow-card');
+        console.log('[HPFC-DEBUG] inner via previewCard.shadowRoot.querySelector:', !!innerViaShadow);
+        console.log('[HPFC-DEBUG] previewCard.shadowRoot.innerHTML snippet:', previewCard.shadowRoot.innerHTML.slice(0, 800));
+      }
+      console.log('[HPFC-DEBUG] previewCard.innerHTML snippet (light DOM):', previewCard.innerHTML.slice(0, 800));
 
       // The settings column (the preview's flex sibling) defaults to
       // min-width:auto, the classic flexbox trap: it refuses to shrink below
