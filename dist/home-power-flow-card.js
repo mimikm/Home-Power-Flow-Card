@@ -10,7 +10,7 @@
  * Issues & feature requests: https://github.com/mimikm/Home-Power-Flow-Card/issues
  */
 (() => {
-  const VERSION = '0.7.5.9';
+  const VERSION = '0.7.6.0';
   const DEFAULT_BG = '/hacsfiles/Home-Power-Flow-Card/smart-home-energy-background.png';
   const DEFAULT_BG_NIGHT = '/hacsfiles/Home-Power-Flow-Card/smart-home-energy-background2.png';
   const TYPES = [
@@ -140,6 +140,75 @@
     config.flow_threshold_watts = Math.min(2000, Math.max(0, Number(config.flow_threshold_watts) || 0));
     config.flow_threshold = config.flow_threshold_watts / 1000;
     return config;
+  }
+
+  // ---- UK grid mix (NESO Carbon Intensity API, no key needed) ----------
+  // One shared cache for every card instance (dashboard + editor preview),
+  // keyed by outward postcode ('' = Great Britain). The API updates every
+  // 30 minutes, so data is refetched at most that often; failures are
+  // retried after 5 minutes.
+  const GRID_MIX_API = 'https://api.carbonintensity.org.uk';
+  const GRID_MIX_CACHE = new Map();
+  const GRID_MIX_TTL = 30 * 60 * 1000, GRID_MIX_RETRY = 5 * 60 * 1000;
+  const GRID_FUELS = {
+    wind:    { label:'Wind',    icon:'mdi:wind-turbine',               color:'#4fc3f7' },
+    solar:   { label:'Solar',   icon:'mdi:solar-power-variant',        color:'#ffd54f' },
+    nuclear: { label:'Nuclear', icon:'mdi:atom',                       color:'#b388ff' },
+    hydro:   { label:'Hydro',   icon:'mdi:hydro-power',                color:'#26a69a' },
+    biomass: { label:'Biomass', icon:'mdi:leaf',                       color:'#8bc34a' },
+    gas:     { label:'Gas',     icon:'mdi:fire',                       color:'#ff8a3d' },
+    coal:    { label:'Coal',    icon:'mdi:factory',                    color:'#8d8d8d' },
+    imports: { label:'Imports', icon:'mdi:transmission-tower-import',  color:'#90a4ae' },
+    other:   { label:'Other',   icon:'mdi:dots-horizontal-circle-outline', color:'#bdbdbd' },
+  };
+  const GRID_INDEX = {
+    'very low':  { label:'Very low',  color:'#2e7d32' },
+    'low':       { label:'Low',       color:'#66bb6a' },
+    'moderate':  { label:'Moderate',  color:'#f9a825' },
+    'high':      { label:'High',      color:'#ef6c00' },
+    'very high': { label:'Very high', color:'#c62828' },
+  };
+  function gridMixPostcode(raw) {
+    const outward = String(raw || '').trim().toUpperCase().split(/\s+/)[0].replace(/[^A-Z0-9]/g, '');
+    return /^[A-Z]{1,2}[0-9][A-Z0-9]?$/.test(outward) ? outward : '';
+  }
+  async function gridMixFetchJson(url) {
+    const ctl = typeof AbortController !== 'undefined' ? new AbortController() : null;
+    const timer = ctl ? setTimeout(() => ctl.abort(), 10000) : null;
+    try {
+      const r = await fetch(url, { headers: { Accept: 'application/json' }, signal: ctl?.signal });
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      return await r.json();
+    } finally { if (timer) clearTimeout(timer); }
+  }
+  // Normalises both API shapes into { region, intensity, index, mix:[{fuel,perc}] }.
+  async function gridMixLoad(postcode) {
+    if (postcode) {
+      const j = await gridMixFetchJson(`${GRID_MIX_API}/regional/postcode/${encodeURIComponent(postcode)}`);
+      const reg = Array.isArray(j?.data) ? j.data[0] : j?.data;
+      const period = Array.isArray(reg?.data) ? reg.data[0] : reg?.data;
+      if (!period) throw new Error('No regional data');
+      return { region: reg.shortname || postcode, intensity: period.intensity?.forecast, index: period.intensity?.index, mix: period.generationmix || [] };
+    }
+    const [ij, gj] = await Promise.all([gridMixFetchJson(`${GRID_MIX_API}/intensity`), gridMixFetchJson(`${GRID_MIX_API}/generation`)]);
+    const ip = Array.isArray(ij?.data) ? ij.data[0] : ij?.data;
+    const gp = Array.isArray(gj?.data) ? gj.data[0] : gj?.data;
+    if (!ip) throw new Error('No national data');
+    return { region: 'Great Britain', intensity: ip.intensity?.actual ?? ip.intensity?.forecast, index: ip.intensity?.index, mix: gp?.generationmix || [] };
+  }
+  function gridMixGet(postcode, onData) {
+    const key = postcode || '';
+    let e = GRID_MIX_CACHE.get(key);
+    const now = Date.now();
+    if (e?.promise) { e.promise.then(() => onData(GRID_MIX_CACHE.get(key))); return e; }
+    if (e && ((e.data && now - e.t < GRID_MIX_TTL) || (e.error && now - e.t < GRID_MIX_RETRY))) return e;
+    const entry = { t: now, data: e?.data || null, error: null };
+    entry.promise = gridMixLoad(key)
+      .then(d => { entry.data = d; entry.error = null; })
+      .catch(err => { entry.error = String(err?.message || err); })
+      .finally(() => { entry.t = Date.now(); entry.promise = null; onData(entry); });
+    GRID_MIX_CACHE.set(key, entry);
+    return entry;
   }
 
   function state(hass, entity) {
@@ -317,6 +386,8 @@
       }
       const rawT = Number(this._config?.title_scale);
       stage.style.setProperty('--hpf-title-scale', String(Number.isFinite(rawT) && rawT > 0 ? Math.max(0.3, Math.min(3, rawT)) : 1));
+      const rawG = Number(this._config?.grid_mix_scale);
+      stage.style.setProperty('--hpf-gridmix-scale', String(Number.isFinite(rawG) && rawG > 0 ? Math.max(0.3, Math.min(2, rawG)) : 1));
       const rawW = Number(this._config?.weather_scale);
       stage.style.setProperty('--hpf-weather-scale', String(Number.isFinite(rawW) && rawW > 0 ? Math.max(0.3, Math.min(2, rawW)) : 1));
       const t = Math.max(0, Math.min(1, (900 - w) / 500));
@@ -367,6 +438,19 @@
           .header { position:absolute; left:var(--header-x,2.6%); top:var(--header-y,2.7%); z-index:20; transform-origin:top left; transform:scale(calc(var(--hpf-title-scale,1) * var(--hpf-boost,1))); color:var(--hpf-title-color,#fff); white-space:nowrap; }
           .title { font-size:42px; font-weight:700; letter-spacing:-.03em; text-shadow:0 2px 8px rgba(0,0,0,.4); }
           .subtitle { margin-top:4px; font-size:18px; opacity:.88; text-shadow:0 2px 8px rgba(0,0,0,.45); }
+          .gridmix { position:absolute; z-index:19; left:var(--gm-x,83%); top:var(--gm-y,32%); transform:translate(-50%,-50%) scale(calc(var(--hpf-gridmix-scale,1) * var(--hpf-boost,1))); width:270px; padding:12px 14px; border-radius:15px; background:rgba(8,29,52,.78); border:1px solid rgba(255,255,255,.15); box-shadow:0 8px 28px rgba(0,0,0,.25); backdrop-filter:blur(12px); font-size:12px; }
+          .gridmix .gm-head { display:flex; align-items:center; gap:6px; font-weight:700; font-size:13px; opacity:.9; }
+          .gridmix .gm-head ha-icon { --mdc-icon-size:16px; width:16px; height:16px; }
+          .gridmix .gm-main { display:flex; align-items:baseline; gap:6px; margin:6px 0 8px; }
+          .gridmix .gm-val { font-size:24px; font-weight:750; }
+          .gridmix .gm-unit { opacity:.7; font-size:11px; }
+          .gridmix .gm-badge { margin-left:auto; padding:2px 8px; border-radius:999px; font-size:11px; font-weight:700; color:#fff; }
+          .gridmix .gm-bar { display:flex; height:7px; border-radius:4px; overflow:hidden; margin-bottom:8px; background:rgba(255,255,255,.1); }
+          .gridmix .gm-list { display:grid; grid-template-columns:1fr 1fr; gap:3px 12px; }
+          .gridmix .gm-row { display:flex; align-items:center; gap:5px; white-space:nowrap; }
+          .gridmix .gm-row ha-icon { --mdc-icon-size:14px; width:14px; height:14px; flex:none; }
+          .gridmix .gm-row b { margin-left:auto; font-weight:650; }
+          .gridmix .gm-msg { opacity:.7; margin-top:6px; }
           .weather { position:absolute; z-index:20; left:var(--weather-x,82%); top:var(--weather-y,10%); transform:translate(-50%,-50%) scale(calc(var(--hpf-weather-scale,1) * var(--hpf-boost,1))); min-width:250px; max-width:31%; padding:13px 17px; border-radius:17px; background:rgba(8,29,52,.78); border:1px solid rgba(255,255,255,.15); box-shadow:0 8px 28px rgba(0,0,0,.25); backdrop-filter:blur(12px); display:grid; grid-template-columns:1fr auto; gap:4px 14px; }
           .date { font-size:14px; opacity:.82; align-self:end; }.clock { font-size:26px; font-weight:700; }.wicon { grid-row:1/3; grid-column:2; font-size:35px; align-self:center; }.temp { font-size:23px; font-weight:600; }.wstate { font-size:13px; opacity:.85; }
           .stats { position:absolute; z-index:18; left:var(--stats-x,17%); top:var(--stats-y,86%); transform:translate(-50%,-50%) scale(var(--hpf-stats-scale,0.8)); width:min(360px,30%); padding:18px 20px; border-radius:21px; background:linear-gradient(145deg,rgba(45,38,33,.74),rgba(18,25,31,.74)); border:1px solid rgba(255,255,255,.18); box-shadow:0 10px 30px rgba(0,0,0,.24); backdrop-filter:blur(12px); }
@@ -385,6 +469,7 @@
           <div class="bg"></div><div class="vignette"></div>
           <div class="stage">
           ${this._headerHTML()}
+          ${this._gridMixBoxHTML()}
           <div class="weather" style="--weather-x:${this._uiPosition(c.weather_position, 82, 10).x}%;--weather-y:${this._uiPosition(c.weather_position, 82, 10).y}%"><div class="date">${esc(date)}</div><div class="clock">${esc(time)}</div><div class="wicon">${weatherIcon}</div><div class="temp">${weatherTemp != null ? esc(weatherTemp) + esc(weatherUnit) : '—'}</div><div class="wstate">${esc(weatherText)}</div></div>
           <div class="canvas"><svg class="flows" viewBox="0 0 1000 667" preserveAspectRatio="none">${this._svgFilterDefs()}${flows}</svg>${nodes}</div>
           ${stats ? stats.replace('<div class="stats">', `<div class="stats" style="--stats-x:${this._uiPosition(c.stats_position, 17, 86).x}%;--stats-y:${this._uiPosition(c.stats_position, 17, 86).y}%">`) : ''}
@@ -395,6 +480,7 @@
       this._rendered = true;
       this._applyBackground(bg);
       this._applyScale();
+      this._gridMixRefresh();
       // Clicking a device opens the corresponding Home Assistant entity dialog.
       this.shadowRoot.querySelectorAll('.node[data-entity-id]').forEach(node => {
         node.addEventListener('click', () => {
@@ -465,6 +551,32 @@
       return `<div class="header" style="--header-x:${p.x}%;--header-y:${p.y}%;--hpf-title-color:${color}">${title.trim() ? `<div class="title">${esc(title)}</div>` : ''}${subtitle.trim() ? `<div class="subtitle">${esc(subtitle)}</div>` : ''}</div>`;
     }
 
+    _gridMixEnabled() { return this._config?.grid_mix_enabled === true; }
+    _gridMixBoxHTML() {
+      if (!this._gridMixEnabled()) return '';
+      const p = this._uiPosition(this._config.grid_mix_position, 83, 32);
+      return `<div class="gridmix" style="--gm-x:${p.x}%;--gm-y:${p.y}%">${this._gridMixInner()}</div>`;
+    }
+    _gridMixInner() {
+      const e = GRID_MIX_CACHE.get(gridMixPostcode(this._config?.grid_mix_postcode));
+      const d = e?.data;
+      const head = `<div class="gm-head"><ha-icon icon="mdi:transmission-tower"></ha-icon><span>Grid · ${esc(d?.region || (gridMixPostcode(this._config?.grid_mix_postcode) || 'Great Britain'))}</span></div>`;
+      if (!d) return head + `<div class="gm-msg">${e?.error ? 'Grid data unavailable' : 'Loading grid data…'}</div>`;
+      const idx = GRID_INDEX[String(d.index || '').toLowerCase()];
+      const mix = (d.mix || []).filter(m => Number(m.perc) > 0).sort((a, b) => b.perc - a.perc);
+      const bar = mix.map(m => `<span style="width:${Number(m.perc)}%;background:${(GRID_FUELS[m.fuel] || GRID_FUELS.other).color}"></span>`).join('');
+      const rows = mix.slice(0, 8).map(m => { const f = GRID_FUELS[m.fuel] || { ...GRID_FUELS.other, label: m.fuel }; return `<div class="gm-row"><ha-icon icon="${f.icon}" style="color:${f.color}"></ha-icon><span>${esc(f.label)}</span><b>${Number(m.perc).toFixed(0)}%</b></div>`; }).join('');
+      return head + `<div class="gm-main"><span class="gm-val">${Number.isFinite(Number(d.intensity)) ? Math.round(d.intensity) : '—'}</span><span class="gm-unit">gCO₂/kWh</span>${idx ? `<span class="gm-badge" style="background:${idx.color}">${idx.label}</span>` : ''}</div><div class="gm-bar">${bar}</div><div class="gm-list">${rows}</div>` + (e.error ? `<div class="gm-msg">Showing last data (update failed)</div>` : '');
+    }
+    // Fetches (via the shared cache) when enabled; cheap to call often.
+    _gridMixRefresh() {
+      if (!this._gridMixEnabled()) return;
+      gridMixGet(gridMixPostcode(this._config.grid_mix_postcode), () => {
+        const box = this.shadowRoot?.querySelector('.gridmix');
+        if (box) box.innerHTML = this._gridMixInner();
+      });
+    }
+
     _uiPosition(pos, dx, dy) {
       if (pos && Number.isFinite(Number(pos.x)) && Number.isFinite(Number(pos.y))) return { x:Number(pos.x), y:Number(pos.y) };
       return { x:dx, y:dy };
@@ -482,6 +594,7 @@
 
     _updateLiveValues() {
       if (!this._hass || !this._config || !this._rendered) return;
+      this._gridMixRefresh();
       const nextBg = this._resolveBackground();
       if (nextBg !== this._currentBg) {
         this._currentBg = nextBg;
@@ -1004,8 +1117,9 @@
       </style><div class="wrap"><h3>Home Power Flow</h3><div class="hint">Bidirectional power flow from live positive/negative values, dotted connections, single moving power dot, invertible device direction, dynamic flow colors and draggable layout. Entity IDs are shown in full below each picker.</div>
       <div class="section"><h3>Backup</h3><div class="hint">Download the whole card configuration as a file, or restore one saved earlier. Importing replaces every setting below (devices, connections, layout, statistics) - it does not save to your dashboard until you click Save.</div><div class="upload-row"><button class="btn secondary-btn" type="button" id="export-config">⬇ Export config</button><button class="btn secondary-btn" type="button" id="import-config-btn">⬆ Import config</button><input type="file" accept="application/json,.json" data-import-config-file style="display:none"></div><div class="upload-status" data-import-status></div></div>
       <div class="row"><div class="field"><label>Title</label><input data-key="title" placeholder="Leave empty for no title" value="${esc(c.title===undefined||c.title===null?'Energy Flow':c.title)}"></div><div class="field"><label>Subtitle</label><input data-key="subtitle" placeholder="Optional" value="${esc(c.subtitle||'')}"></div><div class="field"><label>Title colour</label><div class="ha-color-box"><input class="ha-color-picker" type="color" data-key="title_color" value="${esc(/^#[0-9a-f]{6}$/i.test(String(c.title_color||''))?c.title_color:'#ffffff')}"><span class="color-preview" style="background:${esc(c.title_color||'#ffffff')}"></span></div></div><div class="field"><label>Time format</label><select data-key="time_format"><option value="24h" ${(c.time_format||'24h')==='24h'?'selected':''}>24 hour</option><option value="12h" ${c.time_format==='12h'?'selected':''}>12 hour</option></select></div><div class="field full"><label>Weather entity</label><ha-entity-picker data-editor-key="weather_entity" allow-custom-entity></ha-entity-picker></div><div class="field full">${this._bgUploadField('day','Day background')}</div><div class="field full">${this._bgUploadField('night','Night background')}</div><div class="field full"><label>Sun entity (switches day/night background)</label><ha-entity-picker data-editor-key="sun_entity" allow-custom-entity></ha-entity-picker></div><div class="field"><label>Flow threshold (W)</label><input type="number" min="0" step="0.1" data-key="flow_threshold_watts" value="${esc((Number(c.flow_threshold ?? 0.0005)*1000).toFixed(1))}"></div><div class="field"><label>Flow animation speed (seconds)</label><input type="number" min="3" max="30" step="0.5" data-key="flow_speed" value="${esc(c.flow_speed??8)}"></div><div class="field"><label>Particle stagger (seconds)</label><input type="number" min="0.15" max="1.5" step="0.05" data-key="flow_stagger" value="${esc(c.flow_stagger??0.55)}"></div></div>
-      <h3>Sizing</h3><div class="hint">1 = default size. Small screen scale enlarges boxes on phones (eases in below 900px wide). Max width 0 = fill the available width; the card never grows taller than the screen. The Today panel also shrinks automatically if it would be taller than the card.</div><div class="row compact"><div class="field"><label>Title</label><input type="number" min="0.3" max="3" step="0.05" data-key="title_scale" value="${esc(c.title_scale??1)}"></div><div class="field"><label>Device boxes</label><input type="number" min="0.5" max="2" step="0.05" data-key="device_scale" value="${esc(c.device_scale??1)}"></div><div class="field"><label>Weather box</label><input type="number" min="0.3" max="2" step="0.05" data-key="weather_scale" value="${esc(c.weather_scale??1)}"></div><div class="field"><label>Today panel</label><input type="number" min="0.3" max="1.5" step="0.05" data-key="stats_scale" value="${esc(c.stats_scale??0.8)}"></div><div class="field"><label>Small screen</label><input type="number" min="1" max="2.5" step="0.05" data-key="mobile_scale" value="${esc(c.mobile_scale??1.4)}"></div><div class="field"><label>Max width (px)</label><input type="number" min="0" step="10" data-key="max_width" value="${esc(c.max_width??0)}"></div></div>
-      <h3>Visual layout</h3><div class="hint">Drag the device boxes on the template to place them exactly where you want. Positions are saved automatically. New devices without a saved position use the automatic layout.</div><div class="layout-editor" id="layout-editor"><div class="layout-bg"></div>${(c.devices||[]).map((d,i)=>this._layoutNode(d,i)).join('')}${this._layoutSpecial('header','Title','🔤',c.header_position,2.6,2.7)}${this._layoutSpecial('weather','Weather','🌤️',c.weather_position,82,10)}${this._layoutSpecial('stats','Daily Stats','📊',c.stats_position,17,86)}<button class="btn secondary-btn" id="reset-layout" style="position:absolute;right:10px;bottom:10px;z-index:5">Reset positions</button></div><button class="btn secondary-btn" id="reset-layout">↺ Reset positions to automatic</button>
+      <h3>UK grid mix</h3><div class="hint">Optional box showing how green the GB electricity grid is right now (carbon intensity and generation mix), from the National Grid ESO Carbon Intensity API. Updates every 30 minutes.</div><div class="row"><div class="field"><label style="display:flex;align-items:center;gap:6px;cursor:pointer;margin-top:6px"><input type="checkbox" data-key="grid_mix_enabled" style="width:auto" ${c.grid_mix_enabled===true?'checked':''}> Show grid mix box</label></div><div class="field"><label>Postcode (optional)</label><input data-key="grid_mix_postcode" placeholder="e.g. SW1A, blank = all of GB" value="${esc(c.grid_mix_postcode||'')}"></div></div>
+      <h3>Sizing</h3><div class="hint">1 = default size. Small screen scale enlarges boxes on phones (eases in below 900px wide). Max width 0 = fill the available width; the card never grows taller than the screen. The Today panel also shrinks automatically if it would be taller than the card.</div><div class="row compact"><div class="field"><label>Title</label><input type="number" min="0.3" max="3" step="0.05" data-key="title_scale" value="${esc(c.title_scale??1)}"></div><div class="field"><label>Device boxes</label><input type="number" min="0.5" max="2" step="0.05" data-key="device_scale" value="${esc(c.device_scale??1)}"></div><div class="field"><label>Weather box</label><input type="number" min="0.3" max="2" step="0.05" data-key="weather_scale" value="${esc(c.weather_scale??1)}"></div><div class="field"><label>Today panel</label><input type="number" min="0.3" max="1.5" step="0.05" data-key="stats_scale" value="${esc(c.stats_scale??0.8)}"></div><div class="field"><label>Small screen</label><input type="number" min="1" max="2.5" step="0.05" data-key="mobile_scale" value="${esc(c.mobile_scale??1.4)}"></div><div class="field"><label>Max width (px)</label><input type="number" min="0" step="10" data-key="max_width" value="${esc(c.max_width??0)}"></div><div class="field"><label>Grid mix</label><input type="number" min="0.3" max="2" step="0.05" data-key="grid_mix_scale" value="${esc(c.grid_mix_scale??1)}"></div></div>
+      <h3>Visual layout</h3><div class="hint">Drag the device boxes on the template to place them exactly where you want. Positions are saved automatically. New devices without a saved position use the automatic layout.</div><div class="layout-editor" id="layout-editor"><div class="layout-bg"></div>${(c.devices||[]).map((d,i)=>this._layoutNode(d,i)).join('')}${this._layoutSpecial('header','Title','🔤',c.header_position,2.6,2.7)}${this._layoutSpecial('weather','Weather','🌤️',c.weather_position,82,10)}${c.grid_mix_enabled===true?this._layoutSpecial('gridmix','Grid mix','🌍',c.grid_mix_position,83,32):''}${this._layoutSpecial('stats','Daily Stats','📊',c.stats_position,17,86)}<button class="btn secondary-btn" id="reset-layout" style="position:absolute;right:10px;bottom:10px;z-index:5">Reset positions</button></div><button class="btn secondary-btn" id="reset-layout">↺ Reset positions to automatic</button>
       <h3>Devices</h3><div id="device-list">${(c.devices||[]).map((d,i)=>this._device(d,i)).join('')}</div><button class="btn" id="add">＋ Add device</button>
       <h3>Connections</h3><div class="hint">Optional. Leave empty to use the automatic topology. Add connections to take full control of where power flows.</div><div id="connections">${this._connectionsHTML()}</div><button class="btn" id="add-connection">＋ Add connection</button><h3>Today statistics</h3><div class="hint">Add up to 20 custom statistics. Choose your own name, entity and icon.</div><div id="stats-list">${this._statsEditorHTML()}</div><button class="btn" id="add-stat">＋ Add statistic</button>
       </div>`;
@@ -1065,7 +1179,7 @@
         this._emit(false);
         this._render();
       }));
-      this.shadowRoot.querySelectorAll('[data-key]').forEach(el=>el.addEventListener('change',e=>{ const k=e.target.dataset.key; if(k==='flow_threshold_watts'){ const watts=Math.max(0,parseFloat(e.target.value)||0); this._config.flow_threshold=watts/1000; this._config.flow_threshold_watts=watts; } else { this._config[k]=e.target.value; if(['flow_threshold','flow_speed','flow_stagger','device_scale','mobile_scale','max_width','stats_scale','weather_scale','title_scale'].includes(k))this._config[k]=parseFloat(e.target.value)||0; } if(e.target.type==='color'){const pv=e.target.parentElement?.querySelector('.color-preview'); if(pv) pv.style.background=e.target.value;} this._emit(false); }));
+      this.shadowRoot.querySelectorAll('[data-key]').forEach(el=>el.addEventListener('change',e=>{ const k=e.target.dataset.key; if(k==='flow_threshold_watts'){ const watts=Math.max(0,parseFloat(e.target.value)||0); this._config.flow_threshold=watts/1000; this._config.flow_threshold_watts=watts; } else { this._config[k]=e.target.value; if(['flow_threshold','flow_speed','flow_stagger','device_scale','mobile_scale','max_width','stats_scale','weather_scale','title_scale','grid_mix_scale'].includes(k))this._config[k]=parseFloat(e.target.value)||0; if(e.target.type==='checkbox'){this._config[k]=e.target.checked;} } if(k==='grid_mix_enabled'){this._emit(false);this._render();return;} if(e.target.type==='color'){const pv=e.target.parentElement?.querySelector('.color-preview'); if(pv) pv.style.background=e.target.value;} this._emit(false); }));
       this.shadowRoot.querySelector('#add')?.addEventListener('click',()=>{
         const id=genDeviceId();
         this._config.devices.push({id,type:'solar',name:`Device ${this._config.devices.length+1}`,power_entity:''});
@@ -1122,13 +1236,13 @@
       this.shadowRoot.querySelectorAll('[data-bg-file]').forEach(inp=>inp.addEventListener('change',e=>{const f=e.target.files?.[0];if(f)this._uploadBackground(f,inp.dataset.bgFile);}));
       this.shadowRoot.querySelectorAll('[data-bg-restore]').forEach(b=>b.addEventListener('click',()=>{const slot=b.dataset.bgRestore;delete this._config[slot==='day'?'background_upload_day':'background_upload_night'];this._emit(false);this._render();}));
       this.shadowRoot.querySelectorAll('[data-bg-preview]').forEach(b=>b.addEventListener('click',()=>{this._applyLayoutBg(b.dataset.bgPreview);}));
-      this.shadowRoot.querySelector('#reset-layout')?.addEventListener('click',()=>{this._config.devices.forEach(d=>delete d.position);delete this._config.weather_position;delete this._config.stats_position;delete this._config.header_position;this._emit(false);this._render();});
+      this.shadowRoot.querySelector('#reset-layout')?.addEventListener('click',()=>{this._config.devices.forEach(d=>delete d.position);delete this._config.weather_position;delete this._config.stats_position;delete this._config.header_position;delete this._config.grid_mix_position;this._emit(false);this._render();});
       this._enlargeDialogPreview();
     }
     _layoutNode(d,i){ const p=d.position && Number.isFinite(Number(d.position.x)) && Number.isFinite(Number(d.position.y)) ? d.position : this._autoPreviewPosition(d,i); return `<div class="layout-node" data-layout-kind="device" data-layout-index="${i}" style="left:${p.x}%;top:${p.y}%"><div class="ln-top">${esc(ICONS[d.type] || '⚙️')} ${esc(d.name || LABELS[d.type] || 'Device')}</div><div class="ln-pos">${Number(p.x).toFixed(1)}% × ${Number(p.y).toFixed(1)}%</div></div>`; }
     _layoutSpecial(kind,label,icon,pos,dx,dy){ const p=pos && Number.isFinite(Number(pos.x)) && Number.isFinite(Number(pos.y)) ? pos : {x:dx,y:dy}; return `<div class="layout-node special" data-layout-kind="${kind}" style="left:${p.x}%;top:${p.y}%"><div class="ln-top">${icon} ${label}</div><div class="ln-pos">${Number(p.x).toFixed(1)}% × ${Number(p.y).toFixed(1)}%</div></div>`; }
     _autoPreviewPosition(d,i){ const zones={solar:[18,23],inverter:[56,39],battery:[58,65],gateway:[48,78],house:[28,82],grid:[82,84],ev:[83,50],load:[76,67]}; const same=this._config.devices.filter(x=>(x.type||'load')===(d.type||'load')); const n=same.indexOf(d); const [cx,cy]=zones[d.type||'load']||[70,68]; const spacing=Math.min(15,70/Math.max(1,same.length)); let x=cx,y=cy;if(same.length>1)x=cx+(n-(same.length-1)/2)*spacing;if((d.type==='battery'&&same.length>3)){const col=n%3,row=Math.floor(n/3);x=48+col*12;y=64+row*12;}if(d.type==='solar'&&same.length>4){const col=n%4,row=Math.floor(n/4);x=33+col*12;y=22+row*11;}if(d.type==='ev'&&same.length>2){const col=n%2,row=Math.floor(n/2);x=78+col*10;y=45+row*13;}return{x,y}; }
-    _enableLayoutDragging(){ const area=this.shadowRoot.querySelector('#layout-editor'); if(!area)return; area.querySelectorAll('.layout-node').forEach(node=>{ let dragging=false; const move=e=>{if(!dragging)return;const r=area.getBoundingClientRect();let x=((e.clientX-r.left)/r.width)*100;let y=((e.clientY-r.top)/r.height)*100;const kind=node.dataset.layoutKind; if(kind==='header'){x=Math.max(0,Math.min(85,x));y=Math.max(0,Math.min(90,y));} else {x=Math.max(5,Math.min(95,x));y=Math.max(6,Math.min(94,y));} if(kind==='device'){const i=Number(node.dataset.layoutIndex);this._config.devices[i].position={x,y};} else if(kind==='header') this._config.header_position={x,y}; else if(kind==='weather') this._config.weather_position={x,y}; else if(kind==='stats') this._config.stats_position={x,y}; node.style.left=x+'%';node.style.top=y+'%';const pos=node.querySelector('.ln-pos');if(pos)pos.textContent=`${x.toFixed(1)}% × ${y.toFixed(1)}%`;}; const up=()=>{if(!dragging)return;dragging=false;node.classList.remove('dragging');window.removeEventListener('pointermove',move);window.removeEventListener('pointerup',up);this._emit(false);}; node.addEventListener('pointerdown',e=>{e.preventDefault();dragging=true;node.classList.add('dragging');node.setPointerCapture?.(e.pointerId);window.addEventListener('pointermove',move);window.addEventListener('pointerup',up);}); }); }
+    _enableLayoutDragging(){ const area=this.shadowRoot.querySelector('#layout-editor'); if(!area)return; area.querySelectorAll('.layout-node').forEach(node=>{ let dragging=false; const move=e=>{if(!dragging)return;const r=area.getBoundingClientRect();let x=((e.clientX-r.left)/r.width)*100;let y=((e.clientY-r.top)/r.height)*100;const kind=node.dataset.layoutKind; if(kind==='header'){x=Math.max(0,Math.min(85,x));y=Math.max(0,Math.min(90,y));} else {x=Math.max(5,Math.min(95,x));y=Math.max(6,Math.min(94,y));} if(kind==='device'){const i=Number(node.dataset.layoutIndex);this._config.devices[i].position={x,y};} else if(kind==='header') this._config.header_position={x,y}; else if(kind==='weather') this._config.weather_position={x,y}; else if(kind==='gridmix') this._config.grid_mix_position={x,y}; else if(kind==='stats') this._config.stats_position={x,y}; node.style.left=x+'%';node.style.top=y+'%';const pos=node.querySelector('.ln-pos');if(pos)pos.textContent=`${x.toFixed(1)}% × ${y.toFixed(1)}%`;}; const up=()=>{if(!dragging)return;dragging=false;node.classList.remove('dragging');window.removeEventListener('pointermove',move);window.removeEventListener('pointerup',up);this._emit(false);}; node.addEventListener('pointerdown',e=>{e.preventDefault();dragging=true;node.classList.add('dragging');node.setPointerCapture?.(e.pointerId);window.addEventListener('pointermove',move);window.addEventListener('pointerup',up);}); }); }
 
     _connectsToOptions(i){
       const cur = this._config.devices[i]?.connects_to;
