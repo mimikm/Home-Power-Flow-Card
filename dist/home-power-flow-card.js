@@ -10,7 +10,7 @@
  * Issues & feature requests: https://github.com/mimikm/Home-Power-Flow-Card/issues
  */
 (() => {
-  const VERSION = '0.9.14';
+  const VERSION = '0.9.15';
   const DEFAULT_BG = '/hacsfiles/Home-Power-Flow-Card/smart-home-energy-background.png';
   const DEFAULT_BG_NIGHT = '/hacsfiles/Home-Power-Flow-Card/smart-home-energy-background2.png';
   const TYPES = [
@@ -867,7 +867,16 @@
               // reflowing its internals - to fit entirely within whatever
               // space is actually available, both width and height.
               const availW=preview.clientWidth||naturalW;
-              const availH=Math.max(320, preview.clientHeight || (surface?.clientHeight ? surface.clientHeight*0.62 : window.innerHeight*0.6));
+              // preview.clientHeight is circular if that container just
+              // grows to fit its content rather than being genuinely
+              // height-capped (very plausible for this dialog) - it would
+              // then never detect a constraint at all. Prefer real,
+              // non-circular signals (the dialog surface's own height, a
+              // window-relative fallback) and take whichever is smallest.
+              const heightCandidates=[window.innerHeight*0.6];
+              if(surface?.clientHeight) heightCandidates.push(surface.clientHeight*0.62);
+              if(preview.clientHeight) heightCandidates.push(preview.clientHeight);
+              const availH=Math.max(320, Math.min(...heightCandidates));
               const scale=Math.min(1, availW/naturalW, availH/naturalH);
               if(scale<1){
                 card.style.transform=`scale(${scale})`;
