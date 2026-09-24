@@ -10,7 +10,7 @@
  * Issues & feature requests: https://github.com/mimikm/Home-Power-Flow-Card/issues
  */
 (() => {
-  const VERSION = '0.7.5.2';
+  const VERSION = '0.7.5.3';
   const DEFAULT_BG = '/hacsfiles/Home-Power-Flow-Card/smart-home-energy-background.png';
   const DEFAULT_BG_NIGHT = '/hacsfiles/Home-Power-Flow-Card/smart-home-energy-background2.png';
   const TYPES = [
@@ -254,10 +254,50 @@
       else this._updateLiveValues();
     }
 
-    getCardSize() { return 8; }
+    // Masonry dashboards: rough height in 50px rows, from the card's
+    // actual width (fixed 3:2 aspect ratio).
+    getCardSize() {
+      const w = this.clientWidth || 900;
+      return Math.max(4, Math.ceil(w / 1.5 / 50));
+    }
+
+    // Sections dashboards: full width by default, height decided by the
+    // card itself (fixed 3:2 aspect ratio), never narrower than half.
+    getGridOptions() {
+      return { columns: 12, min_columns: 6, rows: 'auto' };
+    }
+
+    connectedCallback() {
+      if (!this._resizeObserver && typeof ResizeObserver !== 'undefined') {
+        this._resizeObserver = new ResizeObserver(() => this._applyScale());
+        this._resizeObserver.observe(this);
+      }
+      this._applyScale();
+    }
 
     disconnectedCallback() {
       if (this._timer) clearInterval(this._timer);
+      if (this._resizeObserver) { this._resizeObserver.disconnect(); this._resizeObserver = null; }
+    }
+
+    // Everything is laid out on a fixed 1200x800 design stage and scaled
+    // uniformly to the card's real width, so the whole composition is always
+    // visible and identical on any screen (desktop, tablet, phone, Sections
+    // column, editor preview). On small cards, boxes and panels get an
+    // extra per-element boost so text stays readable.
+    _applyScale() {
+      const card = this.shadowRoot?.querySelector('.card');
+      const stage = this.shadowRoot?.querySelector('.stage');
+      if (!card || !stage) return;
+      const w = card.clientWidth;
+      if (!w) return;
+      stage.style.setProperty('--hpf-scale', String(w / 1200));
+      const raw = Number(this._config?.mobile_scale);
+      const mobileBoost = Number.isFinite(raw) && raw > 0 ? Math.max(1, Math.min(2.5, raw)) : 1.4;
+      // Ramp the boost in smoothly between 900px (none) and 400px (full),
+      // so text size never jumps as the card crosses a breakpoint.
+      const t = Math.max(0, Math.min(1, (900 - w) / 500));
+      stage.style.setProperty('--hpf-boost', String(1 + (mobileBoost - 1) * t));
     }
 
     _render() {
@@ -297,39 +337,41 @@
         <style>
           :host { display:block; width:100%; }
           * { box-sizing:border-box; }
-          .card { position:relative; width:100%; min-height:700px; aspect-ratio: 1.5 / 1; overflow:hidden; border-radius:22px; color:#fff; font-family:var(--primary-font-family,Arial,sans-serif); background:#101820; box-shadow:0 12px 40px rgba(0,0,0,.28); }
+          .card { position:relative; width:100%; aspect-ratio: 3 / 2; overflow:hidden; border-radius:22px; color:#fff; font-family:var(--primary-font-family,Arial,sans-serif); background:#101820; box-shadow:0 12px 40px rgba(0,0,0,.28); }
           .bg { position:absolute; inset:0; background-size:cover; background-position:center; }
+          .stage { position:absolute; left:0; top:0; width:1200px; height:800px; transform-origin:top left; transform:scale(var(--hpf-scale,1)); }
           .vignette { position:absolute; inset:0; background:radial-gradient(circle at 55% 45%,transparent 25%,rgba(0,0,0,.12) 72%,rgba(0,0,0,.32)); pointer-events:none; }
-          .header { position:absolute; left:2.6%; top:2.7%; z-index:20; }
-          .title { font-size:clamp(24px,3vw,44px); font-weight:700; letter-spacing:-.03em; text-shadow:0 2px 8px rgba(0,0,0,.4); }
-          .subtitle { margin-top:4px; font-size:clamp(12px,1.25vw,19px); opacity:.88; text-shadow:0 2px 8px rgba(0,0,0,.45); }
-          .weather { position:absolute; z-index:20; left:var(--weather-x,82%); top:var(--weather-y,10%); transform:translate(-50%,-50%); min-width:250px; max-width:31%; padding:13px 17px; border-radius:17px; background:rgba(8,29,52,.78); border:1px solid rgba(255,255,255,.15); box-shadow:0 8px 28px rgba(0,0,0,.25); backdrop-filter:blur(12px); display:grid; grid-template-columns:1fr auto; gap:4px 14px; }
+          .header { position:absolute; left:2.6%; top:2.7%; z-index:20; transform-origin:top left; transform:scale(var(--hpf-boost,1)); }
+          .title { font-size:42px; font-weight:700; letter-spacing:-.03em; text-shadow:0 2px 8px rgba(0,0,0,.4); }
+          .subtitle { margin-top:4px; font-size:18px; opacity:.88; text-shadow:0 2px 8px rgba(0,0,0,.45); }
+          .weather { position:absolute; z-index:20; left:var(--weather-x,82%); top:var(--weather-y,10%); transform:translate(-50%,-50%) scale(var(--hpf-boost,1)); min-width:250px; max-width:31%; padding:13px 17px; border-radius:17px; background:rgba(8,29,52,.78); border:1px solid rgba(255,255,255,.15); box-shadow:0 8px 28px rgba(0,0,0,.25); backdrop-filter:blur(12px); display:grid; grid-template-columns:1fr auto; gap:4px 14px; }
           .date { font-size:14px; opacity:.82; align-self:end; }.clock { font-size:26px; font-weight:700; }.wicon { grid-row:1/3; grid-column:2; font-size:35px; align-self:center; }.temp { font-size:23px; font-weight:600; }.wstate { font-size:13px; opacity:.85; }
-          .stats { position:absolute; z-index:18; left:var(--stats-x,17%); top:var(--stats-y,86%); transform:translate(-50%,-50%); width:min(360px,30%); padding:18px 20px; border-radius:21px; background:linear-gradient(145deg,rgba(45,38,33,.74),rgba(18,25,31,.74)); border:1px solid rgba(255,255,255,.18); box-shadow:0 10px 30px rgba(0,0,0,.24); backdrop-filter:blur(12px); }
+          .stats { position:absolute; z-index:18; left:var(--stats-x,17%); top:var(--stats-y,86%); transform:translate(-50%,-50%) scale(var(--hpf-boost,1)); width:min(360px,30%); padding:18px 20px; border-radius:21px; background:linear-gradient(145deg,rgba(45,38,33,.74),rgba(18,25,31,.74)); border:1px solid rgba(255,255,255,.18); box-shadow:0 10px 30px rgba(0,0,0,.24); backdrop-filter:blur(12px); }
           .stats h3 { margin:0 0 14px; font-size:20px; }.stat { display:grid; grid-template-columns:28px 1fr auto; align-items:center; gap:7px; padding:8px 0; font-size:14px; }.stat .ico{font-size:19px}.stat .value{font-weight:700;font-size:15px}.co2{border-top:1px solid rgba(255,255,255,.18);margin-top:7px;padding-top:12px;color:#d6f5d0}
           .canvas { position:absolute; inset:0; z-index:5; }
           svg.flows { position:absolute; inset:0; width:100%; height:100%; overflow:visible; pointer-events:none; }
           .flow-path { fill:none; stroke-linecap:round; filter:url(#glow); opacity:.92; }
           .flow-dot { filter:url(#dotglow); }
-          .node { position:absolute; transform:translate(-50%,-50%) scale(${nodeScale}); width:clamp(135px,13vw,205px); min-height:74px; padding:11px 13px; border-radius:15px; z-index:10; background:linear-gradient(145deg,rgba(9,25,40,.87),rgba(15,30,44,.73)); border:1px solid rgba(255,255,255,.17); box-shadow:0 8px 22px rgba(0,0,0,.32); backdrop-filter:blur(10px); }
+          .node { position:absolute; transform:translate(-50%,-50%) scale(calc(${nodeScale} * var(--hpf-boost,1))); width:195px; min-height:74px; padding:11px 13px; border-radius:15px; z-index:10; background:linear-gradient(145deg,rgba(9,25,40,.87),rgba(15,30,44,.73)); border:1px solid rgba(255,255,255,.17); box-shadow:0 8px 22px rgba(0,0,0,.32); backdrop-filter:blur(10px); }
           .node .top { display:flex; align-items:center; gap:8px; }.node .icon { font-size:24px; line-height:1; }.node .name { font-weight:700; font-size:14px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }.node .power { margin-top:5px; font-size:19px; font-weight:750; }.node .extras { margin-top:4px; display:flex; flex-wrap:wrap; gap:2px 8px; }.node .extras:empty { display:none; margin:0; }.node .extra-row { display:inline-flex; align-items:center; gap:3px; font-size:10px; line-height:1.3; opacity:.78; white-space:nowrap; max-width:100%; overflow:hidden; text-overflow:ellipsis; }.node .extra-row ha-icon { --mdc-icon-size:12px; width:12px; height:12px; flex:none; }.node.battery { border-color:rgba(123,255,158,.28); }.node.grid { border-color:rgba(93,191,255,.3); }.node.ev { border-color:rgba(151,255,103,.28); }
           @keyframes hpf-charge-pulse { 0%,100% { box-shadow:0 8px 22px rgba(0,0,0,.32), 0 0 0 0 var(--pulse-color); } 50% { box-shadow:0 8px 22px rgba(0,0,0,.32), 0 0 30px 8px var(--pulse-color); } }
           @media (prefers-reduced-motion: reduce) { .node[data-batt-state="charging"], .node[data-batt-state="discharging"] { animation:none !important; } }
           .empty { position:absolute; inset:0; display:flex; align-items:center; justify-content:center; z-index:30; }.empty > div { padding:24px 30px; background:rgba(10,25,38,.82); border-radius:18px; border:1px solid rgba(255,255,255,.18); text-align:center; backdrop-filter:blur(10px); }.empty b{display:block;font-size:20px;margin-bottom:6px}.empty span{opacity:.75}
-          @media (max-width: 800px) { .card{aspect-ratio:auto; min-height:760px}.weather{min-width:190px;padding:10px 12px}.header{top:2%;left:2%}.stats{width:46%;min-width:260px}.node{width:130px} }
-          @media (max-width: 560px) { .card{min-height:900px}.title{font-size:27px}.subtitle{font-size:12px}.weather{max-width:45%;min-width:150px}.date{font-size:10px}.clock{font-size:19px}.temp{font-size:17px}.wicon{font-size:25px}.stats{width:62%;min-width:230px}.node{width:120px;padding:9px}.node .power{font-size:16px}.node .name{font-size:12px}.node .extra-row{font-size:9px} }
         </style>
         <div class="card">
           <div class="bg"></div><div class="vignette"></div>
+          <div class="stage">
           <div class="header"><div class="title">${esc(c.title || 'Energy Flow')}</div>${c.subtitle ? `<div class="subtitle">${esc(c.subtitle)}</div>` : ''}</div>
           <div class="weather" style="--weather-x:${this._uiPosition(c.weather_position, 82, 10).x}%;--weather-y:${this._uiPosition(c.weather_position, 82, 10).y}%"><div class="date">${esc(date)}</div><div class="clock">${esc(time)}</div><div class="wicon">${weatherIcon}</div><div class="temp">${weatherTemp != null ? esc(weatherTemp) + esc(weatherUnit) : '—'}</div><div class="wstate">${esc(weatherText)}</div></div>
           <div class="canvas"><svg class="flows" viewBox="0 0 1000 667" preserveAspectRatio="none">${this._svgFilterDefs()}${flows}</svg>${nodes}</div>
           ${stats ? stats.replace('<div class="stats">', `<div class="stats" style="--stats-x:${this._uiPosition(c.stats_position, 17, 86).x}%;--stats-y:${this._uiPosition(c.stats_position, 17, 86).y}%">`) : ''}
           ${devices.length ? '' : '<div class="empty"><div><b>Add your first device</b><span>Open the card editor and add Solar, Inverter, Battery, Grid or House.</span></div></div>'}
+          </div>
         </div>`;
 
       this._rendered = true;
       this._applyBackground(bg);
+      this._applyScale();
       // Clicking a device opens the corresponding Home Assistant entity dialog.
       this.shadowRoot.querySelectorAll('.node[data-entity-id]').forEach(node => {
         node.addEventListener('click', () => {
@@ -900,45 +942,20 @@
       this._declampAncestors(inner, preview);
 
       const applyInner=()=>{
-        if(inner?.shadowRoot){
-          const card=inner.shadowRoot.querySelector('.card');
-          if(card){
-            card.style.minHeight='0'; card.style.height='auto';
-            // Reset any previous fit-scaling before measuring the card's
-            // natural (unscaled) size, so repeated calls don't compound.
-            card.style.transform=''; card.style.transformOrigin='';
-            inner.style.height=''; inner.style.overflow='';
-            const naturalW=card.offsetWidth, naturalH=card.offsetHeight;
-            if(naturalW && naturalH){
-              // The dialog only gives the preview a limited height (that's
-              // what was clipping/zooming the card into a cropped view).
-              // Shrink the whole card - as one rigid thumbnail, not by
-              // reflowing its internals - to fit entirely within whatever
-              // space is actually available, both width and height.
-              const availW=preview.clientWidth||naturalW;
-              // preview.clientHeight is circular if that container just
-              // grows to fit its content rather than being genuinely
-              // height-capped (very plausible for this dialog) - it would
-              // then never detect a constraint at all. Prefer real,
-              // non-circular signals (the dialog surface's own height, a
-              // window-relative fallback) and take whichever is smallest.
-              const heightCandidates=[window.innerHeight*0.6];
-              if(surface?.clientHeight) heightCandidates.push(surface.clientHeight*0.62);
-              if(preview.clientHeight) heightCandidates.push(preview.clientHeight);
-              const availH=Math.max(320, Math.min(...heightCandidates));
-              const scale=Math.min(1, availW/naturalW, availH/naturalH);
-              if(scale<1){
-                card.style.transform=`scale(${scale})`;
-                card.style.transformOrigin='top left';
-                inner.style.display='block';
-                inner.style.width=(naturalW*scale)+'px';
-                inner.style.height=(naturalH*scale)+'px';
-                inner.style.overflow='hidden';
-                inner.style.margin='0 auto';
-              }
-            }
-          }
-        }
+        if(!inner?.shadowRoot) return;
+        const card=inner.shadowRoot.querySelector('.card');
+        if(card){ card.style.transform=''; card.style.transformOrigin=''; }
+        // The card keeps a fixed 3:2 aspect ratio and scales its own contents
+        // to its width, so fitting the preview only needs a width cap that
+        // keeps the card's height inside the dialog.
+        const heightCandidates=[window.innerHeight*0.6];
+        if(surface?.clientHeight) heightCandidates.push(surface.clientHeight*0.62);
+        const availH=Math.max(320, Math.min(...heightCandidates));
+        inner.style.display='block';
+        inner.style.height=''; inner.style.overflow='';
+        inner.style.width='100%';
+        inner.style.maxWidth=Math.floor(availH*1.5)+'px';
+        inner.style.margin='0 auto';
       };
       applyInner();
       requestAnimationFrame(()=>{ applyInner(); requestAnimationFrame(applyInner); });
@@ -949,7 +966,7 @@
         :host{display:block;width:100%;max-width:680px;min-width:0;box-sizing:border-box;overflow-x:hidden}.wrap{padding:4px 0;font-family:var(--primary-font-family,Arial)}h3{margin:18px 0 8px}.hint{opacity:.65;font-size:12px;margin-bottom:12px}.row{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin:8px 0}.field{display:flex;flex-direction:column;gap:5px}.field.full{grid-column:1/-1}.entity-id{font:11px/1.35 ui-monospace,SFMono-Regular,Consolas,monospace;opacity:.72;word-break:break-all;margin-top:2px}.section{padding:14px 16px;margin:12px 0;border:1px solid var(--divider-color,#ddd);border-radius:14px}.section h3{margin-top:0}label{font-size:12px;opacity:.75}input,select{width:100%;padding:10px;border:1px solid var(--divider-color,#ddd);border-radius:8px;background:var(--card-background-color,#fff);color:var(--primary-text-color,#111)}.stat-sort-item{cursor:grab}.stat-drag-handle{font-size:24px;cursor:grab;margin-right:10px}.stat-sort-item.dragging{opacity:.5}.device{padding:13px;margin:10px 0;border:1px solid var(--divider-color,#ddd);border-radius:12px;background:var(--secondary-background-color,rgba(0,0,0,.03))}.device-head{display:flex;justify-content:space-between;align-items:center;font-weight:700}.device-title{cursor:pointer;display:flex;align-items:center;gap:6px;flex:1;min-width:0;user-select:none}.device-sub{font:11px/1 ui-monospace,SFMono-Regular,Consolas,monospace;font-weight:400;opacity:.6;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.device-head button{border:0;background:transparent;color:var(--error-color,#db4437);font-size:20px;cursor:pointer}.btn{border:0;border-radius:10px;padding:11px 14px;background:var(--primary-color,#03a9f4);color:#fff;cursor:pointer;font-weight:700}.small{font-size:11px;opacity:.6}.layout-editor{position:relative;width:100%;aspect-ratio:1.5/1;min-height:420px;border-radius:16px;overflow:hidden;border:1px solid var(--divider-color,#ddd);background:#10202c;touch-action:none}.layout-bg{position:absolute;inset:0;background-size:cover;background-position:center}.layout-node{position:absolute;transform:translate(-50%,-50%);min-width:112px;max-width:160px;padding:8px 10px;border-radius:11px;background:rgba(8,29,45,.9);border:1px solid rgba(255,255,255,.35);color:#fff;box-shadow:0 6px 16px rgba(0,0,0,.35);cursor:grab;user-select:none;touch-action:none;font-size:12px;z-index:2}.layout-node.dragging{cursor:grabbing;box-shadow:0 10px 24px rgba(0,0,0,.5);border-color:var(--primary-color,#03a9f4)}.layout-node .ln-top{font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.layout-node .ln-pos{font:10px ui-monospace,SFMono-Regular,Consolas,monospace;opacity:.65;margin-top:2px}.secondary-btn{margin-bottom:8px;background:var(--secondary-text-color,#607d8b)}.flow-colours{grid-template-columns:repeat(3,minmax(0,1fr))}.color-row{display:grid;grid-template-columns:42px 1fr;gap:6px;align-items:center}.color-row input[type=color]{height:40px;padding:3px}.ha-color-box{display:flex;align-items:center;gap:10px}.ha-color-picker{width:56px!important;height:40px!important;padding:2px!important;border-radius:8px}.color-preview{width:80px;height:36px;border-radius:8px;border:1px solid var(--divider-color,#ddd);display:inline-block}.color-row input[type=text]{padding:9px;font:12px ui-monospace,SFMono-Regular,Consolas,monospace}.upload-row{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:4px}.upload-row .btn{padding:9px 12px;font-size:12px}.upload-status{font-size:11px;opacity:.65;margin-bottom:6px}
       </style><div class="wrap"><h3>Home Power Flow</h3><div class="hint">Bidirectional power flow from live positive/negative values, dotted connections, single moving power dot, invertible device direction, dynamic flow colors and draggable layout. Entity IDs are shown in full below each picker.</div>
       <div class="section"><h3>Backup</h3><div class="hint">Download the whole card configuration as a file, or restore one saved earlier. Importing replaces every setting below (devices, connections, layout, statistics) - it does not save to your dashboard until you click Save.</div><div class="upload-row"><button class="btn secondary-btn" type="button" id="export-config">⬇ Export config</button><button class="btn secondary-btn" type="button" id="import-config-btn">⬆ Import config</button><input type="file" accept="application/json,.json" data-import-config-file style="display:none"></div><div class="upload-status" data-import-status></div></div>
-      <div class="row"><div class="field"><label>Title</label><input data-key="title" value="${esc(c.title||'Energy Flow')}"></div><div class="field"><label>Time format</label><select data-key="time_format"><option value="24h" ${(c.time_format||'24h')==='24h'?'selected':''}>24 hour</option><option value="12h" ${c.time_format==='12h'?'selected':''}>12 hour</option></select></div><div class="field full"><label>Weather entity</label><ha-entity-picker data-editor-key="weather_entity" allow-custom-entity></ha-entity-picker></div><div class="field full">${this._bgUploadField('day','Day background')}</div><div class="field full">${this._bgUploadField('night','Night background')}</div><div class="field full"><label>Sun entity (switches day/night background)</label><ha-entity-picker data-editor-key="sun_entity" allow-custom-entity></ha-entity-picker></div><div class="field"><label>Flow threshold (W)</label><input type="number" min="0" step="0.1" data-key="flow_threshold_watts" value="${esc((Number(c.flow_threshold ?? 0.0005)*1000).toFixed(1))}"></div><div class="field"><label>Flow animation speed (seconds)</label><input type="number" min="3" max="30" step="0.5" data-key="flow_speed" value="${esc(c.flow_speed??8)}"></div><div class="field"><label>Particle stagger (seconds)</label><input type="number" min="0.15" max="1.5" step="0.05" data-key="flow_stagger" value="${esc(c.flow_stagger??0.55)}"></div><div class="field"><label>Device box scale</label><input type="number" min="0.5" max="2" step="0.05" data-key="device_scale" value="${esc(c.device_scale??1)}"><span class="small" style="display:block">1 = default size. Turn down for a smaller/simpler background image, up for a larger one.</span></div></div>
+      <div class="row"><div class="field"><label>Title</label><input data-key="title" value="${esc(c.title||'Energy Flow')}"></div><div class="field"><label>Time format</label><select data-key="time_format"><option value="24h" ${(c.time_format||'24h')==='24h'?'selected':''}>24 hour</option><option value="12h" ${c.time_format==='12h'?'selected':''}>12 hour</option></select></div><div class="field full"><label>Weather entity</label><ha-entity-picker data-editor-key="weather_entity" allow-custom-entity></ha-entity-picker></div><div class="field full">${this._bgUploadField('day','Day background')}</div><div class="field full">${this._bgUploadField('night','Night background')}</div><div class="field full"><label>Sun entity (switches day/night background)</label><ha-entity-picker data-editor-key="sun_entity" allow-custom-entity></ha-entity-picker></div><div class="field"><label>Flow threshold (W)</label><input type="number" min="0" step="0.1" data-key="flow_threshold_watts" value="${esc((Number(c.flow_threshold ?? 0.0005)*1000).toFixed(1))}"></div><div class="field"><label>Flow animation speed (seconds)</label><input type="number" min="3" max="30" step="0.5" data-key="flow_speed" value="${esc(c.flow_speed??8)}"></div><div class="field"><label>Particle stagger (seconds)</label><input type="number" min="0.15" max="1.5" step="0.05" data-key="flow_stagger" value="${esc(c.flow_stagger??0.55)}"></div><div class="field"><label>Device box scale</label><input type="number" min="0.5" max="2" step="0.05" data-key="device_scale" value="${esc(c.device_scale??1)}"><span class="small" style="display:block">1 = default size. Turn down for a smaller/simpler background image, up for a larger one.</span></div><div class="field"><label>Small screen box scale</label><input type="number" min="1" max="2.5" step="0.05" data-key="mobile_scale" value="${esc(c.mobile_scale??1.4)}"><span class="small" style="display:block">Extra size for boxes and panels on narrow cards (phones), easing in below 900px wide. 1 = same proportions as desktop.</span></div></div>
       <h3>Visual layout</h3><div class="hint">Drag the device boxes on the template to place them exactly where you want. Positions are saved automatically. New devices without a saved position use the automatic layout.</div><div class="layout-editor" id="layout-editor"><div class="layout-bg"></div>${(c.devices||[]).map((d,i)=>this._layoutNode(d,i)).join('')}${this._layoutSpecial('weather','Weather','🌤️',c.weather_position,82,10)}${this._layoutSpecial('stats','Daily Stats','📊',c.stats_position,17,86)}<button class="btn secondary-btn" id="reset-layout" style="position:absolute;right:10px;bottom:10px;z-index:5">Reset positions</button></div><button class="btn secondary-btn" id="reset-layout">↺ Reset positions to automatic</button>
       <h3>Devices</h3>${(c.devices||[]).map((d,i)=>this._device(d,i)).join('')}<button class="btn" id="add">＋ Add device</button>
       <h3>Connections</h3><div class="hint">Optional. Leave empty to use the automatic topology. Add connections to take full control of where power flows.</div><div id="connections">${this._connectionsHTML()}</div><button class="btn" id="add-connection">＋ Add connection</button><h3>Today statistics</h3><div class="hint">Add up to 20 custom statistics. Choose your own name, entity and icon.</div><div id="stats-list">${this._statsEditorHTML()}</div><button class="btn" id="add-stat">＋ Add statistic</button>
@@ -1010,7 +1027,7 @@
         this._emit(false);
         this._render();
       }));
-      this.shadowRoot.querySelectorAll('[data-key]').forEach(el=>el.addEventListener('change',e=>{ const k=e.target.dataset.key; if(k==='flow_threshold_watts'){ const watts=Math.max(0,parseFloat(e.target.value)||0); this._config.flow_threshold=watts/1000; this._config.flow_threshold_watts=watts; } else { this._config[k]=e.target.value; if(['flow_threshold','flow_speed','flow_stagger','device_scale'].includes(k))this._config[k]=parseFloat(e.target.value)||0; } this._emit(false); }));
+      this.shadowRoot.querySelectorAll('[data-key]').forEach(el=>el.addEventListener('change',e=>{ const k=e.target.dataset.key; if(k==='flow_threshold_watts'){ const watts=Math.max(0,parseFloat(e.target.value)||0); this._config.flow_threshold=watts/1000; this._config.flow_threshold_watts=watts; } else { this._config[k]=e.target.value; if(['flow_threshold','flow_speed','flow_stagger','device_scale','mobile_scale'].includes(k))this._config[k]=parseFloat(e.target.value)||0; } this._emit(false); }));
       this.shadowRoot.querySelector('#add')?.addEventListener('click',()=>{
         const id=genDeviceId();
         this._config.devices.push({id,type:'solar',name:`Device ${this._config.devices.length+1}`,power_entity:''});
