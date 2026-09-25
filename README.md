@@ -8,7 +8,7 @@ An animated, real-time energy flow card for Home Assistant dashboards, built by 
 
 Show your whole home energy system (solar, batteries, grid, EV chargers, even multi-inverter setups) as a living picture of your home, with power flowing between devices exactly as your sensors report it.
 
-![Home Power Flow Card](images/preview.png)
+![Home Power Flow Card](images/preview2.png)
 
 ---
 
