@@ -8,7 +8,7 @@ An animated, real-time energy flow card for Home Assistant dashboards, built by 
 
 Show your whole home energy system (solar, batteries, grid, EV chargers, even multi-inverter setups) as a living picture of your home, with power flowing between devices exactly as your sensors report it.
 
-![Home Power Flow Card](images/preview2.png)
+![Home Power Flow Card](https://github.com/mimikm/Home-Power-Flow-Card/raw/main/images/preview2.png)
 
 ---
 
@@ -98,7 +98,7 @@ Or manually in HACS:
 ### 🌤️ Weather, stats and grid
 - **Weather & clock** box from any weather entity (12 or 24 hour)
 - **Today panel** with up to 20 statistics (solar yield, grid import/export, anything with a number), each with its own icon, updating live
-- **Self-sufficiency** (optional): the share of your home's electricity that didn't come from the grid, right now (calculated automatically from your Grid and House devices) and for today (from your daily energy sensors)
+- **Self-sufficiency & self-consumption** (optional): how much of your electricity didn't come from the grid, and how much of your solar you used yourself, both live and for today
 - **UK grid mix** box (optional): live carbon intensity with a colour-coded rating, plus the current generation mix by source, for your region or all of Great Britain
 
 ### ⚙️ Fully visual editor
@@ -122,16 +122,19 @@ Each line is judged by its own device: a device reading 0 W stays quiet even if 
 
 ---
 
-## 🏡 Self-sufficiency
+## 🏡 Self-sufficiency & self-consumption
 
-Self-sufficiency is the share of your home's electricity that **didn't** come from the grid:
+Two optional figures shown at the top of the Today panel. Turn them on in the editor's **Self-sufficiency & self-consumption** section.
 
-> self-sufficiency = 1 − grid import ÷ home consumption
+| Figure | What it tells you | Formula |
+|---|---|---|
+| **Self-sufficiency** | How much of your home's electricity **didn't** come from the grid | 1 − grid import ÷ home consumption |
+| **Self-consumption** | How much of your solar you **used yourself** instead of exporting | (solar − grid export) ÷ solar |
 
-- **Now** uses the live power of your **Grid** and **House** devices. Exporting counts as 100%. It follows the same direction as your Grid flow line: if the grid dots flow the right way, self-sufficiency is right too. If they flow the wrong way, tick **Invert flow** on the Grid device to fix both.
-- **Today** uses two daily energy sensors (kWh): grid import today and home consumption today.
-
-Both rows appear at the top of the Today panel. Turn them on in the editor's **Self-sufficiency** section.
+- **Now** is calculated automatically from your devices: **Grid** and **House** for self-sufficiency, **Solar** and **Grid** for self-consumption. No extra setup needed.
+- **Today** uses your daily energy sensors (kWh or Wh, converted automatically).
+- **No reliable consumption sensor?** Tick *Calculate consumption instead* and the card works it out: import + solar − export + battery discharge − battery charge (battery sensors optional).
+- Both follow the same direction as your Grid flow line. If the grid dots flow the wrong way, tick **Invert flow** on the Grid device to fix both.
 
 ---
 
@@ -213,8 +216,15 @@ Each device gets a stable internal `id` automatically. `connects_to` refers to t
 | `grid_mix_postcode` | — | Outward postcode for regional data (e.g. `SW1A`); blank = all of GB |
 | `self_sufficiency_live` | `false` | Show live self-sufficiency (needs a Grid and a House device) |
 | `self_sufficiency_today` | `false` | Show today's self-sufficiency |
-| `self_sufficiency_import_entity` | — | Grid import today (kWh) sensor |
-| `self_sufficiency_consumption_entity` | — | Home consumption today (kWh) sensor |
+| `self_consumption_live` | `false` | Show live self-consumption (needs a Solar and a Grid device) |
+| `self_consumption_today` | `false` | Show today's self-consumption |
+| `self_sufficiency_import_entity` | — | Grid import today sensor |
+| `self_sufficiency_consumption_entity` | — | Home consumption today sensor |
+| `energy_export_entity` | — | Grid export today sensor |
+| `energy_solar_entity` | — | Solar production today sensor |
+| `self_sufficiency_calc_consumption` | `false` | Calculate consumption from import, solar, export and battery sensors |
+| `energy_battery_charge_entity` | — | Battery charge today sensor (optional) |
+| `energy_battery_discharge_entity` | — | Battery discharge today sensor (optional) |
 
 ### Sizing
 
