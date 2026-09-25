@@ -10,7 +10,7 @@
  * Issues & feature requests: https://github.com/mimikm/Home-Power-Flow-Card/issues
  */
 (() => {
-  const VERSION = '0.7.6.3';
+  const VERSION = '0.7.6.4';
   const DEFAULT_BG = '/hacsfiles/Home-Power-Flow-Card/smart-home-energy-background.png';
   const DEFAULT_BG_NIGHT = '/hacsfiles/Home-Power-Flow-Card/smart-home-energy-background2.png';
   const TYPES = [
@@ -954,6 +954,14 @@
         const v = this._selfSufficiencyToday();
         rows.push({ icon: 'mdi:home-clock-outline', name: 'Self-sufficiency today', value: v == null ? '—' : `${v} %` });
       }
+      if (c.self_consumption_live === true) {
+        const v = this._selfConsumptionLive();
+        rows.push({ icon: 'mdi:solar-power-variant', name: 'Self-consumption now', value: v == null ? '—' : `${v} %` });
+      }
+      if (c.self_consumption_today === true) {
+        const v = this._selfConsumptionToday();
+        rows.push({ icon: 'mdi:sun-clock', name: 'Self-consumption today', value: v == null ? '—' : `${v} %` });
+      }
       const list = Array.isArray(c.statistics?.entities) ? c.statistics.entities.slice(0,20) : [];
       list.forEach(r => rows.push({ icon: r.custom_icon || r.icon || 'mdi:chart-line', name: r.name || 'Statistic', value: this._energyEntity(r.entity) }));
       return rows;
@@ -976,13 +984,68 @@
       return Math.round(Math.max(0, Math.min(1, 1 - imp / cons)) * 100);
     }
 
+    // A daily energy sensor's value in kWh (Wh and MWh are converted, so
+    // sensors with different units still give correct ratios). Returns
+    // null when the entity isn't set or has no numeric value.
+    _energyKwh(entity) {
+      if (!entity) return null;
+      const st = state(this._hass, entity);
+      const v = parseFloat(st?.state);
+      if (!Number.isFinite(v)) return null;
+      const unit = String(st?.attributes?.unit_of_measurement || 'kWh').toLowerCase();
+      return unit === 'wh' ? v / 1000 : unit === 'mwh' ? v * 1000 : v;
+    }
+
+    // Today's home consumption: from the consumption sensor, or - when
+    // "calculate" is on - from the energy balance
+    // import + solar - export + battery discharge - battery charge.
+    // Battery sensors are optional (treated as 0 when not set).
+    _consumptionToday() {
+      const c = this._config || {};
+      if (c.self_sufficiency_calc_consumption !== true) return this._energyKwh(c.self_sufficiency_consumption_entity);
+      const imp = this._energyKwh(c.self_sufficiency_import_entity);
+      const solar = this._energyKwh(c.energy_solar_entity);
+      const exp = this._energyKwh(c.energy_export_entity);
+      if (imp == null || solar == null || exp == null) return null;
+      const opt = key => { if (!c[key]) return 0; return this._energyKwh(c[key]); };
+      const dis = opt('energy_battery_discharge_entity'), chg = opt('energy_battery_charge_entity');
+      if (dis == null || chg == null) return null;
+      return imp + solar - exp + dis - chg;
+    }
+
     // Same formula over today's energy: 1 - grid import today / consumption today.
     _selfSufficiencyToday() {
-      const c = this._config || {};
-      const imp = parseFloat(state(this._hass, c.self_sufficiency_import_entity)?.state);
-      const cons = parseFloat(state(this._hass, c.self_sufficiency_consumption_entity)?.state);
-      if (!Number.isFinite(imp) || !Number.isFinite(cons) || cons <= 0) return null;
+      const imp = this._energyKwh(this._config?.self_sufficiency_import_entity);
+      const cons = this._consumptionToday();
+      if (imp == null || cons == null || cons <= 0) return null;
       return Math.round(Math.max(0, Math.min(1, 1 - imp / cons)) * 100);
+    }
+
+    // Share of solar production used at home instead of exported, right now:
+    // (solar - export) / solar, from the Solar and Grid devices. Export uses
+    // the same direction formula as the grid flow animation. Hidden at night.
+    _selfConsumptionLive() {
+      const devices = this._config?.devices || [];
+      const solars = devices.filter(d => d.type === 'solar' && d.power_entity);
+      if (!solars.length) return null;
+      let solar = 0;
+      for (const d of solars) { const v = powerValue(this._hass, d.power_entity); if (v != null) solar += Math.abs(v); }
+      if (solar < 10) return null;
+      let exp = 0;
+      for (const g of devices.filter(d => d.type === 'grid' && d.power_entity)) {
+        const v = powerValue(this._hass, g.power_entity); if (v == null) continue;
+        let importing = v < 0; if (g.invert_flow) importing = !importing;
+        if (!importing) exp += Math.abs(v);
+      }
+      return Math.round(Math.max(0, Math.min(1, (solar - exp) / solar)) * 100);
+    }
+
+    // Same over today's energy: (solar today - export today) / solar today.
+    _selfConsumptionToday() {
+      const solar = this._energyKwh(this._config?.energy_solar_entity);
+      const exp = this._energyKwh(this._config?.energy_export_entity);
+      if (solar == null || exp == null || solar <= 0) return null;
+      return Math.round(Math.max(0, Math.min(1, (solar - exp) / solar)) * 100);
     }
 
     _statsHTML(s) {
@@ -1171,7 +1234,7 @@
     _render(){
       const c=this._config;
       this.shadowRoot.innerHTML=`<style>
-        :host{display:block;width:100%;max-width:680px;min-width:0;box-sizing:border-box;overflow-x:hidden}.wrap{padding:4px 0;font-family:var(--primary-font-family,Arial)}h3{margin:18px 0 8px}.hint{opacity:.65;font-size:12px;margin-bottom:12px}.row{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin:8px 0}.row.compact{grid-template-columns:repeat(auto-fit,minmax(110px,1fr));align-items:end}.field{display:flex;flex-direction:column;gap:5px;min-width:0}.field.full{grid-column:1/-1}.entity-id{font:11px/1.35 ui-monospace,SFMono-Regular,Consolas,monospace;opacity:.72;word-break:break-all;margin-top:2px}.section{padding:14px 16px;margin:12px 0;border:1px solid var(--divider-color,#ddd);border-radius:14px}.section h3{margin-top:0}label{font-size:12px;opacity:.75}input,select{width:100%;box-sizing:border-box;min-width:0;padding:10px;border:1px solid var(--divider-color,#ddd);border-radius:8px;background:var(--card-background-color,#fff);color:var(--primary-text-color,#111)}.drag-handle{display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;margin-right:6px;flex:none;cursor:grab;touch-action:none;opacity:.7;border-radius:6px}.drag-handle:hover{opacity:1;background:rgba(127,127,127,.15)}.drag-handle ha-icon{--mdc-icon-size:18px;width:18px;height:18px}.sort-item.sorting{opacity:.85;box-shadow:0 8px 22px rgba(0,0,0,.35);border-color:var(--primary-color,#03a9f4);position:relative;z-index:5}.sort-item.sorting .drag-handle{cursor:grabbing}.device{padding:13px;margin:10px 0;border:1px solid var(--divider-color,#ddd);border-radius:12px;background:var(--secondary-background-color,rgba(0,0,0,.03))}.device-head{display:flex;justify-content:space-between;align-items:center;font-weight:700}.device-title{cursor:pointer;display:flex;align-items:center;gap:6px;flex:1;min-width:0;user-select:none}.device-sub{font:11px/1 ui-monospace,SFMono-Regular,Consolas,monospace;font-weight:400;opacity:.6;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.device-head button{border:0;background:transparent;color:var(--error-color,#db4437);font-size:20px;cursor:pointer}.device-actions{display:flex;align-items:center;gap:2px;flex:none}.device-head button.dup-btn{color:var(--primary-text-color,#fff);opacity:.7;display:inline-flex;align-items:center;padding:2px 4px}.device-head button.dup-btn:hover{opacity:1}.device-head button.dup-btn ha-icon{--mdc-icon-size:18px;width:18px;height:18px}.flow-live{font-size:11px;line-height:1.5;margin-top:4px;opacity:.85}.flow-live .fl-on{color:var(--success-color,#4caf50)}.flow-live .fl-off{opacity:.6}.btn{border:0;border-radius:10px;padding:11px 14px;background:var(--primary-color,#03a9f4);color:#fff;cursor:pointer;font-weight:700}.small{font-size:11px;opacity:.6}.layout-editor{position:relative;width:100%;aspect-ratio:1.5/1;min-height:420px;border-radius:16px;overflow:hidden;border:1px solid var(--divider-color,#ddd);background:#10202c;touch-action:none}.layout-bg{position:absolute;inset:0;background-size:cover;background-position:center}.layout-node{position:absolute;transform:translate(-50%,-50%);min-width:112px;max-width:160px;padding:8px 10px;border-radius:11px;background:rgba(8,29,45,.9);border:1px solid rgba(255,255,255,.35);color:#fff;box-shadow:0 6px 16px rgba(0,0,0,.35);cursor:grab;user-select:none;touch-action:none;font-size:12px;z-index:2}.layout-node[data-layout-kind="header"]{transform:none}.layout-node.dragging{cursor:grabbing;box-shadow:0 10px 24px rgba(0,0,0,.5);border-color:var(--primary-color,#03a9f4)}.layout-node .ln-top{font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.layout-node .ln-pos{font:10px ui-monospace,SFMono-Regular,Consolas,monospace;opacity:.65;margin-top:2px}.secondary-btn{margin-bottom:8px;background:var(--secondary-text-color,#607d8b)}.flow-colours{grid-template-columns:repeat(3,minmax(0,1fr))}.color-row{display:grid;grid-template-columns:42px 1fr;gap:6px;align-items:center}.color-row input[type=color]{height:40px;padding:3px}.ha-color-box{display:flex;align-items:center;gap:10px}.ha-color-picker{width:56px!important;height:40px!important;padding:2px!important;border-radius:8px}.color-preview{width:80px;height:36px;border-radius:8px;border:1px solid var(--divider-color,#ddd);display:inline-block}.color-row input[type=text]{padding:9px;font:12px ui-monospace,SFMono-Regular,Consolas,monospace}.upload-row{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:4px}.upload-row .btn{padding:9px 12px;font-size:12px}.upload-status{font-size:11px;opacity:.65;margin-bottom:6px}
+        :host{display:block;width:100%;max-width:680px;min-width:0;box-sizing:border-box;overflow-x:hidden}.wrap{padding:4px 0;font-family:var(--primary-font-family,Arial)}h3{margin:18px 0 8px}.hint{opacity:.65;font-size:12px;margin-bottom:12px}.row{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin:8px 0}.row.compact{grid-template-columns:repeat(auto-fit,minmax(110px,1fr));align-items:end}.field{display:flex;flex-direction:column;gap:5px;min-width:0}.field.full{grid-column:1/-1}.entity-id{font:11px/1.35 ui-monospace,SFMono-Regular,Consolas,monospace;opacity:.72;word-break:break-all;margin-top:2px}.section{padding:14px 16px;margin:12px 0;border:1px solid var(--divider-color,#ddd);border-radius:14px}.section h3{margin-top:0}label{font-size:12px;opacity:.75}input,select{width:100%;box-sizing:border-box;min-width:0;padding:10px;border:1px solid var(--divider-color,#ddd);border-radius:8px;background:var(--card-background-color,#fff);color:var(--primary-text-color,#111)}.drag-handle{display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;margin-right:6px;flex:none;cursor:grab;touch-action:none;opacity:.7;border-radius:6px}.drag-handle:hover{opacity:1;background:rgba(127,127,127,.15)}.drag-handle ha-icon{--mdc-icon-size:18px;width:18px;height:18px}.sort-item.sorting{opacity:.85;box-shadow:0 8px 22px rgba(0,0,0,.35);border-color:var(--primary-color,#03a9f4);position:relative;z-index:5}.sort-item.sorting .drag-handle{cursor:grabbing}.device{padding:13px;margin:10px 0;border:1px solid var(--divider-color,#ddd);border-radius:12px;background:var(--secondary-background-color,rgba(0,0,0,.03))}.device-head{display:flex;justify-content:space-between;align-items:center;font-weight:700}.device-title{cursor:pointer;display:flex;align-items:center;gap:6px;flex:1;min-width:0;user-select:none}.device-sub{font:11px/1 ui-monospace,SFMono-Regular,Consolas,monospace;font-weight:400;opacity:.6;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.device-head button{border:0;background:transparent;color:var(--error-color,#db4437);font-size:20px;cursor:pointer}.section-toggle{cursor:pointer;user-select:none;display:flex;align-items:baseline;gap:8px}.section-sub{font-size:12px;font-weight:400;opacity:.6}.section-body[hidden]{display:none}.device-actions{display:flex;align-items:center;gap:2px;flex:none}.device-head button.dup-btn{color:var(--primary-text-color,#fff);opacity:.7;display:inline-flex;align-items:center;padding:2px 4px}.device-head button.dup-btn:hover{opacity:1}.device-head button.dup-btn ha-icon{--mdc-icon-size:18px;width:18px;height:18px}.flow-live{font-size:11px;line-height:1.5;margin-top:4px;opacity:.85}.flow-live .fl-on{color:var(--success-color,#4caf50)}.flow-live .fl-off{opacity:.6}.btn{border:0;border-radius:10px;padding:11px 14px;background:var(--primary-color,#03a9f4);color:#fff;cursor:pointer;font-weight:700}.small{font-size:11px;opacity:.6}.layout-editor{position:relative;width:100%;aspect-ratio:1.5/1;min-height:420px;border-radius:16px;overflow:hidden;border:1px solid var(--divider-color,#ddd);background:#10202c;touch-action:none}.layout-bg{position:absolute;inset:0;background-size:cover;background-position:center}.layout-node{position:absolute;transform:translate(-50%,-50%);min-width:112px;max-width:160px;padding:8px 10px;border-radius:11px;background:rgba(8,29,45,.9);border:1px solid rgba(255,255,255,.35);color:#fff;box-shadow:0 6px 16px rgba(0,0,0,.35);cursor:grab;user-select:none;touch-action:none;font-size:12px;z-index:2}.layout-node[data-layout-kind="header"]{transform:none}.layout-node.dragging{cursor:grabbing;box-shadow:0 10px 24px rgba(0,0,0,.5);border-color:var(--primary-color,#03a9f4)}.layout-node .ln-top{font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.layout-node .ln-pos{font:10px ui-monospace,SFMono-Regular,Consolas,monospace;opacity:.65;margin-top:2px}.secondary-btn{margin-bottom:8px;background:var(--secondary-text-color,#607d8b)}.flow-colours{grid-template-columns:repeat(3,minmax(0,1fr))}.color-row{display:grid;grid-template-columns:42px 1fr;gap:6px;align-items:center}.color-row input[type=color]{height:40px;padding:3px}.ha-color-box{display:flex;align-items:center;gap:10px}.ha-color-picker{width:56px!important;height:40px!important;padding:2px!important;border-radius:8px}.color-preview{width:80px;height:36px;border-radius:8px;border:1px solid var(--divider-color,#ddd);display:inline-block}.color-row input[type=text]{padding:9px;font:12px ui-monospace,SFMono-Regular,Consolas,monospace}.upload-row{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:4px}.upload-row .btn{padding:9px 12px;font-size:12px}.upload-status{font-size:11px;opacity:.65;margin-bottom:6px}
       </style><div class="wrap"><h3>Home Power Flow</h3><div class="hint">Bidirectional power flow from live positive/negative values, dotted connections, single moving power dot, invertible device direction, dynamic flow colors and draggable layout. Entity IDs are shown in full below each picker.</div>
       <div class="section"><h3>Backup</h3><div class="hint">Download the whole card configuration as a file, or restore one saved earlier. Importing replaces every setting below (devices, connections, layout, statistics) - it does not save to your dashboard until you click Save.</div><div class="upload-row"><button class="btn secondary-btn" type="button" id="export-config">⬇ Export config</button><button class="btn secondary-btn" type="button" id="import-config-btn">⬆ Import config</button><input type="file" accept="application/json,.json" data-import-config-file style="display:none"></div><div class="upload-status" data-import-status></div></div>
       <div class="row"><div class="field"><label>Title</label><input data-key="title" placeholder="Leave empty for no title" value="${esc(c.title===undefined||c.title===null?'Energy Flow':c.title)}"></div><div class="field"><label>Subtitle</label><input data-key="subtitle" placeholder="Optional" value="${esc(c.subtitle||'')}"></div><div class="field"><label>Title colour</label><div class="ha-color-box"><input class="ha-color-picker" type="color" data-key="title_color" value="${esc(/^#[0-9a-f]{6}$/i.test(String(c.title_color||''))?c.title_color:'#ffffff')}"><span class="color-preview" style="background:${esc(c.title_color||'#ffffff')}"></span></div></div><div class="field"><label>Time format</label><select data-key="time_format"><option value="24h" ${(c.time_format||'24h')==='24h'?'selected':''}>24 hour</option><option value="12h" ${c.time_format==='12h'?'selected':''}>12 hour</option></select></div><div class="field full"><label>Weather entity</label><ha-entity-picker data-editor-key="weather_entity" allow-custom-entity></ha-entity-picker></div><div class="field full">${this._bgUploadField('day','Day background')}</div><div class="field full">${this._bgUploadField('night','Night background')}</div><div class="field full"><label>Sun entity (switches day/night background)</label><ha-entity-picker data-editor-key="sun_entity" allow-custom-entity></ha-entity-picker></div><div class="field"><label>Flow threshold (W)</label><input type="number" min="0" step="0.1" data-key="flow_threshold_watts" value="${esc((Number(c.flow_threshold ?? 0.0005)*1000).toFixed(1))}"></div><div class="field"><label>Flow animation speed (seconds)</label><input type="number" min="3" max="30" step="0.5" data-key="flow_speed" value="${esc(c.flow_speed??8)}"></div><div class="field"><label>Particle stagger (seconds)</label><input type="number" min="0.15" max="1.5" step="0.05" data-key="flow_stagger" value="${esc(c.flow_stagger??0.55)}"></div></div>
@@ -1180,7 +1243,7 @@
       <h3>Visual layout</h3><div class="hint">Drag the device boxes on the template to place them exactly where you want. Positions are saved automatically. New devices without a saved position use the automatic layout.</div><div class="layout-editor" id="layout-editor"><div class="layout-bg"></div>${(c.devices||[]).map((d,i)=>this._layoutNode(d,i)).join('')}${this._layoutSpecial('header','Title','🔤',c.header_position,2.6,2.7)}${this._layoutSpecial('weather','Weather','🌤️',c.weather_position,82,10)}${c.grid_mix_enabled===true?this._layoutSpecial('gridmix','Grid mix','🌍',c.grid_mix_position,83,32):''}${this._layoutSpecial('stats','Daily Stats','📊',c.stats_position,17,86)}<button class="btn secondary-btn" id="reset-layout" style="position:absolute;right:10px;bottom:10px;z-index:5">Reset positions</button></div><button class="btn secondary-btn" id="reset-layout">↺ Reset positions to automatic</button>
       <h3>Devices</h3><div id="device-list">${(c.devices||[]).map((d,i)=>this._device(d,i)).join('')}</div><button class="btn" id="add">＋ Add device</button>
       <h3>Connections</h3><div class="hint">Optional. Leave empty to use the automatic topology. Add connections to take full control of where power flows.</div><div id="connections">${this._connectionsHTML()}</div><button class="btn" id="add-connection">＋ Add connection</button><h3>Today statistics</h3><div class="hint">Add up to 20 custom statistics. Choose your own name, entity and icon.</div><div id="stats-list">${this._statsEditorHTML()}</div><button class="btn" id="add-stat">＋ Add statistic</button>
-      <h3>Self-sufficiency</h3><div class="hint">Share of your home's electricity that didn't come from the grid, shown at the top of the Today panel. <b>Now</b> is calculated automatically from your Grid and House devices. <b>Today</b> needs two daily energy sensors (kWh).</div><div class="row"><div class="field"><label style="display:flex;align-items:center;gap:6px;cursor:pointer;margin-top:6px"><input type="checkbox" data-key="self_sufficiency_live" style="width:auto" ${c.self_sufficiency_live===true?'checked':''}> Show self-sufficiency now</label></div><div class="field"><label style="display:flex;align-items:center;gap:6px;cursor:pointer;margin-top:6px"><input type="checkbox" data-key="self_sufficiency_today" style="width:auto" ${c.self_sufficiency_today===true?'checked':''}> Show self-sufficiency today</label></div><div class="field full"><label>Grid import today (kWh)</label><ha-entity-picker data-editor-key="self_sufficiency_import_entity" allow-custom-entity></ha-entity-picker></div><div class="field full"><label>Home consumption today (kWh)</label><ha-entity-picker data-editor-key="self_sufficiency_consumption_entity" allow-custom-entity></ha-entity-picker></div></div>
+      <h3 class="section-toggle" data-toggle-section="selfsuff">${this._ssOpen?'▾':'▸'} Self-sufficiency &amp; self-consumption<span class="section-sub">${(()=>{const n=['self_sufficiency_live','self_sufficiency_today','self_consumption_live','self_consumption_today'].filter(k=>c[k]===true).length;return n?`${n} of 4 on`:'off';})()}</span></h3><div class="section-body" data-section-body="selfsuff" ${this._ssOpen?'':'hidden'}><div class="hint"><b>Self-sufficiency</b>: share of your home's electricity that didn't come from the grid. <b>Self-consumption</b>: share of your solar you used yourself instead of exporting. Shown at the top of the Today panel. <b>Now</b> is calculated automatically from your devices; <b>today</b> uses the daily energy sensors below.</div><div class="row"><div class="field"><label style="display:flex;align-items:center;gap:6px;cursor:pointer;margin-top:6px"><input type="checkbox" data-key="self_sufficiency_live" style="width:auto" ${c.self_sufficiency_live===true?'checked':''}> Self-sufficiency now</label></div><div class="field"><label style="display:flex;align-items:center;gap:6px;cursor:pointer;margin-top:6px"><input type="checkbox" data-key="self_sufficiency_today" style="width:auto" ${c.self_sufficiency_today===true?'checked':''}> Self-sufficiency today</label></div><div class="field"><label style="display:flex;align-items:center;gap:6px;cursor:pointer;margin-top:6px"><input type="checkbox" data-key="self_consumption_live" style="width:auto" ${c.self_consumption_live===true?'checked':''}> Self-consumption now</label></div><div class="field"><label style="display:flex;align-items:center;gap:6px;cursor:pointer;margin-top:6px"><input type="checkbox" data-key="self_consumption_today" style="width:auto" ${c.self_consumption_today===true?'checked':''}> Self-consumption today</label></div></div><div class="hint">Daily energy sensors (kWh or Wh). Self-sufficiency today needs import and consumption; self-consumption today needs solar and export.</div><div class="row"><div class="field full"><label>Grid import today</label><ha-entity-picker data-editor-key="self_sufficiency_import_entity" allow-custom-entity></ha-entity-picker></div><div class="field full"><label>Grid export today</label><ha-entity-picker data-editor-key="energy_export_entity" allow-custom-entity></ha-entity-picker></div><div class="field full"><label>Solar production today</label><ha-entity-picker data-editor-key="energy_solar_entity" allow-custom-entity></ha-entity-picker></div><div class="field full"><label>Home consumption today</label><ha-entity-picker data-editor-key="self_sufficiency_consumption_entity" allow-custom-entity></ha-entity-picker></div><div class="field"><label style="display:flex;align-items:center;gap:6px;cursor:pointer;margin-top:6px"><input type="checkbox" data-key="self_sufficiency_calc_consumption" style="width:auto" ${c.self_sufficiency_calc_consumption===true?'checked':''}> Calculate consumption instead (import + solar − export + battery discharge − battery charge)</label></div><div class="field full"><label>Battery charge today (optional, for calculated consumption)</label><ha-entity-picker data-editor-key="energy_battery_charge_entity" allow-custom-entity></ha-entity-picker></div><div class="field full"><label>Battery discharge today (optional, for calculated consumption)</label><ha-entity-picker data-editor-key="energy_battery_discharge_entity" allow-custom-entity></ha-entity-picker></div></div></div>
       </div>`;
       this.shadowRoot.querySelectorAll('ha-entity-picker').forEach(el=>{
         el.hass=this._hass;
@@ -1238,7 +1301,7 @@
         this._emit(false);
         this._render();
       }));
-      this.shadowRoot.querySelectorAll('[data-key]').forEach(el=>el.addEventListener('change',e=>{ const k=e.target.dataset.key; if(k==='flow_threshold_watts'){ const watts=Math.max(0,parseFloat(e.target.value)||0); this._config.flow_threshold=watts/1000; this._config.flow_threshold_watts=watts; } else { this._config[k]=e.target.value; if(['flow_threshold','flow_speed','flow_stagger','device_scale','mobile_scale','max_width','stats_scale','weather_scale','title_scale','grid_mix_scale'].includes(k))this._config[k]=parseFloat(e.target.value)||0; if(e.target.type==='checkbox'){this._config[k]=e.target.checked;} } if(k==='grid_mix_enabled'){this._emit(false);this._render();return;} if(e.target.type==='color'){const pv=e.target.parentElement?.querySelector('.color-preview'); if(pv) pv.style.background=e.target.value;} this._emit(false); }));
+      this.shadowRoot.querySelectorAll('[data-key]').forEach(el=>el.addEventListener('change',e=>{ const k=e.target.dataset.key; if(k==='flow_threshold_watts'){ const watts=Math.max(0,parseFloat(e.target.value)||0); this._config.flow_threshold=watts/1000; this._config.flow_threshold_watts=watts; } else { this._config[k]=e.target.value; if(['flow_threshold','flow_speed','flow_stagger','device_scale','mobile_scale','max_width','stats_scale','weather_scale','title_scale','grid_mix_scale'].includes(k))this._config[k]=parseFloat(e.target.value)||0; if(e.target.type==='checkbox'){this._config[k]=e.target.checked;} } if(['self_sufficiency_live','self_sufficiency_today','self_consumption_live','self_consumption_today'].includes(k)){const sub=this.shadowRoot.querySelector('[data-toggle-section="selfsuff"] .section-sub'); if(sub){const n=['self_sufficiency_live','self_sufficiency_today','self_consumption_live','self_consumption_today'].filter(x=>this._config[x]===true).length; sub.textContent=n?`${n} of 4 on`:'off';}} if(k==='grid_mix_enabled'){this._emit(false);this._render();return;} if(e.target.type==='color'){const pv=e.target.parentElement?.querySelector('.color-preview'); if(pv) pv.style.background=e.target.value;} this._emit(false); }));
       this.shadowRoot.querySelector('#add')?.addEventListener('click',()=>{
         const id=genDeviceId();
         this._config.devices.push({id,type:'solar',name:`Device ${this._config.devices.length+1}`,power_entity:''});
@@ -1279,6 +1342,11 @@
         this._remapStatsOpen(k=>{ if(k===from) return to; if(from<to&&k>from&&k<=to) return k-1; if(from>to&&k>=to&&k<from) return k+1; return k; });
         this._emit(false); this._render();
       });
+      this.shadowRoot.querySelectorAll('[data-toggle-section="selfsuff"]').forEach(h=>h.addEventListener('click',()=>{
+        this._ssOpen=!this._ssOpen;
+        const body=this.shadowRoot.querySelector('[data-section-body="selfsuff"]'); if(body) body.hidden=!this._ssOpen;
+        h.firstChild.textContent=(this._ssOpen?'▾':'▸')+' Self-sufficiency & self-consumption';
+      }));
       this._updateFlowLive();
       this._enableSortable('#device-list',(from,to)=>{
         const a=this._config.devices; const [m]=a.splice(from,1); a.splice(to,0,m);
