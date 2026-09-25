@@ -103,6 +103,8 @@ Or manually in HACS:
 ### ⚙️ Fully visual editor
 - Everything is configurable without YAML, using Home Assistant's own entity, icon and colour pickers
 - Collapsible, **drag-to-reorder** devices and statistics
+- **Duplicate** any device with one click, handy for multi-inverter or multi-string setups
+- A **live direction readout** under each device's Invert flow toggle (e.g. `▶ Solar PV → Inverter · 450 W`), so you can check flow directions before saving
 - A live preview that always shows the whole card
 - Click any device on the card to open its Home Assistant details
 
@@ -126,7 +128,7 @@ With a single inverter there is nothing to configure.
 With two or more inverters:
 1. **Nothing wired manually?** Devices attach to the first inverter, and extra inverters attach to a Gateway device if you have one. Nothing is left disconnected.
 2. **Want it to match your real wiring?** Add a **Gateway** device and set each device's **Connects to** field.
-3. **Direction backwards?** Use that device's **Invert flow** toggle.
+3. **Direction backwards?** Use that device's **Invert flow** toggle. The live readout under it shows the current direction straight away.
 
 > Devices set to Automatic connect to the *first* inverter in the list, so reordering inverters changes which one is the main hub.
 
@@ -233,10 +235,6 @@ Ideas and feedback are welcome, so [open an issue](https://github.com/mimikm/Hom
 - Editor warnings for misconfigured devices and broken "Connects to" links
 - Respect the system "reduce motion" setting for flow dots
 - Separate phone layout (different positions on small screens)
-
-**Editor**
-- Duplicate device button
-- Live flow direction indicator next to each Invert flow toggle
 
 **Features**
 - Automatic kW formatting for large values (e.g. `3.2 kW` instead of `3200 W`)
