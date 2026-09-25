@@ -97,7 +97,8 @@ Or manually in HACS:
 
 ### 🌤️ Weather, stats and grid
 - **Weather & clock** box from any weather entity (12 or 24 hour)
-- **Today panel** with up to 20 statistics (solar yield, grid import/export, anything with a number), each with its own icon
+- **Today panel** with up to 20 statistics (solar yield, grid import/export, anything with a number), each with its own icon, updating live
+- **Self-sufficiency** (optional): the share of your home's electricity that didn't come from the grid, right now (calculated automatically from your Grid and House devices) and for today (from your daily energy sensors)
 - **UK grid mix** box (optional): live carbon intensity with a colour-coded rating, plus the current generation mix by source, for your region or all of Great Britain
 
 ### ⚙️ Fully visual editor
@@ -118,6 +119,19 @@ Export your whole card configuration as a JSON file with one click, and import i
 A device's power must reach the threshold before its flow line appears, so sensor noise doesn't cause flickering. Default: **1 W**, adjustable in the editor.
 
 Each line is judged by its own device: a device reading 0 W stays quiet even if whatever it's connected to is busy.
+
+---
+
+## 🏡 Self-sufficiency
+
+Self-sufficiency is the share of your home's electricity that **didn't** come from the grid:
+
+> self-sufficiency = 1 − grid import ÷ home consumption
+
+- **Now** uses the live power of your **Grid** and **House** devices. Exporting counts as 100%. If your grid sensor reports import as a negative number, tick **Invert flow** on the Grid device and the calculation reads it correctly too.
+- **Today** uses two daily energy sensors (kWh): grid import today and home consumption today.
+
+Both rows appear at the top of the Today panel. Turn them on in the editor's **Self-sufficiency** section.
 
 ---
 
@@ -197,6 +211,10 @@ Each device gets a stable internal `id` automatically. `connects_to` refers to t
 | `flow_speed` | `8` | Base animation duration in seconds (at 1 kW) |
 | `grid_mix_enabled` | `false` | Show the UK grid mix box |
 | `grid_mix_postcode` | — | Outward postcode for regional data (e.g. `SW1A`); blank = all of GB |
+| `self_sufficiency_live` | `false` | Show live self-sufficiency (needs a Grid and a House device) |
+| `self_sufficiency_today` | `false` | Show today's self-sufficiency |
+| `self_sufficiency_import_entity` | — | Grid import today (kWh) sensor |
+| `self_sufficiency_consumption_entity` | — | Home consumption today (kWh) sensor |
 
 ### Sizing
 
@@ -240,7 +258,6 @@ Ideas and feedback are welcome, so [open an issue](https://github.com/mimikm/Hom
 - Automatic kW formatting for large values (e.g. `3.2 kW` instead of `3200 W`)
 - Configurable tap actions per device (more-info, navigate, toggle)
 - Battery time remaining (to full / to reserve). *Waiting on feedback, let me know if you'd use it!*
-- Self-sufficiency % and other computed stats
 - Light theme support
 
 **Project**
