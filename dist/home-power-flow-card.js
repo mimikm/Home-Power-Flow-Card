@@ -10,7 +10,7 @@
  * Issues & feature requests: https://github.com/mimikm/Home-Power-Flow-Card/issues
  */
 (() => {
-  const VERSION = '0.7.6.1';
+  const VERSION = '0.7.6.2';
   const DEFAULT_BG = '/hacsfiles/Home-Power-Flow-Card/smart-home-energy-background.png';
   const DEFAULT_BG_NIGHT = '/hacsfiles/Home-Power-Flow-Card/smart-home-energy-background2.png';
   const TYPES = [
@@ -595,6 +595,7 @@
     _updateLiveValues() {
       if (!this._hass || !this._config || !this._rendered) return;
       this._gridMixRefresh();
+      this._updateStatsValues();
       const nextBg = this._resolveBackground();
       if (nextBg !== this._currentBg) {
         this._currentBg = nextBg;
@@ -938,14 +939,68 @@
       }).join('');
     }
 
+    // Rows shown in the Today panel: optional computed self-sufficiency
+    // rows first, then the user's statistics. Values are plain text so the
+    // live update loop can refresh them in place.
+    _statsRows() {
+      const c = this._config || {};
+      const rows = [];
+      if (c.self_sufficiency_live === true) {
+        const v = this._selfSufficiencyLive();
+        rows.push({ icon: 'mdi:home-lightning-bolt-outline', name: 'Self-sufficiency now', value: v == null ? '—' : `${v} %` });
+      }
+      if (c.self_sufficiency_today === true) {
+        const v = this._selfSufficiencyToday();
+        rows.push({ icon: 'mdi:home-clock-outline', name: 'Self-sufficiency today', value: v == null ? '—' : `${v} %` });
+      }
+      const list = Array.isArray(c.statistics?.entities) ? c.statistics.entities.slice(0,20) : [];
+      list.forEach(r => rows.push({ icon: r.custom_icon || r.icon || 'mdi:chart-line', name: r.name || 'Statistic', value: this._energyEntity(r.entity) }));
+      return rows;
+    }
+
+    // Share of home consumption NOT imported from the grid, right now:
+    // 1 - import / consumption, from the Grid and House devices. Grid
+    // positive = import (card convention); a Grid device with Invert flow
+    // ticked is read the other way round, matching the flow animation.
+    _selfSufficiencyLive() {
+      const devices = this._config?.devices || [];
+      const grids = devices.filter(d => d.type === 'grid' && d.power_entity);
+      const houses = devices.filter(d => d.type === 'house' && d.power_entity);
+      if (!grids.length || !houses.length) return null;
+      let imp = 0, cons = 0, seen = false;
+      for (const g of grids) { const v = powerValue(this._hass, g.power_entity); if (v == null) continue; seen = true; imp += Math.max(0, g.invert_flow ? -v : v); }
+      for (const h of houses) { const v = powerValue(this._hass, h.power_entity); if (v == null) continue; cons += Math.abs(v); }
+      if (!seen || cons < 1) return null;
+      return Math.round(Math.max(0, Math.min(1, 1 - imp / cons)) * 100);
+    }
+
+    // Same formula over today's energy: 1 - grid import today / consumption today.
+    _selfSufficiencyToday() {
+      const c = this._config || {};
+      const imp = parseFloat(state(this._hass, c.self_sufficiency_import_entity)?.state);
+      const cons = parseFloat(state(this._hass, c.self_sufficiency_consumption_entity)?.state);
+      if (!Number.isFinite(imp) || !Number.isFinite(cons) || cons <= 0) return null;
+      return Math.round(Math.max(0, Math.min(1, 1 - imp / cons)) * 100);
+    }
+
     _statsHTML(s) {
-      const list = Array.isArray(s.entities) ? s.entities.slice(0,20) : [];
-      if (!list.length) return '';
-      return `<div class="stats"><h3>${esc(s.title || 'Today')}</h3>${list.map(r=>{
-        const icon = r.custom_icon || r.icon || 'mdi:chart-line';
-        const iconHtml = icon.startsWith('mdi:') ? `<ha-icon icon="${esc(icon)}"></ha-icon>` : esc(icon);
-        return `<div class="stat"><span class="ico">${iconHtml}</span><span>${esc(r.name || 'Statistic')}</span><span class="value">${esc(this._energyEntity(r.entity))}</span></div>`;
+      const rows = this._statsRows();
+      if (!rows.length) return '';
+      return `<div class="stats"><h3>${esc(s.title || 'Today')}</h3>${rows.map(r=>{
+        const iconHtml = String(r.icon).startsWith('mdi:') ? `<ha-icon icon="${esc(r.icon)}"></ha-icon>` : esc(r.icon);
+        return `<div class="stat"><span class="ico">${iconHtml}</span><span>${esc(r.name)}</span><span class="value">${esc(r.value)}</span></div>`;
       }).join('')}</div>`;
+    }
+
+    // Keeps Today panel values current between full redraws (previously
+    // they only updated on page load or config changes).
+    _updateStatsValues() {
+      const statsEl = this.shadowRoot?.querySelector('.stats');
+      if (!statsEl) return;
+      const rows = this._statsRows();
+      const vals = statsEl.querySelectorAll('.stat .value');
+      if (vals.length !== rows.length) return;
+      rows.forEach((r, k) => { if (vals[k].textContent !== r.value) vals[k].textContent = r.value; });
     }
 
     _energyEntity(entity) {
@@ -1123,6 +1178,7 @@
       <h3>Visual layout</h3><div class="hint">Drag the device boxes on the template to place them exactly where you want. Positions are saved automatically. New devices without a saved position use the automatic layout.</div><div class="layout-editor" id="layout-editor"><div class="layout-bg"></div>${(c.devices||[]).map((d,i)=>this._layoutNode(d,i)).join('')}${this._layoutSpecial('header','Title','🔤',c.header_position,2.6,2.7)}${this._layoutSpecial('weather','Weather','🌤️',c.weather_position,82,10)}${c.grid_mix_enabled===true?this._layoutSpecial('gridmix','Grid mix','🌍',c.grid_mix_position,83,32):''}${this._layoutSpecial('stats','Daily Stats','📊',c.stats_position,17,86)}<button class="btn secondary-btn" id="reset-layout" style="position:absolute;right:10px;bottom:10px;z-index:5">Reset positions</button></div><button class="btn secondary-btn" id="reset-layout">↺ Reset positions to automatic</button>
       <h3>Devices</h3><div id="device-list">${(c.devices||[]).map((d,i)=>this._device(d,i)).join('')}</div><button class="btn" id="add">＋ Add device</button>
       <h3>Connections</h3><div class="hint">Optional. Leave empty to use the automatic topology. Add connections to take full control of where power flows.</div><div id="connections">${this._connectionsHTML()}</div><button class="btn" id="add-connection">＋ Add connection</button><h3>Today statistics</h3><div class="hint">Add up to 20 custom statistics. Choose your own name, entity and icon.</div><div id="stats-list">${this._statsEditorHTML()}</div><button class="btn" id="add-stat">＋ Add statistic</button>
+      <h3>Self-sufficiency</h3><div class="hint">Share of your home's electricity that didn't come from the grid, shown at the top of the Today panel. <b>Now</b> is calculated automatically from your Grid and House devices. <b>Today</b> needs two daily energy sensors (kWh).</div><div class="row"><div class="field"><label style="display:flex;align-items:center;gap:6px;cursor:pointer;margin-top:6px"><input type="checkbox" data-key="self_sufficiency_live" style="width:auto" ${c.self_sufficiency_live===true?'checked':''}> Show self-sufficiency now</label></div><div class="field"><label style="display:flex;align-items:center;gap:6px;cursor:pointer;margin-top:6px"><input type="checkbox" data-key="self_sufficiency_today" style="width:auto" ${c.self_sufficiency_today===true?'checked':''}> Show self-sufficiency today</label></div><div class="field full"><label>Grid import today (kWh)</label><ha-entity-picker data-editor-key="self_sufficiency_import_entity" allow-custom-entity></ha-entity-picker></div><div class="field full"><label>Home consumption today (kWh)</label><ha-entity-picker data-editor-key="self_sufficiency_consumption_entity" allow-custom-entity></ha-entity-picker></div></div>
       </div>`;
       this.shadowRoot.querySelectorAll('ha-entity-picker').forEach(el=>{
         el.hass=this._hass;
