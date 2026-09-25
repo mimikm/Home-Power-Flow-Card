@@ -128,7 +128,7 @@ Self-sufficiency is the share of your home's electricity that **didn't** come fr
 
 > self-sufficiency = 1 − grid import ÷ home consumption
 
-- **Now** uses the live power of your **Grid** and **House** devices. Exporting counts as 100%. If your grid sensor reports import as a negative number, tick **Invert flow** on the Grid device and the calculation reads it correctly too.
+- **Now** uses the live power of your **Grid** and **House** devices. Exporting counts as 100%. It follows the same direction as your Grid flow line: if the grid dots flow the right way, self-sufficiency is right too. If they flow the wrong way, tick **Invert flow** on the Grid device to fix both.
 - **Today** uses two daily energy sensors (kWh): grid import today and home consumption today.
 
 Both rows appear at the top of the Today panel. Turn them on in the editor's **Self-sufficiency** section.
