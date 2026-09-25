@@ -10,7 +10,7 @@
  * Issues & feature requests: https://github.com/mimikm/Home-Power-Flow-Card/issues
  */
 (() => {
-  const VERSION = '0.7.6.2';
+  const VERSION = '0.7.6.3';
   const DEFAULT_BG = '/hacsfiles/Home-Power-Flow-Card/smart-home-energy-background.png';
   const DEFAULT_BG_NIGHT = '/hacsfiles/Home-Power-Flow-Card/smart-home-energy-background2.png';
   const TYPES = [
@@ -788,7 +788,8 @@
           // automatic/explicit builder always places the hub first.
           reverse = Number(value) < 0 ? false : true;
         } else if (t === 'grid') {
-          // positive = import (grid -> hub).
+          // positive = export (hub -> grid), negative = import (grid -> hub).
+          // Sensors with the opposite convention are corrected by Invert flow.
           reverse = Number(value) < 0 ? true : false;
         } else {
           // Generic bidirectional convention for every other device type
@@ -959,16 +960,17 @@
     }
 
     // Share of home consumption NOT imported from the grid, right now:
-    // 1 - import / consumption, from the Grid and House devices. Grid
-    // positive = import (card convention); a Grid device with Invert flow
-    // ticked is read the other way round, matching the flow animation.
+    // 1 - import / consumption, from the Grid and House devices. Import is
+    // decided with the exact same formula as the grid flow animation
+    // (negative = import, flipped by Invert flow), so the percentage always
+    // agrees with the direction the dots travel.
     _selfSufficiencyLive() {
       const devices = this._config?.devices || [];
       const grids = devices.filter(d => d.type === 'grid' && d.power_entity);
       const houses = devices.filter(d => d.type === 'house' && d.power_entity);
       if (!grids.length || !houses.length) return null;
       let imp = 0, cons = 0, seen = false;
-      for (const g of grids) { const v = powerValue(this._hass, g.power_entity); if (v == null) continue; seen = true; imp += Math.max(0, g.invert_flow ? -v : v); }
+      for (const g of grids) { const v = powerValue(this._hass, g.power_entity); if (v == null) continue; seen = true; let importing = v < 0; if (g.invert_flow) importing = !importing; if (importing) imp += Math.abs(v); }
       for (const h of houses) { const v = powerValue(this._hass, h.power_entity); if (v == null) continue; cons += Math.abs(v); }
       if (!seen || cons < 1) return null;
       return Math.round(Math.max(0, Math.min(1, 1 - imp / cons)) * 100);
