@@ -10,7 +10,7 @@
  * Issues & feature requests: https://github.com/mimikm/Home-Power-Flow-Card/issues
  */
 (() => {
-  const VERSION = '0.7.6.5';
+  const VERSION = '0.7.6.6';
   const DEFAULT_BG = '/hacsfiles/Home-Power-Flow-Card/smart-home-energy-background.png';
   const DEFAULT_BG_NIGHT = '/hacsfiles/Home-Power-Flow-Card/smart-home-energy-background2.png';
   const TYPES = [
@@ -460,7 +460,7 @@
           .flow-path { fill:none; stroke-linecap:round; filter:url(#glow); opacity:.92; }
           .flow-dot { filter:url(#dotglow); }
           .node { position:absolute; transform:translate(-50%,-50%) scale(calc(${nodeScale} * var(--hpf-boost,1))); width:195px; min-height:74px; padding:11px 13px; border-radius:15px; z-index:10; background:linear-gradient(145deg,rgba(9,25,40,.87),rgba(15,30,44,.73)); border:1px solid rgba(255,255,255,.17); box-shadow:0 8px 22px rgba(0,0,0,.32); backdrop-filter:blur(10px); }
-          .node .top { display:flex; align-items:center; gap:8px; }.node .icon { font-size:24px; line-height:1; }.node .name { font-weight:700; font-size:14px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }.node .power { margin-top:5px; font-size:19px; font-weight:750; }.node .extras { margin-top:4px; display:flex; flex-wrap:wrap; gap:2px 8px; }.node .extras:empty { display:none; margin:0; }.node .extra-row { display:inline-flex; align-items:center; gap:3px; font-size:10px; line-height:1.3; opacity:.78; white-space:nowrap; max-width:100%; overflow:hidden; text-overflow:ellipsis; }.node .extra-row ha-icon { --mdc-icon-size:12px; width:12px; height:12px; flex:none; }.node.battery { border-color:rgba(123,255,158,.28); }.node.grid { border-color:rgba(93,191,255,.3); }.node.ev { border-color:rgba(151,255,103,.28); }
+          .node .top { display:flex; align-items:center; gap:8px; }.node .icon { font-size:24px; line-height:1; }.node .name { font-weight:700; font-size:14px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }.node .power { margin-top:5px; font-size:19px; font-weight:750; }.node .batt-time { margin-top:3px; display:flex; align-items:center; gap:4px; font-size:12px; font-weight:600; opacity:.9; }.node .batt-time:empty { display:none; }.node .batt-time ha-icon { --mdc-icon-size:13px; width:13px; height:13px; }.node .extras { margin-top:4px; display:flex; flex-wrap:wrap; gap:2px 8px; }.node .extras:empty { display:none; margin:0; }.node .extra-row { display:inline-flex; align-items:center; gap:3px; font-size:10px; line-height:1.3; opacity:.78; white-space:nowrap; max-width:100%; overflow:hidden; text-overflow:ellipsis; }.node .extra-row ha-icon { --mdc-icon-size:12px; width:12px; height:12px; flex:none; }.node.battery { border-color:rgba(123,255,158,.28); }.node.grid { border-color:rgba(93,191,255,.3); }.node.ev { border-color:rgba(151,255,103,.28); }
           @keyframes hpf-charge-pulse { 0%,100% { box-shadow:0 8px 22px rgba(0,0,0,.32), 0 0 0 0 var(--pulse-color); } 50% { box-shadow:0 8px 22px rgba(0,0,0,.32), 0 0 30px 8px var(--pulse-color); } }
           @media (prefers-reduced-motion: reduce) { .node[data-batt-state="charging"], .node[data-batt-state="discharging"] { animation:none !important; } }
           .empty { position:absolute; inset:0; display:flex; align-items:center; justify-content:center; z-index:30; }.empty > div { padding:24px 30px; background:rgba(10,25,38,.82); border-radius:18px; border:1px solid rgba(255,255,255,.18); text-align:center; backdrop-filter:blur(10px); }.empty b{display:block;font-size:20px;margin-bottom:6px}.empty span{opacity:.75}
@@ -611,6 +611,8 @@
         if (powerEl) powerEl.textContent = power == null ? '—' : fmtPower(power);
         const extrasEl = node.querySelector('.extras');
         if (extrasEl) extrasEl.innerHTML = this._extraEntitiesRows(d);
+        const btEl = node.querySelector('.batt-time');
+        if (btEl) { const h = this._batteryTimeHTML(d, power); if (btEl.innerHTML !== h) btEl.innerHTML = h; }
         const battState = this._batteryState(d, power);
         node.dataset.battState = battState || '';
         // Plain inline styles (see _batteryGlowStyle), not a CSS class -
@@ -716,8 +718,15 @@
     // way that resolves for a given sensor and Invert Flow setting. Returns
     // null when idle/below threshold, or for any non-battery device.
     _batteryState(d, value) {
-      if ((d.type || 'load') !== 'battery') return null;
       if (d.battery_glow === false) return null; // user opted out in the editor
+      return this._batteryDirection(d, value);
+    }
+
+    // Charging/discharging from the battery's own reading, using the same
+    // formula as the flow animation (incl. Invert flow). Independent of the
+    // glow setting, so time remaining works with the glow switched off.
+    _batteryDirection(d, value) {
+      if ((d.type || 'load') !== 'battery') return null;
       const threshold = Math.max(1, Number.isFinite(Number(this._config.flow_threshold_watts)) ? Number(this._config.flow_threshold_watts) : 1);
       if (value == null || !Number.isFinite(Number(value)) || Math.abs(Number(value)) < threshold) return null;
       let reverse = Number(value) < 0 ? false : true; // same expression as _flowDirection's battery branch
@@ -725,6 +734,40 @@
       // reverse=true means the dot travels battery -> hub (discharging);
       // reverse=false means hub -> battery (charging).
       return reverse ? 'discharging' : 'charging';
+    }
+
+    // Estimated time until the battery reaches its charge limit (charging)
+    // or its reserve (discharging). Power is smoothed with a ~2 minute
+    // moving average so the estimate doesn't jump with every reading.
+    _batteryTimeText(d, value) {
+      if (d.type !== 'battery' || d.battery_time !== true) return '';
+      const dir = this._batteryDirection(d, value);
+      this._battAvg ||= new Map();
+      const key = d.id || d.name;
+      if (!dir) { this._battAvg.delete(key); return ''; }
+      const now = Date.now(), w = Math.abs(Number(value));
+      let avg = this._battAvg.get(key);
+      if (!avg || avg.dir !== dir) avg = { dir, w, t: now };
+      else { const a = 1 - Math.exp(-(now - avg.t) / 120000); avg = { dir, w: avg.w + (w - avg.w) * a, t: now }; }
+      this._battAvg.set(key, avg);
+      const soc = parseFloat(state(this._hass, d.battery_soc_entity)?.state);
+      let cap = parseFloat(d.battery_capacity);
+      if (d.battery_capacity_entity) { const cs = state(this._hass, d.battery_capacity_entity); let cv = parseFloat(cs?.state); if (Number.isFinite(cv)) { if (String(cs?.attributes?.unit_of_measurement || '').toLowerCase() === 'wh') cv /= 1000; cap = cv; } }
+      if (!Number.isFinite(soc) || !Number.isFinite(cap) || cap <= 0 || avg.w < 1) return '';
+      const reserve = Math.max(0, Math.min(99, Number.isFinite(parseFloat(d.battery_reserve)) ? parseFloat(d.battery_reserve) : 0));
+      const limit = Math.max(1, Math.min(100, Number.isFinite(parseFloat(d.battery_charge_limit)) ? parseFloat(d.battery_charge_limit) : 100));
+      const target = dir === 'charging' ? limit : reserve;
+      const pct = dir === 'charging' ? target - soc : soc - target;
+      if (pct <= 0) return dir === 'charging' ? `at ${Math.round(limit)}%` : `at reserve`;
+      const hours = (pct / 100) * cap * 1000 / avg.w;
+      const mins = Math.round(hours * 60);
+      const t = mins >= 48 * 60 ? `${Math.floor(mins / 1440)}d` : mins >= 60 ? `${Math.floor(mins / 60)}h ${String(mins % 60).padStart(2, '0')}m` : `${Math.max(1, mins)}m`;
+      const label = dir === 'charging' ? (target >= 100 ? 'to full' : `to ${Math.round(target)}%`) : (target <= 0 ? 'to empty' : `to ${Math.round(target)}%`);
+      return `${t} ${label}`;
+    }
+    _batteryTimeHTML(d, value) {
+      const t = this._batteryTimeText(d, value);
+      return t ? `<ha-icon icon="mdi:timer-sand"></ha-icon><span>${esc(t)}</span>` : '';
     }
 
     // Plain inline CSS text for the charge/discharge glow - deliberately NOT
@@ -743,7 +786,7 @@
       const power = powerValue(this._hass, d.power_entity);
       const powerText = power == null ? '—' : fmtPower(power);
       const battState = this._batteryState(d, power);
-      return `<div class="node ${esc(d.type || 'load')}" data-device-index="${i}" data-batt-state="${battState || ''}" data-entity-id="${esc(d.power_entity || '')}" title="${esc(d.power_entity ? 'Open ' + d.power_entity : '')}" style="left:${p.x}%;top:${p.y}%;${this._batteryGlowStyle(battState)}"><div class="top"><span class="icon">${esc(ICONS[d.type] || '⚙️')}</span><span class="name">${esc(d.name || LABELS[d.type] || 'Device')}</span></div><div class="power">${esc(powerText)}</div><div class="extras">${this._extraEntitiesRows(d)}</div></div>`;
+      return `<div class="node ${esc(d.type || 'load')}" data-device-index="${i}" data-batt-state="${battState || ''}" data-entity-id="${esc(d.power_entity || '')}" title="${esc(d.power_entity ? 'Open ' + d.power_entity : '')}" style="left:${p.x}%;top:${p.y}%;${this._batteryGlowStyle(battState)}"><div class="top"><span class="icon">${esc(ICONS[d.type] || '⚙️')}</span><span class="name">${esc(d.name || LABELS[d.type] || 'Device')}</span></div><div class="power">${esc(powerText)}</div><div class="batt-time">${this._batteryTimeHTML(d, power)}</div><div class="extras">${this._extraEntitiesRows(d)}</div></div>`;
     }
 
     // Generic junction model: a device with no power_entity configured acts
@@ -1370,7 +1413,7 @@
           this._config.devices[i][k]=e.target.value;
         }
         this._emit(false);
-        if(k==='type')this._render();
+        if(k==='type'||k==='battery_time')this._render();
       }));
       this.shadowRoot.querySelectorAll('[data-invert-flow]').forEach(b=>b.addEventListener('click',()=>{const i=Number(b.dataset.invertFlow);this._config.devices[i].invert_flow=!this._config.devices[i].invert_flow;this._emit(false);this._render();}));
       this._enableLayoutDragging();
@@ -1431,8 +1474,9 @@
       const extrasBody = expanded ? `<div class="extras-editor">${extras.map((ex,ei)=>this._extraEntityField(i,ei,ex)).join('')}${extras.length<5?`<button class="btn secondary-btn" type="button" data-add-extra="${i}">＋ Add extra entity</button>`:'<div class="small">Maximum of 5 extra entities reached.</div>'}</div>` : '';
       const deviceOpen=this._isDeviceOpen(d.id);
       const connectsToField=`<div class="field full"><label>Connects to</label><select data-device="${i}" data-field="connects_to">${this._connectsToOptions(i)}</select><span class="small" style="display:block">Automatic = the (first) inverter, or a Gateway/Distribution Board device for extra inverters. Override this for multi-inverter or custom topologies.</span></div>`;
+      const battTimeFields = d.type!=='battery' ? '' : `<div class="field full"><label style="display:flex;align-items:center;gap:6px;cursor:pointer;margin-top:6px"><input type="checkbox" data-device="${i}" data-field="battery_time" style="width:auto" ${d.battery_time===true?'checked':''}> Show time remaining</label><span class="small" style="display:block">Estimated time to full (charging) or to reserve (discharging), shown under the power value.</span></div>`+(d.battery_time!==true?'':`<div class="field full"><label>State of charge (%)</label><ha-entity-picker data-device-picker="${i}" data-field="battery_soc_entity" allow-custom-entity></ha-entity-picker></div><div class="field"><label>Capacity (kWh)</label><input type="number" min="0" step="0.1" data-device="${i}" data-field="battery_capacity" value="${esc(d.battery_capacity??'')}" placeholder="e.g. 13.5"></div><div class="field"><label>Reserve %</label><input type="number" min="0" max="99" step="1" data-device="${i}" data-field="battery_reserve" value="${esc(d.battery_reserve??0)}"></div><div class="field"><label>Charge limit %</label><input type="number" min="1" max="100" step="1" data-device="${i}" data-field="battery_charge_limit" value="${esc(d.battery_charge_limit??100)}"></div><div class="field full"><label>Capacity sensor (optional, overrides the number above)</label><ha-entity-picker data-device-picker="${i}" data-field="battery_capacity_entity" allow-custom-entity></ha-entity-picker></div>`);
       const battGlowField = d.type==='battery' ? `<div class="field"><label style="display:flex;align-items:center;gap:6px;cursor:pointer;margin-top:6px"><input type="checkbox" data-device="${i}" data-field="battery_glow" style="width:auto" ${d.battery_glow===false?'':'checked'}> Show charge/discharge glow</label><span class="small" style="display:block">Pulses the box when actively charging or discharging.</span></div>` : '';
-      const body = deviceOpen ? `<div class="row"><div class="field"><label>Type</label><select data-device="${i}" data-field="type">${TYPES.map(t=>`<option value="${t[0]}" ${d.type===t[0]?'selected':''}>${esc(t[1])}</option>`).join('')}</select></div><div class="field"><label>Name</label><input data-device="${i}" data-field="name" value="${esc(d.name||'')}"></div>${entityField('power_entity','Power entity','data-entity-label')}${connectsToField}<div class="field"><label>Flow colour</label><div class="ha-color-box"><input class="ha-color-picker" type="color" title="Choose flow colour" data-device="${i}" data-field="flow_color" value="${esc(d.flow_color || FLOW_COLORS[d.type] || FLOW_COLORS.neutral)}"><span class="color-preview" style="background:${esc(d.flow_color || FLOW_COLORS[d.type] || FLOW_COLORS.neutral)}"></span></div><span class="small" style="display:block">Only used if this device has its own power entity.</span></div><div class="field"><label>Flow direction</label><button class="btn ${inverted?'secondary-btn':''}" type="button" data-invert-flow="${i}">${inverted?'↔ Inverted':'↔ Normal'}<span class="small" style="display:block">Visual direction only</span></button><div class="flow-live" data-flow-live="${i}"></div></div>${battGlowField}</div><button class="btn secondary-btn" type="button" data-toggle-extras="${esc(d.id)}">${expanded?'▾':'▸'} Extra entities${extras.length?` (${extras.length}/5)`:' (optional)'}</button>${extrasBody}` : '';
+      const body = deviceOpen ? `<div class="row"><div class="field"><label>Type</label><select data-device="${i}" data-field="type">${TYPES.map(t=>`<option value="${t[0]}" ${d.type===t[0]?'selected':''}>${esc(t[1])}</option>`).join('')}</select></div><div class="field"><label>Name</label><input data-device="${i}" data-field="name" value="${esc(d.name||'')}"></div>${entityField('power_entity','Power entity','data-entity-label')}${connectsToField}<div class="field"><label>Flow colour</label><div class="ha-color-box"><input class="ha-color-picker" type="color" title="Choose flow colour" data-device="${i}" data-field="flow_color" value="${esc(d.flow_color || FLOW_COLORS[d.type] || FLOW_COLORS.neutral)}"><span class="color-preview" style="background:${esc(d.flow_color || FLOW_COLORS[d.type] || FLOW_COLORS.neutral)}"></span></div><span class="small" style="display:block">Only used if this device has its own power entity.</span></div><div class="field"><label>Flow direction</label><button class="btn ${inverted?'secondary-btn':''}" type="button" data-invert-flow="${i}">${inverted?'↔ Inverted':'↔ Normal'}<span class="small" style="display:block">Visual direction only</span></button><div class="flow-live" data-flow-live="${i}"></div></div>${battGlowField}${battTimeFields}</div><button class="btn secondary-btn" type="button" data-toggle-extras="${esc(d.id)}">${expanded?'▾':'▸'} Extra entities${extras.length?` (${extras.length}/5)`:' (optional)'}</button>${extrasBody}` : '';
       return `<div class="device sort-item" data-sort-index="${i}"><div class="device-head"><span class="drag-handle" data-sort-handle title="Drag to reorder"><ha-icon icon="mdi:drag-horizontal-variant"></ha-icon></span><span class="device-title" data-toggle-device="${esc(d.id)}">${deviceOpen?'▾':'▸'} ${esc(ICONS[d.type]||'⚙️')} ${esc(d.name||'Device')}${!deviceOpen && d.power_entity ? `<span class="device-sub">${esc(d.power_entity)}</span>`:''}</span><span class="device-actions"><button class="dup-btn" title="Duplicate device" data-duplicate="${i}"><ha-icon icon="mdi:content-copy"></ha-icon></button><button title="Remove" data-remove="${i}">×</button></span></div>${body}</div>`;
     }
     _extraEntityField(di,ei,ex){
