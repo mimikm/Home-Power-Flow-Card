@@ -81,6 +81,7 @@ Or manually in HACS:
 - **Invert flow** per device, for sensors that report power the other way round
 - Up to **5 extra entities** per device (SoC, voltage, temperature...) with their own icons, shown in small text under the power value
 - **Battery glow**: batteries pulse green when charging and amber when discharging (can be turned off per battery)
+- **Battery time remaining** (optional): e.g. `⏳ 2h 40m to 4%` or `⏳ 1h 15m to full`, from the battery's state of charge and capacity, with its own reserve and charge limit
 
 ### 🖱️ Flexible layout
 - **Drag and drop** devices, the title, the weather box, the Today panel and the grid mix box to exactly where you want them
@@ -103,7 +104,7 @@ Or manually in HACS:
 
 ### ⚙️ Fully visual editor
 - Everything is configurable without YAML, using Home Assistant's own entity, icon and colour pickers
-- Collapsible, **drag-to-reorder** devices and statistics
+- Collapsible, **drag-to-reorder** devices and statistics, plus collapsible optional sections to keep the editor tidy
 - **Duplicate** any device with one click, handy for multi-inverter or multi-string setups
 - A **live direction readout** under each device's Invert flow toggle (e.g. `▶ Solar PV → Inverter · 450 W`), so you can check flow directions before saving
 - A live preview that always shows the whole card
@@ -135,6 +136,17 @@ Two optional figures shown at the top of the Today panel. Turn them on in the ed
 - **Today** uses your daily energy sensors (kWh or Wh, converted automatically).
 - **No reliable consumption sensor?** Tick *Calculate consumption instead* and the card works it out: import + solar − export + battery discharge − battery charge (battery sensors optional).
 - Both follow the same direction as your Grid flow line. If the grid dots flow the wrong way, tick **Invert flow** on the Grid device to fix both.
+
+---
+
+## 🔋 Battery time remaining
+
+Open a Battery device in the editor, tick **Show time remaining**, then pick its **state of charge** sensor and enter its **capacity** (or pick a capacity sensor).
+
+- **Discharging:** time until the battery reaches its **reserve** (e.g. the 4% many batteries stop at). Default: empty.
+- **Charging:** time until it reaches its **charge limit**. Default: full.
+- Power is averaged over roughly the last two minutes, so the estimate stays steady instead of jumping with every reading.
+- The line hides when the battery is idle, and follows the same direction as the battery's flow line (including Invert flow).
 
 ---
 
@@ -249,6 +261,12 @@ Each device gets a stable internal `id` automatically. `connects_to` refers to t
 | `flow_color` | Flow line colour, e.g. `#ffd54f` |
 | `invert_flow` | `true` to reverse the flow direction |
 | `battery_glow` | Batteries only: `false` to turn off the charge/discharge glow |
+| `battery_time` | Batteries only: `true` to show time remaining |
+| `battery_soc_entity` | Batteries only: state of charge sensor (%) |
+| `battery_capacity` | Batteries only: capacity in kWh (e.g. `13.5`) |
+| `battery_capacity_entity` | Batteries only: capacity sensor, overrides `battery_capacity` |
+| `battery_reserve` | Batteries only: reserve % where discharging stops (default `0`) |
+| `battery_charge_limit` | Batteries only: charge limit % (default `100`) |
 | `extra_entities` | Up to 5 extra readings, each with `entity` and `icon` |
 
 Positions and sizes are easiest to set by dragging in the editor's **Visual layout**.
@@ -267,7 +285,6 @@ Ideas and feedback are welcome, so [open an issue](https://github.com/mimikm/Hom
 **Features**
 - Automatic kW formatting for large values (e.g. `3.2 kW` instead of `3200 W`)
 - Configurable tap actions per device (more-info, navigate, toggle)
-- Battery time remaining (to full / to reserve). *Waiting on feedback, let me know if you'd use it!*
 - Light theme support
 
 **Project**
