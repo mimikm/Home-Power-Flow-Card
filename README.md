@@ -101,7 +101,7 @@ Or manually in HACS:
 - **Weather & clock** box from any weather entity (12 or 24 hour)
 - **Today panel** with up to 20 statistics (solar yield, grid import/export, anything with a number), each with its own icon, updating live
 - **Self-sufficiency & self-consumption** (optional): how much of your electricity didn't come from the grid, and how much of your solar you used yourself, both live and for today
-- **Last updated** box (optional): a small pill showing how long ago an entity was updated (e.g. `🕒 Updated 2m ago`), turning amber when data goes stale, so you can spot a stalled integration at a glance
+- **Last updated** box (optional): a small pill counting live how long ago an entity was updated (e.g. `🕒 Updated 3m 05s ago`), turning amber when data goes stale, so you can spot a stalled integration at a glance. Understands date-time, time-only and Unix timestamp sensors
 - **UK grid mix** box (optional): live carbon intensity with a colour-coded rating, plus the current generation mix by source, for your region or all of Great Britain
 
 ### ⚙️ Fully visual editor
@@ -242,7 +242,7 @@ Each device gets a stable internal `id` automatically. `connects_to` refers to t
 | `flow_threshold_watts` | `1` | Minimum power (W) before a flow line shows |
 | `flow_speed` | `8` | Base animation duration in seconds (at 1 kW) |
 | `updated_enabled` | `false` | Show the last updated box |
-| `updated_entity` | — | Entity to watch (uses its own timestamp if its state is one) |
+| `updated_entity` | — | Entity to watch (uses its own timestamp if its state is one: date-time, time-only or Unix) |
 | `updated_label` | `Updated` | Text before the time; `""` for none |
 | `updated_stale_minutes` | `10` | Minutes before the box turns amber |
 | `grid_mix_enabled` | `false` | Show the UK grid mix box |
