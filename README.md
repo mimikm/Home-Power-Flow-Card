@@ -67,6 +67,7 @@ Or manually in HACS:
 - Live animated flow lines between every device, with a moving, softly pulsing dot showing the direction of power
 - Dots move **faster on high-power connections** and slower on light ones
 - Evenly spaced flow lines, whatever the distance between devices
+- Choose **curved** lines or **right-angle** lines that route around every box on the card
 - A configurable **noise threshold** keeps idle connections quiet
 
 ### 🔌 Any setup, including multi-inverter
@@ -234,6 +235,7 @@ Each device gets a stable internal `id` automatically. `connects_to` refers to t
 | `theme_panel_color` | `#081d34` | Custom theme: panel colour |
 | `theme_text_color` | `#ffffff` | Custom theme: text colour |
 | `theme_opacity` | `0.8` | Custom theme: panel opacity (`0.2` to `1`) |
+| `flow_style` | `curved` | `curved`, or `orthogonal` for right-angle lines that avoid boxes |
 | `time_format` | `24h` | `24h` or `12h` for the clock |
 | `weather_entity` | — | Weather entity for the weather box |
 | `sun_entity` | `sun.sun` | Switches between the day and night backgrounds |
