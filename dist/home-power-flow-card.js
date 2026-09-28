@@ -10,7 +10,7 @@
  * Issues & feature requests: https://github.com/mimikm/Home-Power-Flow-Card/issues
  */
 (() => {
-  const VERSION = '0.7.7.0';
+  const VERSION = '0.7.7.1';
   const DEFAULT_BG = '/hacsfiles/Home-Power-Flow-Card/smart-home-energy-background.png';
   const DEFAULT_BG_NIGHT = '/hacsfiles/Home-Power-Flow-Card/smart-home-energy-background2.png';
   const TYPES = [
@@ -246,6 +246,33 @@
     return { node: grad, panel: rgba(p, op), stats: grad, border: rgba(t, 0.18), text: `rgb(${t.join(',')})`, track: rgba(t, 0.12) };
   }
 
+  // ---- Phone layout ------------------------------------------------------
+  // Phone mode uses a portrait 800x1200 stage with its own positions. Keys
+  // for panel positions: desktop key -> phone key, with default positions.
+  const PANEL_POS = {
+    header:  { key:'header_position',   phone:'phone_header_position',   d:[2.6, 2.7], p:[4, 1.5] },
+    weather: { key:'weather_position',  phone:'phone_weather_position',  d:[82, 10],   p:[74, 10] },
+    gridmix: { key:'grid_mix_position', phone:'phone_grid_mix_position', d:[83, 32],   p:[27, 14] },
+    updated: { key:'updated_position',  phone:'phone_updated_position',  d:[50, 95],   p:[50, 21.5] },
+    stats:   { key:'stats_position',    phone:'phone_stats_position',    d:[17, 86],   p:[50, 84] },
+  };
+  // Default phone layout: devices keep their desktop top-to-bottom order
+  // and are arranged in rows of three (left to right by desktop position),
+  // below the title/weather area. The Today panel goes under the last row.
+  function phoneAutoLayout(devices, desktopPos) {
+    const order = devices.map((d, i) => i).sort((a, b) => (desktopPos[a].y - desktopPos[b].y) || (desktopPos[a].x - desktopPos[b].x));
+    const out = new Array(devices.length), rows = Math.ceil(order.length / 3);
+    const rowH = rows > 1 ? Math.min(10.5, 44 / (rows - 1)) : 0, top = 28;
+    for (let r = 0; r < rows; r++) {
+      const chunk = order.slice(r * 3, r * 3 + 3).sort((a, b) => desktopPos[a].x - desktopPos[b].x);
+      const xs = chunk.length === 1 ? [50] : chunk.length === 2 ? [30, 70] : [17, 50, 83];
+      chunk.forEach((i, k) => { out[i] = { x: xs[k], y: top + r * rowH }; });
+    }
+    const lastY = rows ? top + (rows - 1) * rowH : top;
+    return { positions: out, statsY: Math.max(72, Math.min(88, lastY + 19)) };
+  }
+  const validPos = p => p && Number.isFinite(Number(p.x)) && Number.isFinite(Number(p.y)) ? { x: Number(p.x), y: Number(p.y) } : null;
+
   function state(hass, entity) {
     return entity && hass?.states?.[entity] ? hass.states[entity] : null;
   }
@@ -419,9 +446,12 @@
       const card = this.shadowRoot?.querySelector('.card');
       const stage = this.shadowRoot?.querySelector('.stage');
       if (!card || !stage) return;
+      // Switch between desktop and phone layout when needed (full redraw).
+      const phone = this._computePhone();
+      if (this._rendered && phone !== this._phoneMode) { this._render(); return; }
       const w = card.clientWidth;
       if (!w) return;
-      stage.style.setProperty('--hpf-scale', String(w / 1200));
+      stage.style.setProperty('--hpf-scale', String(w / (this._phoneMode ? 800 : 1200)));
       const raw = Number(this._config?.mobile_scale);
       const mobileBoost = Number.isFinite(raw) && raw > 0 ? Math.max(1, Math.min(2.5, raw)) : 1.4;
       // Ramp the boost in smoothly between 900px (none) and 400px (full),
@@ -434,8 +464,16 @@
         const rawS = Number(this._config?.stats_scale);
         const userS = Number.isFinite(rawS) && rawS > 0 ? Math.max(0.3, Math.min(1.5, rawS)) : 0.8;
         const h = statsEl.offsetHeight;
-        const fitS = h ? (800 * 0.92) / h : userS;
-        stage.style.setProperty('--hpf-stats-scale', String(Math.min(userS, fitS)));
+        const fitS = h ? ((this._phoneMode ? 1200 : 800) * 0.92) / h : userS;
+        const statsS = Math.min(userS, fitS);
+        stage.style.setProperty('--hpf-stats-scale', String(statsS));
+        // Phone, automatic position: nudge the panel up so it never hangs
+        // off the bottom of the card (its height depends on the stat rows).
+        if (this._phoneMode && !validPos(this._config?.phone_stats_position) && h) {
+          const halfPct = (h * statsS / 2) / 1200 * 100;
+          const y = Math.min(this._panelPos('stats').y, 99 - halfPct);
+          statsEl.style.setProperty('--stats-y', y + '%');
+        }
       }
       const rawT = Number(this._config?.title_scale);
       stage.style.setProperty('--hpf-title-scale', String(Number.isFinite(rawT) && rawT > 0 ? Math.max(0.3, Math.min(3, rawT)) : 1));
@@ -445,7 +483,7 @@
       stage.style.setProperty('--hpf-gridmix-scale', String(Number.isFinite(rawG) && rawG > 0 ? Math.max(0.3, Math.min(2, rawG)) : 1));
       const rawW = Number(this._config?.weather_scale);
       stage.style.setProperty('--hpf-weather-scale', String(Number.isFinite(rawW) && rawW > 0 ? Math.max(0.3, Math.min(2, rawW)) : 1));
-      const t = Math.max(0, Math.min(1, (900 - w) / 500));
+      const t = Math.max(0, Math.min(1, (900 - w) / 500)) * (this._phoneMode ? 0.5 : 1);
       stage.style.setProperty('--hpf-boost', String(1 + (mobileBoost - 1) * t));
       if (this._lastRouteW !== w) { this._lastRouteW = w; this._scheduleReroute(); }
     }
@@ -483,12 +521,15 @@
       const nodeScaleRaw = Number(c.device_scale);
       const nodeScale = Number.isFinite(nodeScaleRaw) && nodeScaleRaw > 0 ? Math.max(0.5, Math.min(2, nodeScaleRaw)) : 1;
 
+      this._phoneMode = this._computePhone();
       this.shadowRoot.innerHTML = `
         <style>
           :host { display:block; width:100%; }
           * { box-sizing:border-box; }
           .card { position:relative; width:100%; max-width:min(var(--hpf-max-width,100000px), calc((100vh - 96px) * 1.5)); margin:0 auto; aspect-ratio: 3 / 2; overflow:hidden; border-radius:22px; color:var(--hpf-text,#fff); font-family:var(--primary-font-family,Arial,sans-serif); background:#101820; box-shadow:0 12px 40px rgba(0,0,0,.28); }
           .bg { position:absolute; inset:0; background-size:cover; background-position:center; }
+          .card.phone { aspect-ratio: 2 / 3; max-width:min(var(--hpf-max-width,100000px), calc((100vh - 96px) * 0.6667)); }
+          .card.phone .stage { width:800px; height:1200px; }
           .stage { position:absolute; left:0; top:0; width:1200px; height:800px; transform-origin:top left; transform:scale(var(--hpf-scale,1)); }
           .vignette { position:absolute; inset:0; background:radial-gradient(circle at 55% 45%,transparent 25%,rgba(0,0,0,.12) 72%,rgba(0,0,0,.32)); pointer-events:none; }
           .header { position:absolute; left:var(--header-x,2.6%); top:var(--header-y,2.7%); z-index:20; transform-origin:top left; transform:scale(calc(var(--hpf-title-scale,1) * var(--hpf-boost,1))); color:var(--hpf-title-color,#fff); white-space:nowrap; }
@@ -524,15 +565,15 @@
           @media (prefers-reduced-motion: reduce) { .node[data-batt-state="charging"], .node[data-batt-state="discharging"] { animation:none !important; } }
           .empty { position:absolute; inset:0; display:flex; align-items:center; justify-content:center; z-index:30; }.empty > div { padding:24px 30px; background:rgba(10,25,38,.82); border-radius:18px; border:1px solid var(--hpf-border,rgba(255,255,255,.16)); text-align:center; backdrop-filter:blur(10px); }.empty b{display:block;font-size:20px;margin-bottom:6px}.empty span{opacity:.75}
         </style>
-        <div class="card" style="--hpf-max-width:${this._maxWidthCss()}">
+        <div class="card${this._phoneMode ? ' phone' : ''}" style="--hpf-max-width:${this._maxWidthCss()}">
           <div class="bg"></div><div class="vignette"></div>
           <div class="stage">
           ${this._headerHTML()}
           ${this._gridMixBoxHTML()}
           ${this._updatedBoxHTML()}
-          <div class="weather" style="--weather-x:${this._uiPosition(c.weather_position, 82, 10).x}%;--weather-y:${this._uiPosition(c.weather_position, 82, 10).y}%"><div class="date">${esc(date)}</div><div class="clock">${esc(time)}</div><div class="wicon">${weatherIcon}</div><div class="temp">${weatherTemp != null ? esc(weatherTemp) + esc(weatherUnit) : '—'}</div><div class="wstate">${esc(weatherText)}</div></div>
-          <div class="canvas"><svg class="flows" viewBox="0 0 1000 667" preserveAspectRatio="none">${this._svgFilterDefs()}${flows}</svg>${nodes}</div>
-          ${stats ? stats.replace('<div class="stats">', `<div class="stats" style="--stats-x:${this._uiPosition(c.stats_position, 17, 86).x}%;--stats-y:${this._uiPosition(c.stats_position, 17, 86).y}%">`) : ''}
+          <div class="weather" style="--weather-x:${this._panelPos('weather').x}%;--weather-y:${this._panelPos('weather').y}%"><div class="date">${esc(date)}</div><div class="clock">${esc(time)}</div><div class="wicon">${weatherIcon}</div><div class="temp">${weatherTemp != null ? esc(weatherTemp) + esc(weatherUnit) : '—'}</div><div class="wstate">${esc(weatherText)}</div></div>
+          <div class="canvas"><svg class="flows" viewBox="0 0 ${this._vbW()} ${this._vbH()}" preserveAspectRatio="none">${this._svgFilterDefs()}${flows}</svg>${nodes}</div>
+          ${stats ? stats.replace('<div class="stats">', `<div class="stats" style="--stats-x:${this._panelPos('stats').x}%;--stats-y:${this._panelPos('stats').y}%">`) : ''}
           ${devices.length ? '' : '<div class="empty"><div><b>Add your first device</b><span>Open the card editor and add Solar, Inverter, Battery, Grid or House.</span></div></div>'}
           </div>
         </div>`;
@@ -609,7 +650,7 @@
       const title = c.title === undefined || c.title === null ? 'Energy Flow' : String(c.title);
       const subtitle = c.subtitle ? String(c.subtitle) : '';
       if (!title.trim() && !subtitle.trim()) return '';
-      const p = this._uiPosition(c.header_position, 2.6, 2.7);
+      const p = this._panelPos('header');
       const color = /^#[0-9a-f]{3,8}$/i.test(String(c.title_color || '')) ? c.title_color : '#ffffff';
       return `<div class="header" style="--header-x:${p.x}%;--header-y:${p.y}%;--hpf-title-color:${color}">${title.trim() ? `<div class="title">${esc(title)}</div>` : ''}${subtitle.trim() ? `<div class="subtitle">${esc(subtitle)}</div>` : ''}</div>`;
     }
@@ -669,7 +710,7 @@
     }
     _updatedBoxHTML() {
       if (this._config?.updated_enabled !== true) return '';
-      const p = this._uiPosition(this._config.updated_position, 50, 95);
+      const p = this._panelPos('updated');
       return `<div class="updated${this._updatedInfo().stale ? ' stale' : ''}" style="--up-x:${p.x}%;--up-y:${p.y}%">${this._updatedInner()}</div>`;
     }
     _updatedRefresh() {
@@ -683,7 +724,7 @@
     _gridMixEnabled() { return this._config?.grid_mix_enabled === true; }
     _gridMixBoxHTML() {
       if (!this._gridMixEnabled()) return '';
-      const p = this._uiPosition(this._config.grid_mix_position, 83, 32);
+      const p = this._panelPos('gridmix');
       return `<div class="gridmix" style="--gm-x:${p.x}%;--gm-y:${p.y}%">${this._gridMixInner()}</div>`;
     }
     _gridMixInner() {
@@ -808,7 +849,38 @@
       return '☀️';
     }
 
+    // Flow canvas size in SVG units (landscape on desktop, portrait on phone).
+    _vbW() { return this._phoneMode ? 667 : 1000; }
+    _vbH() { return this._phoneMode ? 1000 : 667; }
     _layout(devices) {
+      const desk = this._desktopLayout(devices);
+      if (!this._phoneMode) return desk;
+      const auto = phoneAutoLayout(devices, desk).positions;
+      return devices.map((d, i) => validPos(d.phone_position) || auto[i]);
+    }
+    // Position of a panel (title, weather, grid mix, last updated, Today)
+    // for the current layout, falling back to that layout's default.
+    _panelPos(kind) {
+      const c = this._config || {}, def = PANEL_POS[kind];
+      if (!this._phoneMode) return this._uiPosition(c[def.key], def.d[0], def.d[1]);
+      const own = validPos(c[def.phone]);
+      if (own) return own;
+      if (kind === 'stats') { const devices = c.devices || []; return { x: def.p[0], y: phoneAutoLayout(devices, this._desktopLayout(devices)).statsY }; }
+      return { x: def.p[0], y: def.p[1] };
+    }
+    // Phone layout on/off: 'auto' (default) switches below the breakpoint
+    // (card width, default 600px); 'always' / 'never' force it. The card
+    // editor can force it while you're editing the phone layout.
+    _computePhone() {
+      if (typeof this._editorPhone === 'boolean') return this._editorPhone;
+      const mode = this._config?.phone_layout || 'auto';
+      if (mode === 'always') return true;
+      if (mode === 'never') return false;
+      const bp = Number(this._config?.phone_breakpoint);
+      const w = this.clientWidth || this.getBoundingClientRect?.().width || 0;
+      return w > 0 && w < (Number.isFinite(bp) && bp > 0 ? bp : 600);
+    }
+    _desktopLayout(devices) {
       const zones = {
         solar: [18, 23], inverter: [56, 39], battery: [58, 65], gateway: [48, 78], house: [28, 82], grid: [82, 84], generator: [18, 62], water: [14, 90], gas: [40, 92], ev: [83, 50], load: [76, 67]
       };
@@ -1138,7 +1210,7 @@
       const canvas = this.shadowRoot?.querySelector('.canvas');
       const cr = canvas?.getBoundingClientRect();
       if (!cr || !cr.width || !cr.height) return null;
-      const sx = 1000 / cr.width, sy = 667 / cr.height, list = [];
+      const sx = this._vbW() / cr.width, sy = this._vbH() / cr.height, list = [];
       this.shadowRoot.querySelectorAll('.node, .weather, .stats, .gridmix, .updated').forEach(el => {
         const r = el.getBoundingClientRect(); if (!r.width) return;
         list.push({ x1:(r.left-cr.left)*sx, y1:(r.top-cr.top)*sy, x2:(r.right-cr.left)*sx, y2:(r.bottom-cr.top)*sy,
@@ -1147,8 +1219,8 @@
       return list;
     }
     _routeOrthogonal(a, b, x1, y1, x2, y2) {
-      const G = 8, W = Math.ceil(1000 / G) + 1, H = Math.ceil(667 / G) + 1, N = W * H;
-      const key = `${a}|${b}|${Math.round(x1)}|${Math.round(y1)}|${Math.round(x2)}|${Math.round(y2)}`;
+      const G = 8, W = Math.ceil(this._vbW() / G) + 1, H = Math.ceil(this._vbH() / G) + 1, N = W * H;
+      const key = `${this._phoneMode ? 'p' : 'd'}|${a}|${b}|${Math.round(x1)}|${Math.round(y1)}|${Math.round(x2)}|${Math.round(y2)}`;
       this._routeCache ||= new Map();
       const lanes = this._lanes;
       // Marks a finished route's lanes: 2 = the lane itself, 1 = beside it.
@@ -1242,7 +1314,7 @@
       // Lane memory for orthogonal routing: lines routed earlier in this
       // build make their lanes (and the lanes beside them) more expensive,
       // so later lines running the same way pick a parallel lane.
-      const LW = Math.ceil(1000 / 8) + 1, LH = Math.ceil(667 / 8) + 1;
+      const LW = Math.ceil(this._vbW() / 8) + 1, LH = Math.ceil(this._vbH() / 8) + 1;
       this._lanes = { h: new Uint8Array(LW * LH), v: new Uint8Array(LW * LH) };
       const edges = this._flowEdges(devices);
       const seen=new Set();
@@ -1251,7 +1323,7 @@
       return edges.map(([a,b,dir,child],idx)=>{
         const key=`${a}-${b}`; if(seen.has(key))return ''; seen.add(key);
         const A=pos[a],B=pos[b]; if(!A||!B)return '';
-        const x1=A.x*10,y1=A.y*6.67,x2=B.x*10,y2=B.y*6.67;
+        const vw=this._vbW()/100, vh=this._vbH()/100, x1=A.x*vw,y1=A.y*vh,x2=B.x*vw,y2=B.y*vh;
         const path=this._edgePath(a,b,x1,y1,x2,y2);
         const da=devices[a],db=devices[b],va=this._flowSnapshot?.[a],vb=this._flowSnapshot?.[b];
         const childDevice = Number.isInteger(child) ? devices[child] : null;
@@ -1414,7 +1486,7 @@
   }
 
   class HomePowerFlowEditor extends HTMLElement {
-    constructor(){ super(); this._config={}; this._hass=null; this._extrasOpen=new Map(); this._devicesOpen=new Map(); this._statsOpen=new Map(); this.attachShadow({mode:'open'}); }
+    constructor(){ super(); this._config={}; this._hass=null; this._extrasOpen=new Map(); this._devicesOpen=new Map(); this._statsOpen=new Map(); this._layoutMode='desktop'; this.attachShadow({mode:'open'}); }
     // Whether the device with this id has its editor body expanded. Keyed by
     // id (not index) so deleting an earlier device never scrambles which
     // other device appears open/closed. Defaults to closed for a clean list.
@@ -1516,6 +1588,8 @@
       // inside hui-section/hui-grid-section on the newer Sections layout.
       const inner=this._deepFind(preview, 'home-power-flow-card');
       if(!inner) return;
+      const wantPhone=this._layoutMode==='phone';
+      if(inner._editorPhone!==wantPhone){ inner._editorPhone=wantPhone; inner._applyScale?.(); }
 
       // The settings column (the preview's flex sibling) defaults to
       // min-width:auto, the classic flexbox trap: it refuses to shrink below
@@ -1565,7 +1639,7 @@
         inner.style.display='block';
         inner.style.height=''; inner.style.overflow='';
         inner.style.width='100%';
-        inner.style.maxWidth=Math.floor(availH*1.5)+'px';
+        inner.style.maxWidth=Math.floor(availH*(inner._phoneMode?0.6667:1.5))+'px';
         inner.style.margin='0 auto';
       };
       applyInner();
@@ -1574,7 +1648,7 @@
     _render(){
       const c=this._config;
       this.shadowRoot.innerHTML=`<style>
-        :host{display:block;width:100%;max-width:680px;min-width:0;box-sizing:border-box;overflow-x:hidden}.wrap{padding:4px 0;font-family:var(--primary-font-family,Arial)}h3{margin:18px 0 8px}.hint{opacity:.65;font-size:12px;margin-bottom:12px}.row{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin:8px 0}.row.compact{grid-template-columns:repeat(auto-fit,minmax(110px,1fr));align-items:end}.field{display:flex;flex-direction:column;gap:5px;min-width:0}.field.full{grid-column:1/-1}.entity-id{font:11px/1.35 ui-monospace,SFMono-Regular,Consolas,monospace;opacity:.72;word-break:break-all;margin-top:2px}.section{padding:14px 16px;margin:12px 0;border:1px solid var(--divider-color,#ddd);border-radius:14px}.section h3{margin-top:0}label{font-size:12px;opacity:.75}input,select{width:100%;box-sizing:border-box;min-width:0;padding:10px;border:1px solid var(--divider-color,#ddd);border-radius:8px;background:var(--card-background-color,#fff);color:var(--primary-text-color,#111)}.drag-handle{display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;margin-right:6px;flex:none;cursor:grab;touch-action:none;opacity:.7;border-radius:6px}.drag-handle:hover{opacity:1;background:rgba(127,127,127,.15)}.drag-handle ha-icon{--mdc-icon-size:18px;width:18px;height:18px}.sort-item.sorting{opacity:.85;box-shadow:0 8px 22px rgba(0,0,0,.35);border-color:var(--primary-color,#03a9f4);position:relative;z-index:5}.sort-item.sorting .drag-handle{cursor:grabbing}.device{padding:13px;margin:10px 0;border:1px solid var(--divider-color,#ddd);border-radius:12px;background:var(--secondary-background-color,rgba(0,0,0,.03))}.device-head{display:flex;justify-content:space-between;align-items:center;font-weight:700}.device-title{cursor:pointer;display:flex;align-items:center;gap:6px;flex:1;min-width:0;user-select:none}.device-sub{font:11px/1 ui-monospace,SFMono-Regular,Consolas,monospace;font-weight:400;opacity:.6;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.device-head button{border:0;background:transparent;color:var(--error-color,#db4437);font-size:20px;cursor:pointer}.section-toggle{cursor:pointer;user-select:none;display:flex;align-items:baseline;gap:8px}.section-sub{font-size:12px;font-weight:400;opacity:.6}.section-body[hidden]{display:none}.device-actions{display:flex;align-items:center;gap:2px;flex:none}.device-head button.dup-btn{color:var(--primary-text-color,#fff);opacity:.7;display:inline-flex;align-items:center;padding:2px 4px}.device-head button.dup-btn:hover{opacity:1}.device-head button.dup-btn ha-icon{--mdc-icon-size:18px;width:18px;height:18px}.flow-live{font-size:11px;line-height:1.5;margin-top:4px;opacity:.85}.flow-live .fl-on{color:var(--success-color,#4caf50)}.flow-live .fl-off{opacity:.6}.btn{border:0;border-radius:10px;padding:11px 14px;background:var(--primary-color,#03a9f4);color:#fff;cursor:pointer;font-weight:700}.small{font-size:11px;opacity:.6}.layout-editor{position:relative;width:100%;aspect-ratio:1.5/1;min-height:420px;border-radius:16px;overflow:hidden;border:1px solid var(--divider-color,#ddd);background:#10202c;touch-action:none}.layout-bg{position:absolute;inset:0;background-size:cover;background-position:center}.layout-node{position:absolute;transform:translate(-50%,-50%);min-width:112px;max-width:160px;padding:8px 10px;border-radius:11px;background:rgba(8,29,45,.9);border:1px solid rgba(255,255,255,.35);color:#fff;box-shadow:0 6px 16px rgba(0,0,0,.35);cursor:grab;user-select:none;touch-action:none;font-size:12px;z-index:2}.layout-node[data-layout-kind="header"]{transform:none}.layout-node.dragging{cursor:grabbing;box-shadow:0 10px 24px rgba(0,0,0,.5);border-color:var(--primary-color,#03a9f4)}.layout-node .ln-top{font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.layout-node .ln-pos{font:10px ui-monospace,SFMono-Regular,Consolas,monospace;opacity:.65;margin-top:2px}.secondary-btn{margin-bottom:8px;background:var(--secondary-text-color,#607d8b)}.flow-colours{grid-template-columns:repeat(3,minmax(0,1fr))}.color-row{display:grid;grid-template-columns:42px 1fr;gap:6px;align-items:center}.color-row input[type=color]{height:40px;padding:3px}.ha-color-box{display:flex;align-items:center;gap:10px}.ha-color-picker{width:56px!important;height:40px!important;padding:2px!important;border-radius:8px}.color-preview{width:80px;height:36px;border-radius:8px;border:1px solid var(--divider-color,#ddd);display:inline-block}.color-row input[type=text]{padding:9px;font:12px ui-monospace,SFMono-Regular,Consolas,monospace}.upload-row{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:4px}.upload-row .btn{padding:9px 12px;font-size:12px}.upload-status{font-size:11px;opacity:.65;margin-bottom:6px}
+        :host{display:block;width:100%;max-width:680px;min-width:0;box-sizing:border-box;overflow-x:hidden}.wrap{padding:4px 0;font-family:var(--primary-font-family,Arial)}h3{margin:18px 0 8px}.hint{opacity:.65;font-size:12px;margin-bottom:12px}.row{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin:8px 0}.row.compact{grid-template-columns:repeat(auto-fit,minmax(110px,1fr));align-items:end}.field{display:flex;flex-direction:column;gap:5px;min-width:0}.field.full{grid-column:1/-1}.entity-id{font:11px/1.35 ui-monospace,SFMono-Regular,Consolas,monospace;opacity:.72;word-break:break-all;margin-top:2px}.section{padding:14px 16px;margin:12px 0;border:1px solid var(--divider-color,#ddd);border-radius:14px}.section h3{margin-top:0}label{font-size:12px;opacity:.75}input,select{width:100%;box-sizing:border-box;min-width:0;padding:10px;border:1px solid var(--divider-color,#ddd);border-radius:8px;background:var(--card-background-color,#fff);color:var(--primary-text-color,#111)}.drag-handle{display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;margin-right:6px;flex:none;cursor:grab;touch-action:none;opacity:.7;border-radius:6px}.drag-handle:hover{opacity:1;background:rgba(127,127,127,.15)}.drag-handle ha-icon{--mdc-icon-size:18px;width:18px;height:18px}.sort-item.sorting{opacity:.85;box-shadow:0 8px 22px rgba(0,0,0,.35);border-color:var(--primary-color,#03a9f4);position:relative;z-index:5}.sort-item.sorting .drag-handle{cursor:grabbing}.device{padding:13px;margin:10px 0;border:1px solid var(--divider-color,#ddd);border-radius:12px;background:var(--secondary-background-color,rgba(0,0,0,.03))}.device-head{display:flex;justify-content:space-between;align-items:center;font-weight:700}.device-title{cursor:pointer;display:flex;align-items:center;gap:6px;flex:1;min-width:0;user-select:none}.device-sub{font:11px/1 ui-monospace,SFMono-Regular,Consolas,monospace;font-weight:400;opacity:.6;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.device-head button{border:0;background:transparent;color:var(--error-color,#db4437);font-size:20px;cursor:pointer}.section-toggle{cursor:pointer;user-select:none;display:flex;align-items:baseline;gap:8px}.section-sub{font-size:12px;font-weight:400;opacity:.6}.section-body[hidden]{display:none}.device-actions{display:flex;align-items:center;gap:2px;flex:none}.device-head button.dup-btn{color:var(--primary-text-color,#fff);opacity:.7;display:inline-flex;align-items:center;padding:2px 4px}.device-head button.dup-btn:hover{opacity:1}.device-head button.dup-btn ha-icon{--mdc-icon-size:18px;width:18px;height:18px}.flow-live{font-size:11px;line-height:1.5;margin-top:4px;opacity:.85}.flow-live .fl-on{color:var(--success-color,#4caf50)}.flow-live .fl-off{opacity:.6}.btn{border:0;border-radius:10px;padding:11px 14px;background:var(--primary-color,#03a9f4);color:#fff;cursor:pointer;font-weight:700}.small{font-size:11px;opacity:.6}.layout-editor{position:relative;width:100%;aspect-ratio:1.5/1;min-height:420px;border-radius:16px;overflow:hidden;border:1px solid var(--divider-color,#ddd);background:#10202c;touch-action:none}.layout-bg{position:absolute;inset:0;background-size:cover;background-position:center}.layout-editor.phone{aspect-ratio:2/3;max-width:380px;min-height:0;margin:0 auto}.seg{display:inline-flex;border:1px solid var(--divider-color,#ddd);border-radius:10px;overflow:hidden;margin:4px 0 8px}.seg button{border:0;padding:7px 14px;background:transparent;color:var(--primary-text-color,#111);cursor:pointer;font-size:13px}.seg button.on{background:var(--primary-color,#03a9f4);color:#fff}.layout-actions{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px}.layout-node{position:absolute;transform:translate(-50%,-50%);min-width:112px;max-width:160px;padding:8px 10px;border-radius:11px;background:rgba(8,29,45,.9);border:1px solid rgba(255,255,255,.35);color:#fff;box-shadow:0 6px 16px rgba(0,0,0,.35);cursor:grab;user-select:none;touch-action:none;font-size:12px;z-index:2}.layout-node[data-layout-kind="header"]{transform:none}.layout-node.dragging{cursor:grabbing;box-shadow:0 10px 24px rgba(0,0,0,.5);border-color:var(--primary-color,#03a9f4)}.layout-node .ln-top{font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.layout-node .ln-pos{font:10px ui-monospace,SFMono-Regular,Consolas,monospace;opacity:.65;margin-top:2px}.secondary-btn{margin-bottom:8px;background:var(--secondary-text-color,#607d8b)}.flow-colours{grid-template-columns:repeat(3,minmax(0,1fr))}.color-row{display:grid;grid-template-columns:42px 1fr;gap:6px;align-items:center}.color-row input[type=color]{height:40px;padding:3px}.ha-color-box{display:flex;align-items:center;gap:10px}.ha-color-picker{width:56px!important;height:40px!important;padding:2px!important;border-radius:8px}.color-preview{width:80px;height:36px;border-radius:8px;border:1px solid var(--divider-color,#ddd);display:inline-block}.color-row input[type=text]{padding:9px;font:12px ui-monospace,SFMono-Regular,Consolas,monospace}.upload-row{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:4px}.upload-row .btn{padding:9px 12px;font-size:12px}.upload-status{font-size:11px;opacity:.65;margin-bottom:6px}
       </style><div class="wrap"><h3>Home Power Flow</h3><div class="hint">Bidirectional power flow from live positive/negative values, dotted connections, single moving power dot, invertible device direction, dynamic flow colors and draggable layout. Entity IDs are shown in full below each picker.</div>
       <div class="section"><h3>Backup</h3><div class="hint">Download the whole card configuration as a file, or restore one saved earlier. Importing replaces every setting below (devices, connections, layout, statistics) - it does not save to your dashboard until you click Save.</div><div class="upload-row"><button class="btn secondary-btn" type="button" id="export-config">⬇ Export config</button><button class="btn secondary-btn" type="button" id="import-config-btn">⬆ Import config</button><input type="file" accept="application/json,.json" data-import-config-file style="display:none"></div><div class="upload-status" data-import-status></div></div>
       <div class="row"><div class="field"><label>Title</label><input data-key="title" placeholder="Leave empty for no title" value="${esc(c.title===undefined||c.title===null?'Energy Flow':c.title)}"></div><div class="field"><label>Subtitle</label><input data-key="subtitle" placeholder="Optional" value="${esc(c.subtitle||'')}"></div><div class="field"><label>Title colour</label><div class="ha-color-box"><input class="ha-color-picker" type="color" data-key="title_color" value="${esc(/^#[0-9a-f]{6}$/i.test(String(c.title_color||''))?c.title_color:'#ffffff')}"><span class="color-preview" style="background:${esc(c.title_color||'#ffffff')}"></span></div></div><div class="field"><label>Time format</label><select data-key="time_format"><option value="24h" ${(c.time_format||'24h')==='24h'?'selected':''}>24 hour</option><option value="12h" ${c.time_format==='12h'?'selected':''}>12 hour</option></select></div><div class="field full"><label>Weather entity</label><ha-entity-picker data-editor-key="weather_entity" allow-custom-entity></ha-entity-picker></div><div class="field full">${this._bgUploadField('day','Day background')}</div><div class="field full">${this._bgUploadField('night','Night background')}</div><div class="field full"><label>Sun entity (switches day/night background)</label><ha-entity-picker data-editor-key="sun_entity" allow-custom-entity></ha-entity-picker></div><div class="field"><label>Flow threshold (W)</label><input type="number" min="0" step="0.1" data-key="flow_threshold_watts" value="${esc((Number(c.flow_threshold ?? 0.0005)*1000).toFixed(1))}"></div><div class="field"><label>Flow animation speed (seconds)</label><input type="number" min="3" max="30" step="0.5" data-key="flow_speed" value="${esc(c.flow_speed??8)}"></div><div class="field"><label>Particle stagger (seconds)</label><input type="number" min="0.15" max="1.5" step="0.05" data-key="flow_stagger" value="${esc(c.flow_stagger??0.55)}"></div></div>
@@ -1582,7 +1656,7 @@
       <h3>UK grid mix</h3><div class="hint">Optional box showing how green the GB electricity grid is right now (carbon intensity and generation mix), from the National Grid ESO Carbon Intensity API. Updates every 30 minutes.</div><div class="row"><div class="field"><label style="display:flex;align-items:center;gap:6px;cursor:pointer;margin-top:6px"><input type="checkbox" data-key="grid_mix_enabled" style="width:auto" ${c.grid_mix_enabled===true?'checked':''}> Show grid mix box</label></div><div class="field"><label>Postcode (optional)</label><input data-key="grid_mix_postcode" placeholder="e.g. SW1A, blank = all of GB" value="${esc(c.grid_mix_postcode||'')}"></div></div>
       <h3>Appearance</h3><div class="hint">Colour theme for the boxes and panels. Your background, flow colours and title colour are set separately.</div><div class="row"><div class="field"><label>Theme</label><select data-key="theme"><option value="auto" ${(c.theme||'dark')==='auto'?'selected':''}>Auto (follow Home Assistant)</option><option value="dark" ${(c.theme||'dark')==='dark'?'selected':''}>Dark</option><option value="light" ${(c.theme||'dark')==='light'?'selected':''}>Light</option><option value="midnight" ${(c.theme||'dark')==='midnight'?'selected':''}>Midnight</option><option value="ocean" ${(c.theme||'dark')==='ocean'?'selected':''}>Ocean</option><option value="forest" ${(c.theme||'dark')==='forest'?'selected':''}>Forest</option><option value="sunset" ${(c.theme||'dark')==='sunset'?'selected':''}>Sunset</option><option value="graphite" ${(c.theme||'dark')==='graphite'?'selected':''}>Graphite</option><option value="custom" ${(c.theme||'dark')==='custom'?'selected':''}>Custom colours</option></select></div><div class="field"><label>Flow line style</label><select data-key="flow_style"><option value="curved" ${c.flow_style!=='orthogonal'?'selected':''}>Curved</option><option value="orthogonal" ${c.flow_style==='orthogonal'?'selected':''}>Right angles (avoid boxes)</option></select></div>${c.theme==='custom'?`<div class="field"><label>Panel colour</label><div class="ha-color-box"><input class="ha-color-picker" type="color" data-key="theme_panel_color" value="${esc(/^#[0-9a-f]{6}$/i.test(String(c.theme_panel_color||''))?c.theme_panel_color:'#081d34')}"><span class="color-preview" style="background:${esc(c.theme_panel_color||'#081d34')}"></span></div></div><div class="field"><label>Text colour</label><div class="ha-color-box"><input class="ha-color-picker" type="color" data-key="theme_text_color" value="${esc(/^#[0-9a-f]{6}$/i.test(String(c.theme_text_color||''))?c.theme_text_color:'#ffffff')}"><span class="color-preview" style="background:${esc(c.theme_text_color||'#ffffff')}"></span></div></div><div class="field"><label>Panel opacity</label><input type="number" min="0.2" max="1" step="0.05" data-key="theme_opacity" value="${esc(c.theme_opacity??0.8)}"></div>`:''}</div>
       <h3>Sizing</h3><div class="hint">1 = default size. Small screen scale enlarges boxes on phones (eases in below 900px wide). Max width 0 = fill the available width; the card never grows taller than the screen. The Today panel also shrinks automatically if it would be taller than the card.</div><div class="row compact"><div class="field"><label>Title</label><input type="number" min="0.3" max="3" step="0.05" data-key="title_scale" value="${esc(c.title_scale??1)}"></div><div class="field"><label>Device boxes</label><input type="number" min="0.5" max="2" step="0.05" data-key="device_scale" value="${esc(c.device_scale??1)}"></div><div class="field"><label>Weather box</label><input type="number" min="0.3" max="2" step="0.05" data-key="weather_scale" value="${esc(c.weather_scale??1)}"></div><div class="field"><label>Today panel</label><input type="number" min="0.3" max="1.5" step="0.05" data-key="stats_scale" value="${esc(c.stats_scale??0.8)}"></div><div class="field"><label>Small screen</label><input type="number" min="1" max="2.5" step="0.05" data-key="mobile_scale" value="${esc(c.mobile_scale??1.4)}"></div><div class="field"><label>Max width (px)</label><input type="number" min="0" step="10" data-key="max_width" value="${esc(c.max_width??0)}"></div><div class="field"><label>Grid mix</label><input type="number" min="0.3" max="2" step="0.05" data-key="grid_mix_scale" value="${esc(c.grid_mix_scale??1)}"></div><div class="field"><label>Updated box</label><input type="number" min="0.3" max="3" step="0.05" data-key="updated_scale" value="${esc(c.updated_scale??1)}"></div></div>
-      <h3>Visual layout</h3><div class="hint">Drag the device boxes on the template to place them exactly where you want. Positions are saved automatically. New devices without a saved position use the automatic layout.</div><div class="layout-editor" id="layout-editor"><div class="layout-bg"></div>${(c.devices||[]).map((d,i)=>this._layoutNode(d,i)).join('')}${this._layoutSpecial('header','Title','🔤',c.header_position,2.6,2.7)}${this._layoutSpecial('weather','Weather','🌤️',c.weather_position,82,10)}${c.grid_mix_enabled===true?this._layoutSpecial('gridmix','Grid mix','🌍',c.grid_mix_position,83,32):''}${c.updated_enabled===true?this._layoutSpecial('updated','Updated','🕒',c.updated_position,50,95):''}${this._layoutSpecial('stats','Daily Stats','📊',c.stats_position,17,86)}<button class="btn secondary-btn" id="reset-layout" style="position:absolute;right:10px;bottom:10px;z-index:5">Reset positions</button></div><button class="btn secondary-btn" id="reset-layout">↺ Reset positions to automatic</button>
+      <h3>Visual layout</h3>${this._layoutEditorHTML(c)}
       <h3>Devices</h3><div id="device-list">${(c.devices||[]).map((d,i)=>this._device(d,i)).join('')}</div><button class="btn" id="add">＋ Add device</button>
       <h3>Connections</h3><div class="hint">Optional. Leave empty to use the automatic topology. Add connections to take full control of where power flows.</div><div id="connections">${this._connectionsHTML()}</div><button class="btn" id="add-connection">＋ Add connection</button><h3>Today statistics</h3><div class="hint">Add up to 20 custom statistics. Choose your own name, entity and icon.</div><div id="stats-list">${this._statsEditorHTML()}</div><button class="btn" id="add-stat">＋ Add statistic</button>
       <h3 class="section-toggle" data-toggle-section="selfsuff">${this._ssOpen?'▾':'▸'} Self-sufficiency &amp; self-consumption<span class="section-sub">${(()=>{const n=['self_sufficiency_live','self_sufficiency_today','self_consumption_live','self_consumption_today'].filter(k=>c[k]===true).length;return n?`${n} of 4 on`:'off';})()}</span></h3><div class="section-body" data-section-body="selfsuff" ${this._ssOpen?'':'hidden'}><div class="hint"><b>Self-sufficiency</b>: share of your home's electricity that didn't come from the grid. <b>Self-consumption</b>: share of your solar you used yourself instead of exporting. Shown at the top of the Today panel. <b>Now</b> is calculated automatically from your devices; <b>today</b> uses the daily energy sensors below.</div><div class="row"><div class="field"><label style="display:flex;align-items:center;gap:6px;cursor:pointer;margin-top:6px"><input type="checkbox" data-key="self_sufficiency_live" style="width:auto" ${c.self_sufficiency_live===true?'checked':''}> Self-sufficiency now</label></div><div class="field"><label style="display:flex;align-items:center;gap:6px;cursor:pointer;margin-top:6px"><input type="checkbox" data-key="self_sufficiency_today" style="width:auto" ${c.self_sufficiency_today===true?'checked':''}> Self-sufficiency today</label></div><div class="field"><label style="display:flex;align-items:center;gap:6px;cursor:pointer;margin-top:6px"><input type="checkbox" data-key="self_consumption_live" style="width:auto" ${c.self_consumption_live===true?'checked':''}> Self-consumption now</label></div><div class="field"><label style="display:flex;align-items:center;gap:6px;cursor:pointer;margin-top:6px"><input type="checkbox" data-key="self_consumption_today" style="width:auto" ${c.self_consumption_today===true?'checked':''}> Self-consumption today</label></div></div><div class="hint">Daily energy sensors (kWh or Wh). Self-sufficiency today needs import and consumption; self-consumption today needs solar and export.</div><div class="row"><div class="field full"><label>Grid import today</label><ha-entity-picker data-editor-key="self_sufficiency_import_entity" allow-custom-entity></ha-entity-picker></div><div class="field full"><label>Grid export today</label><ha-entity-picker data-editor-key="energy_export_entity" allow-custom-entity></ha-entity-picker></div><div class="field full"><label>Solar production today</label><ha-entity-picker data-editor-key="energy_solar_entity" allow-custom-entity></ha-entity-picker></div><div class="field full"><label>Home consumption today</label><ha-entity-picker data-editor-key="self_sufficiency_consumption_entity" allow-custom-entity></ha-entity-picker></div><div class="field"><label style="display:flex;align-items:center;gap:6px;cursor:pointer;margin-top:6px"><input type="checkbox" data-key="self_sufficiency_calc_consumption" style="width:auto" ${c.self_sufficiency_calc_consumption===true?'checked':''}> Calculate consumption instead (import + solar − export + battery discharge − battery charge)</label></div><div class="field full"><label>Battery charge today (optional, for calculated consumption)</label><ha-entity-picker data-editor-key="energy_battery_charge_entity" allow-custom-entity></ha-entity-picker></div><div class="field full"><label>Battery discharge today (optional, for calculated consumption)</label><ha-entity-picker data-editor-key="energy_battery_discharge_entity" allow-custom-entity></ha-entity-picker></div></div></div>
@@ -1643,7 +1717,7 @@
         this._emit(false);
         this._render();
       }));
-      this.shadowRoot.querySelectorAll('[data-key]').forEach(el=>el.addEventListener('change',e=>{ const k=e.target.dataset.key; if(k==='flow_threshold_watts'){ const watts=Math.max(0,parseFloat(e.target.value)||0); this._config.flow_threshold=watts/1000; this._config.flow_threshold_watts=watts; } else { this._config[k]=e.target.value; if(['flow_threshold','flow_speed','flow_stagger','device_scale','mobile_scale','max_width','stats_scale','weather_scale','title_scale','grid_mix_scale','updated_scale','updated_stale_minutes','theme_opacity'].includes(k))this._config[k]=parseFloat(e.target.value)||0; if(e.target.type==='checkbox'){this._config[k]=e.target.checked;} } if(['self_sufficiency_live','self_sufficiency_today','self_consumption_live','self_consumption_today'].includes(k)){const sub=this.shadowRoot.querySelector('[data-toggle-section="selfsuff"] .section-sub'); if(sub){const n=['self_sufficiency_live','self_sufficiency_today','self_consumption_live','self_consumption_today'].filter(x=>this._config[x]===true).length; sub.textContent=n?`${n} of 4 on`:'off';}} if(k==='grid_mix_enabled'||k==='updated_enabled'||k==='theme'){this._emit(false);this._render();return;} if(e.target.type==='color'){const pv=e.target.parentElement?.querySelector('.color-preview'); if(pv) pv.style.background=e.target.value;} this._emit(false); }));
+      this.shadowRoot.querySelectorAll('[data-key]').forEach(el=>el.addEventListener('change',e=>{ const k=e.target.dataset.key; if(k==='flow_threshold_watts'){ const watts=Math.max(0,parseFloat(e.target.value)||0); this._config.flow_threshold=watts/1000; this._config.flow_threshold_watts=watts; } else { this._config[k]=e.target.value; if(['flow_threshold','flow_speed','flow_stagger','device_scale','mobile_scale','max_width','stats_scale','weather_scale','title_scale','grid_mix_scale','updated_scale','updated_stale_minutes','theme_opacity','phone_breakpoint'].includes(k))this._config[k]=parseFloat(e.target.value)||0; if(e.target.type==='checkbox'){this._config[k]=e.target.checked;} } if(['self_sufficiency_live','self_sufficiency_today','self_consumption_live','self_consumption_today'].includes(k)){const sub=this.shadowRoot.querySelector('[data-toggle-section="selfsuff"] .section-sub'); if(sub){const n=['self_sufficiency_live','self_sufficiency_today','self_consumption_live','self_consumption_today'].filter(x=>this._config[x]===true).length; sub.textContent=n?`${n} of 4 on`:'off';}} if(k==='grid_mix_enabled'||k==='updated_enabled'||k==='theme'){this._emit(false);this._render();return;} if(e.target.type==='color'){const pv=e.target.parentElement?.querySelector('.color-preview'); if(pv) pv.style.background=e.target.value;} this._emit(false); }));
       this.shadowRoot.querySelector('#add')?.addEventListener('click',()=>{
         const id=genDeviceId();
         this._config.devices.push({id,type:'solar',name:`Device ${this._config.devices.length+1}`,power_entity:''});
@@ -1721,13 +1795,44 @@
       this.shadowRoot.querySelectorAll('[data-bg-file]').forEach(inp=>inp.addEventListener('change',e=>{const f=e.target.files?.[0];if(f)this._uploadBackground(f,inp.dataset.bgFile);}));
       this.shadowRoot.querySelectorAll('[data-bg-restore]').forEach(b=>b.addEventListener('click',()=>{const slot=b.dataset.bgRestore;delete this._config[slot==='day'?'background_upload_day':'background_upload_night'];this._emit(false);this._render();}));
       this.shadowRoot.querySelectorAll('[data-bg-preview]').forEach(b=>b.addEventListener('click',()=>{this._applyLayoutBg(b.dataset.bgPreview);}));
-      this.shadowRoot.querySelector('#reset-layout')?.addEventListener('click',()=>{this._config.devices.forEach(d=>delete d.position);delete this._config.weather_position;delete this._config.stats_position;delete this._config.header_position;delete this._config.grid_mix_position;delete this._config.updated_position;this._emit(false);this._render();});
+      this.shadowRoot.querySelector('#reset-layout')?.addEventListener('click',()=>{const ph=this._layoutMode==='phone';this._config.devices.forEach(d=>delete d[ph?'phone_position':'position']);Object.values(PANEL_POS).forEach(def=>delete this._config[ph?def.phone:def.key]);this._emit(false);this._render();});
+      this.shadowRoot.querySelector('#copy-desktop-layout')?.addEventListener('click',()=>{const devices=this._config.devices||[];const desk=HomePowerFlowCard.prototype._desktopLayout.call(null,devices);devices.forEach((d,i)=>{d.phone_position={x:desk[i].x,y:desk[i].y};});Object.values(PANEL_POS).forEach(def=>{this._config[def.phone]=validPos(this._config[def.key])||{x:def.d[0],y:def.d[1]};});this._emit(false);this._render();});
+      this.shadowRoot.querySelectorAll('[data-layout-mode]').forEach(b=>b.addEventListener('click',()=>{this._layoutMode=b.dataset.layoutMode;this._render();}));
       this._enlargeDialogPreview();
     }
-    _layoutNode(d,i){ const p=d.position && Number.isFinite(Number(d.position.x)) && Number.isFinite(Number(d.position.y)) ? d.position : this._autoPreviewPosition(d,i); return `<div class="layout-node" data-layout-kind="device" data-layout-index="${i}" style="left:${p.x}%;top:${p.y}%"><div class="ln-top">${esc(ICONS[d.type] || '⚙️')} ${esc(d.name || LABELS[d.type] || 'Device')}</div><div class="ln-pos">${Number(p.x).toFixed(1)}% × ${Number(p.y).toFixed(1)}%</div></div>`; }
-    _layoutSpecial(kind,label,icon,pos,dx,dy){ const p=pos && Number.isFinite(Number(pos.x)) && Number.isFinite(Number(pos.y)) ? pos : {x:dx,y:dy}; return `<div class="layout-node special" data-layout-kind="${kind}" style="left:${p.x}%;top:${p.y}%"><div class="ln-top">${icon} ${label}</div><div class="ln-pos">${Number(p.x).toFixed(1)}% × ${Number(p.y).toFixed(1)}%</div></div>`; }
+    _layoutEditorHTML(c){
+      const phone=this._layoutMode==='phone';
+      const seg=`<div class="seg"><button type="button" class="${phone?'':'on'}" data-layout-mode="desktop">🖥️ Desktop</button><button type="button" class="${phone?'on':''}" data-layout-mode="phone">📱 Phone</button></div>`;
+      const hint=phone
+        ? 'Phone layout: used when the card is narrower than the breakpoint. Drag boxes to arrange it; boxes you have not moved use an automatic arrangement. Your desktop layout is not affected.'
+        : 'Drag the device boxes on the template to place them exactly where you want. Positions are saved automatically. New devices without a saved position use the automatic layout.';
+      const settings=`<div class="row"><div class="field"><label>Phone layout</label><select data-key="phone_layout"><option value="auto" ${(c.phone_layout||'auto')==='auto'?'selected':''}>Auto (narrow screens)</option><option value="always" ${c.phone_layout==='always'?'selected':''}>Always</option><option value="never" ${c.phone_layout==='never'?'selected':''}>Never</option></select></div><div class="field"><label>Switch below (px)</label><input type="number" min="200" max="2000" step="10" data-key="phone_breakpoint" value="${esc(c.phone_breakpoint??600)}"></div></div>`;
+      const specials=[['header','Title','🔤',true],['weather','Weather','🌤️',true],['gridmix','Grid mix','🌍',c.grid_mix_enabled===true],['updated','Updated','🕒',c.updated_enabled===true],['stats','Daily Stats','📊',true]]
+        .filter(x=>x[3]).map(([k,l,ic])=>this._layoutSpecial(k,l,ic)).join('');
+      const actions=phone
+        ? `<button class="btn secondary-btn" id="copy-desktop-layout">⧉ Copy desktop layout</button><button class="btn secondary-btn" id="reset-layout">↺ Reset phone layout</button>`
+        : `<button class="btn secondary-btn" id="reset-layout">↺ Reset positions to automatic</button>`;
+      return `${seg}<div class="hint">${hint}</div>${settings}<div class="layout-editor${phone?' phone':''}" id="layout-editor"><div class="layout-bg"></div>${(c.devices||[]).map((d,i)=>this._layoutNode(d,i)).join('')}${specials}</div><div class="layout-actions">${actions}</div>`;
+    }
+    // Current positions shown in the drag area (desktop or phone).
+    _editorLayoutPositions(){
+      const devices=this._config.devices||[];
+      const desk=HomePowerFlowCard.prototype._desktopLayout.call(null,devices);
+      if(this._layoutMode!=='phone') return desk;
+      const auto=phoneAutoLayout(devices,desk).positions;
+      return devices.map((d,i)=>validPos(d.phone_position)||auto[i]);
+    }
+    _editorPanelPos(kind){
+      const c=this._config, def=PANEL_POS[kind];
+      if(this._layoutMode!=='phone') return validPos(c[def.key])||{x:def.d[0],y:def.d[1]};
+      const own=validPos(c[def.phone]); if(own) return own;
+      if(kind==='stats'){ const devices=c.devices||[]; return {x:def.p[0],y:phoneAutoLayout(devices,HomePowerFlowCard.prototype._desktopLayout.call(null,devices)).statsY}; }
+      return {x:def.p[0],y:def.p[1]};
+    }
+    _layoutNode(d,i){ const p=this._editorLayoutPositions()[i]; return `<div class="layout-node" data-layout-kind="device" data-layout-index="${i}" style="left:${p.x}%;top:${p.y}%"><div class="ln-top">${esc(ICONS[d.type] || '⚙️')} ${esc(d.name || LABELS[d.type] || 'Device')}</div><div class="ln-pos">${Number(p.x).toFixed(1)}% × ${Number(p.y).toFixed(1)}%</div></div>`; }
+    _layoutSpecial(kind,label,icon){ const p=this._editorPanelPos(kind); return `<div class="layout-node special" data-layout-kind="${kind}" style="left:${p.x}%;top:${p.y}%"><div class="ln-top">${icon} ${label}</div><div class="ln-pos">${Number(p.x).toFixed(1)}% × ${Number(p.y).toFixed(1)}%</div></div>`; }
     _autoPreviewPosition(d,i){ const zones={solar:[18,23],inverter:[56,39],battery:[58,65],gateway:[48,78],house:[28,82],grid:[82,84],generator:[18,62],water:[14,90],gas:[40,92],ev:[83,50],load:[76,67]}; const same=this._config.devices.filter(x=>(x.type||'load')===(d.type||'load')); const n=same.indexOf(d); const [cx,cy]=zones[d.type||'load']||[70,68]; const spacing=Math.min(15,70/Math.max(1,same.length)); let x=cx,y=cy;if(same.length>1)x=cx+(n-(same.length-1)/2)*spacing;if((d.type==='battery'&&same.length>3)){const col=n%3,row=Math.floor(n/3);x=48+col*12;y=64+row*12;}if(d.type==='solar'&&same.length>4){const col=n%4,row=Math.floor(n/4);x=33+col*12;y=22+row*11;}if(d.type==='ev'&&same.length>2){const col=n%2,row=Math.floor(n/2);x=78+col*10;y=45+row*13;}return{x,y}; }
-    _enableLayoutDragging(){ const area=this.shadowRoot.querySelector('#layout-editor'); if(!area)return; area.querySelectorAll('.layout-node').forEach(node=>{ let dragging=false; const move=e=>{if(!dragging)return;const r=area.getBoundingClientRect();let x=((e.clientX-r.left)/r.width)*100;let y=((e.clientY-r.top)/r.height)*100;const kind=node.dataset.layoutKind; if(kind==='header'){x=Math.max(0,Math.min(85,x));y=Math.max(0,Math.min(90,y));} else {x=Math.max(5,Math.min(95,x));y=Math.max(6,Math.min(94,y));} if(kind==='device'){const i=Number(node.dataset.layoutIndex);this._config.devices[i].position={x,y};} else if(kind==='header') this._config.header_position={x,y}; else if(kind==='weather') this._config.weather_position={x,y}; else if(kind==='gridmix') this._config.grid_mix_position={x,y}; else if(kind==='updated') this._config.updated_position={x,y}; else if(kind==='stats') this._config.stats_position={x,y}; node.style.left=x+'%';node.style.top=y+'%';const pos=node.querySelector('.ln-pos');if(pos)pos.textContent=`${x.toFixed(1)}% × ${y.toFixed(1)}%`;}; const up=()=>{if(!dragging)return;dragging=false;node.classList.remove('dragging');window.removeEventListener('pointermove',move);window.removeEventListener('pointerup',up);this._emit(false);}; node.addEventListener('pointerdown',e=>{e.preventDefault();dragging=true;node.classList.add('dragging');node.setPointerCapture?.(e.pointerId);window.addEventListener('pointermove',move);window.addEventListener('pointerup',up);}); }); }
+    _enableLayoutDragging(){ const area=this.shadowRoot.querySelector('#layout-editor'); if(!area)return; area.querySelectorAll('.layout-node').forEach(node=>{ let dragging=false; const move=e=>{if(!dragging)return;const r=area.getBoundingClientRect();let x=((e.clientX-r.left)/r.width)*100;let y=((e.clientY-r.top)/r.height)*100;const kind=node.dataset.layoutKind; if(kind==='header'){x=Math.max(0,Math.min(85,x));y=Math.max(0,Math.min(90,y));} else {x=Math.max(5,Math.min(95,x));y=Math.max(6,Math.min(94,y));} const phoneMode=this._layoutMode==='phone'; if(kind==='device'){const i=Number(node.dataset.layoutIndex);this._config.devices[i][phoneMode?'phone_position':'position']={x,y};} else if(PANEL_POS[kind]) this._config[phoneMode?PANEL_POS[kind].phone:PANEL_POS[kind].key]={x,y}; node.style.left=x+'%';node.style.top=y+'%';const pos=node.querySelector('.ln-pos');if(pos)pos.textContent=`${x.toFixed(1)}% × ${y.toFixed(1)}%`;}; const up=()=>{if(!dragging)return;dragging=false;node.classList.remove('dragging');window.removeEventListener('pointermove',move);window.removeEventListener('pointerup',up);this._emit(false);}; node.addEventListener('pointerdown',e=>{e.preventDefault();dragging=true;node.classList.add('dragging');node.setPointerCapture?.(e.pointerId);window.addEventListener('pointermove',move);window.addEventListener('pointerup',up);}); }); }
 
     // Shows, under each open device's Invert flow button, which way power is
     // flowing on its connections right now. Uses the card's own edge and
