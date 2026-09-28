@@ -10,7 +10,7 @@
  * Issues & feature requests: https://github.com/mimikm/Home-Power-Flow-Card/issues
  */
 (() => {
-  const VERSION = '0.7.7.2';
+  const VERSION = '0.7.7.3';
   const DEFAULT_BG = '/hacsfiles/Home-Power-Flow-Card/smart-home-energy-background.png';
   const DEFAULT_BG_NIGHT = '/hacsfiles/Home-Power-Flow-Card/smart-home-energy-background2.png';
   const TYPES = [
@@ -510,6 +510,9 @@
         (groups[type] ||= []).push(d);
       }
 
+      // Decide desktop/phone first: device positions and flow lines below
+      // depend on it.
+      this._phoneMode = this._computePhone();
       const layout = this._layout(devices);
       const nodes = devices.map((d, i) => this._deviceHTML(d, i, layout[i])).join('');
       const flows = this._flows(devices, layout);
@@ -521,7 +524,6 @@
       const nodeScaleRaw = Number(c.device_scale);
       const nodeScale = Number.isFinite(nodeScaleRaw) && nodeScaleRaw > 0 ? Math.max(0.5, Math.min(2, nodeScaleRaw)) : 1;
 
-      this._phoneMode = this._computePhone();
       this.shadowRoot.innerHTML = `
         <style>
           :host { display:block; width:100%; }
