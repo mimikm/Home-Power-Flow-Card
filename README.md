@@ -173,6 +173,8 @@ On narrow screens the card switches to a **portrait layout** with its own box po
 - **Ready out of the box:** boxes you haven't placed are arranged automatically in rows, keeping your desktop's top-to-bottom order.
 - **Arrange it yourself:** in the editor's **Visual layout**, switch to **📱 Phone** and drag boxes. The preview shows the phone layout while you edit.
 - **Copy desktop layout** starts from your desktop positions; **Reset phone layout** goes back to the automatic arrangement.
+- **Background focus:** two sliders choose which part of your background stays in view in the portrait crop.
+- **Show on phone:** untick any device or panel to hide it in the phone layout only. Hiding a device also hides its flow lines.
 
 ---
 
@@ -287,6 +289,8 @@ Each device gets a stable internal `id` automatically. `connects_to` refers to t
 | `max_width` | `0` | Maximum card width in px (`0` = fill the available width) |
 | `phone_layout` | `auto` | `auto` (narrow screens), `always` or `never` |
 | `phone_breakpoint` | `600` | Card width in px below which the phone layout is used |
+| `phone_bg_focus_x` / `phone_bg_focus_y` | `50` | Background focus point for the phone layout (0–100 %) |
+| `phone_hide_header` / `_weather` / `_stats` / `_gridmix` / `_updated` | `false` | Hide that panel in the phone layout |
 
 ### Devices
 
@@ -308,6 +312,7 @@ Each device gets a stable internal `id` automatically. `connects_to` refers to t
 | `utility_unit` | Gas only: `m³` (default) or `kWh` |
 | `gas_cv` | Gas only: calorific value in MJ/m³ for m³ ↔ kWh conversion (default `39.5`) |
 | `extra_entities` | Up to 5 extra readings, each with `entity` and `icon` |
+| `phone_hidden` | `true` to hide this device (and its flow lines) in the phone layout |
 
 Positions and sizes are easiest to set by dragging in the editor's **Visual layout**.
 
