@@ -87,6 +87,7 @@ Or manually in HACS:
 - **Drag and drop** devices, the title, the weather box, the Today panel, the grid mix box and the last updated box to exactly where you want them
 - **Custom backgrounds**: separate day and night images, switched automatically by the sun
 - **Title and subtitle** with your own text and colour, or leave them blank
+- **Colour themes** for the boxes and panels: Auto (follows Home Assistant's light/dark mode), Dark, Light, Midnight, Ocean, Forest, Sunset and Graphite, or pick your own panel and text colours
 - **Sizing controls** for the title, device boxes, weather box, Today panel, grid mix box and last updated box
 
 ### 📱 Fits every screen
@@ -229,6 +230,10 @@ Each device gets a stable internal `id` automatically. `connects_to` refers to t
 | `title` | `Energy Flow` | Card title. Set to `""` for no title |
 | `subtitle` | — | Optional second line under the title |
 | `title_color` | `#ffffff` | Colour of the title and subtitle |
+| `theme` | `dark` | `auto`, `dark`, `light`, `midnight`, `ocean`, `forest`, `sunset`, `graphite` or `custom` |
+| `theme_panel_color` | `#081d34` | Custom theme: panel colour |
+| `theme_text_color` | `#ffffff` | Custom theme: text colour |
+| `theme_opacity` | `0.8` | Custom theme: panel opacity (`0.2` to `1`) |
 | `time_format` | `24h` | `24h` or `12h` for the clock |
 | `weather_entity` | — | Weather entity for the weather box |
 | `sun_entity` | `sun.sun` | Switches between the day and night backgrounds |
@@ -304,7 +309,6 @@ Ideas and feedback are welcome, so [open an issue](https://github.com/mimikm/Hom
 **Features**
 - Automatic kW formatting for large values (e.g. `3.2 kW` instead of `3200 W`)
 - Configurable tap actions per device (more-info, navigate, toggle)
-- Light theme support
 
 **Project**
 - Translations of the editor
