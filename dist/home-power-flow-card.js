@@ -10,7 +10,7 @@
  * Issues & feature requests: https://github.com/mimikm/Home-Power-Flow-Card/issues
  */
 (() => {
-  const VERSION = '0.7.6.8';
+  const VERSION = '0.7.6.9';
   const DEFAULT_BG = '/hacsfiles/Home-Power-Flow-Card/smart-home-energy-background.png';
   const DEFAULT_BG_NIGHT = '/hacsfiles/Home-Power-Flow-Card/smart-home-energy-background2.png';
   const TYPES = [
@@ -447,6 +447,7 @@
       stage.style.setProperty('--hpf-weather-scale', String(Number.isFinite(rawW) && rawW > 0 ? Math.max(0.3, Math.min(2, rawW)) : 1));
       const t = Math.max(0, Math.min(1, (900 - w) / 500));
       stage.style.setProperty('--hpf-boost', String(1 + (mobileBoost - 1) * t));
+      if (this._lastRouteW !== w) { this._lastRouteW = w; this._scheduleReroute(); }
     }
 
     _render() {
@@ -539,6 +540,7 @@
       this._rendered = true;
       this._applyBackground(bg);
       this._applyTheme();
+      this._lastRouteW = null;
       this._applyScale();
       this._updatedTimer();
       this._gridMixRefresh();
@@ -787,6 +789,7 @@
         const svg = this.shadowRoot.querySelector('svg.flows');
         if (svg) {
           const layout = this._layout(devices);
+          if (this._config.flow_style === 'orthogonal') { const obs = this._measureObstacles(); if (obs) this._obstacles = obs; }
           svg.innerHTML = this._svgFilterDefs() + this._flows(devices, layout);
         }
       } else {
@@ -1115,6 +1118,101 @@
     _svgFilterDefs() {
       return `<defs><filter id="glow" x="-60%" y="-60%" width="220%" height="220%"><feGaussianBlur stdDeviation="1.4" result="blur"/><feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge></filter><filter id="dotglow" x="-150%" y="-150%" width="400%" height="400%"><feGaussianBlur stdDeviation="1.6" result="blur"/><feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge></filter></defs>`;
     }
+    // ---- Flow line routing ---------------------------------------------
+    // 'curved' (default): smooth curve between box centres.
+    // 'orthogonal': right-angle lines routed around every box on the card.
+    // Boxes are measured from the rendered card (so real sizes/positions
+    // are used), then each line is found with A* on a grid over the
+    // 1000x667 flow canvas: cells covered by other boxes are expensive
+    // (not forbidden, so a line always exists even between overlapping
+    // boxes), and every bend costs extra, so lines stay clean.
+    _edgePath(a, b, x1, y1, x2, y2) {
+      if (this._config?.flow_style === 'orthogonal' && this._obstacles) {
+        const p = this._routeOrthogonal(a, b, x1, y1, x2, y2);
+        if (p) return p;
+      }
+      const dx = (x2 - x1) * .38;
+      return `M ${x1} ${y1} C ${x1+dx} ${y1}, ${x2-dx} ${y2}, ${x2} ${y2}`;
+    }
+    _measureObstacles() {
+      const canvas = this.shadowRoot?.querySelector('.canvas');
+      const cr = canvas?.getBoundingClientRect();
+      if (!cr || !cr.width || !cr.height) return null;
+      const sx = 1000 / cr.width, sy = 667 / cr.height, list = [];
+      this.shadowRoot.querySelectorAll('.node, .weather, .stats, .gridmix, .updated').forEach(el => {
+        const r = el.getBoundingClientRect(); if (!r.width) return;
+        list.push({ x1:(r.left-cr.left)*sx, y1:(r.top-cr.top)*sy, x2:(r.right-cr.left)*sx, y2:(r.bottom-cr.top)*sy,
+          dev: el.dataset.deviceIndex !== undefined ? Number(el.dataset.deviceIndex) : null });
+      });
+      return list;
+    }
+    _routeOrthogonal(a, b, x1, y1, x2, y2) {
+      const G = 8, W = Math.ceil(1000 / G) + 1, H = Math.ceil(667 / G) + 1, N = W * H;
+      const key = `${a}|${b}|${Math.round(x1)}|${Math.round(y1)}|${Math.round(x2)}|${Math.round(y2)}`;
+      this._routeCache ||= new Map();
+      if (this._routeCache.has(key)) return this._routeCache.get(key);
+      const cl = (v, m) => Math.max(0, Math.min(m - 1, v));
+      const cost = new Float32Array(N), PAD = 6, BOX = 40, BEND = 12;
+      for (const o of this._obstacles) {
+        if (o.dev === a || o.dev === b) continue;
+        const cx1 = cl(Math.floor((o.x1 - PAD) / G), W), cx2 = cl(Math.ceil((o.x2 + PAD) / G), W);
+        const cy1 = cl(Math.floor((o.y1 - PAD) / G), H), cy2 = cl(Math.ceil((o.y2 + PAD) / G), H);
+        for (let y = cy1; y <= cy2; y++) for (let x = cx1; x <= cx2; x++) cost[y * W + x] = BOX;
+      }
+      const sx = cl(Math.round(x1 / G), W), sy = cl(Math.round(y1 / G), H);
+      const ex = cl(Math.round(x2 / G), W), ey = cl(Math.round(y2 / G), H);
+      if (sx === ex && sy === ey) return null;
+      const DX = [1, 0, -1, 0], DY = [0, 1, 0, -1];
+      const g = new Float32Array(N * 4).fill(Infinity), prev = new Int32Array(N * 4).fill(-1);
+      // binary heap of [f, state]
+      const hf = [], hs = [];
+      const push = (f, st) => { let i = hf.length; hf.push(f); hs.push(st); while (i > 0) { const p = (i - 1) >> 1; if (hf[p] <= hf[i]) break; [hf[p], hf[i]] = [hf[i], hf[p]]; [hs[p], hs[i]] = [hs[i], hs[p]]; i = p; } };
+      const pop = () => { const st = hs[0], lf = hf.pop(), ls = hs.pop(); if (hf.length) { hf[0] = lf; hs[0] = ls; let i = 0; for (;;) { const l = 2*i+1, r = l+1; let m = i; if (l < hf.length && hf[l] < hf[m]) m = l; if (r < hf.length && hf[r] < hf[m]) m = r; if (m === i) break; [hf[m], hf[i]] = [hf[i], hf[m]]; [hs[m], hs[i]] = [hs[i], hs[m]]; i = m; } } return st; };
+      const hcost = (x, y) => Math.abs(x - ex) + Math.abs(y - ey);
+      const start = sy * W + sx;
+      for (let d = 0; d < 4; d++) { g[start * 4 + d] = 0; push(hcost(sx, sy), start * 4 + d); }
+      let found = -1, iter = 0;
+      while (hf.length && iter++ < 400000) {
+        const st = pop(), cell = st >> 2, d = st & 3, x = cell % W, y = (cell - x) / W;
+        if (cell === ey * W + ex) { found = st; break; }
+        const gc = g[st];
+        for (let nd = 0; nd < 4; nd++) {
+          if (nd === ((d + 2) & 3)) continue;
+          const nx = x + DX[nd], ny = y + DY[nd];
+          if (nx < 0 || ny < 0 || nx >= W || ny >= H) continue;
+          const nc = ny * W + nx, ns = nc * 4 + nd;
+          const ng = gc + 1 + cost[nc] + (nd !== d ? BEND : 0);
+          if (ng < g[ns]) { g[ns] = ng; prev[ns] = st; push(ng + hcost(nx, ny), ns); }
+        }
+      }
+      if (found < 0) { this._routeCache.set(key, null); return null; }
+      const cells = [];
+      for (let st = found; st >= 0; st = prev[st]) cells.push(st >> 2);
+      cells.reverse();
+      const pts = cells.map(c => [(c % W) * G, Math.floor(c / W) * G]);
+      const corners = [pts[0]];
+      for (let i = 1; i < pts.length - 1; i++) {
+        const [px, py] = pts[i - 1], [cx, cy] = pts[i], [nx, ny] = pts[i + 1];
+        if ((px === cx) !== (cx === nx) || (py === cy) !== (cy === ny)) corners.push(pts[i]);
+      }
+      corners.push(pts[pts.length - 1]);
+      const path = 'M ' + corners.map(p => `${p[0]} ${p[1]}`).join(' L ');
+      this._routeCache.set(key, path);
+      return path;
+    }
+    // Re-measures boxes and redraws the flow lines (orthogonal style only).
+    _scheduleReroute() {
+      if (this._config?.flow_style !== 'orthogonal') return;
+      clearTimeout(this._rerouteT);
+      this._rerouteT = setTimeout(() => {
+        const obs = this._measureObstacles(); if (!obs) return;
+        this._obstacles = obs; this._routeCache = new Map();
+        const svg = this.shadowRoot?.querySelector('svg.flows');
+        const devices = this._config?.devices || [];
+        if (svg) svg.innerHTML = this._svgFilterDefs() + this._flows(devices, this._layout(devices));
+      }, 80);
+    }
+
     _flows(devices, pos) {
       if (!devices.length) return '';
       const edges = this._flowEdges(devices);
@@ -1124,8 +1222,8 @@
       return edges.map(([a,b,dir,child],idx)=>{
         const key=`${a}-${b}`; if(seen.has(key))return ''; seen.add(key);
         const A=pos[a],B=pos[b]; if(!A||!B)return '';
-        const x1=A.x*10,y1=A.y*6.67,x2=B.x*10,y2=B.y*6.67,dx=(x2-x1)*.38;
-        const path=`M ${x1} ${y1} C ${x1+dx} ${y1}, ${x2-dx} ${y2}, ${x2} ${y2}`;
+        const x1=A.x*10,y1=A.y*6.67,x2=B.x*10,y2=B.y*6.67;
+        const path=this._edgePath(a,b,x1,y1,x2,y2);
         const da=devices[a],db=devices[b],va=this._flowSnapshot?.[a],vb=this._flowSnapshot?.[b];
         const childDevice = Number.isInteger(child) ? devices[child] : null;
         const info=this._flowDirection(da,db,va,vb,childDevice);
@@ -1453,7 +1551,7 @@
       <div class="row"><div class="field"><label>Title</label><input data-key="title" placeholder="Leave empty for no title" value="${esc(c.title===undefined||c.title===null?'Energy Flow':c.title)}"></div><div class="field"><label>Subtitle</label><input data-key="subtitle" placeholder="Optional" value="${esc(c.subtitle||'')}"></div><div class="field"><label>Title colour</label><div class="ha-color-box"><input class="ha-color-picker" type="color" data-key="title_color" value="${esc(/^#[0-9a-f]{6}$/i.test(String(c.title_color||''))?c.title_color:'#ffffff')}"><span class="color-preview" style="background:${esc(c.title_color||'#ffffff')}"></span></div></div><div class="field"><label>Time format</label><select data-key="time_format"><option value="24h" ${(c.time_format||'24h')==='24h'?'selected':''}>24 hour</option><option value="12h" ${c.time_format==='12h'?'selected':''}>12 hour</option></select></div><div class="field full"><label>Weather entity</label><ha-entity-picker data-editor-key="weather_entity" allow-custom-entity></ha-entity-picker></div><div class="field full">${this._bgUploadField('day','Day background')}</div><div class="field full">${this._bgUploadField('night','Night background')}</div><div class="field full"><label>Sun entity (switches day/night background)</label><ha-entity-picker data-editor-key="sun_entity" allow-custom-entity></ha-entity-picker></div><div class="field"><label>Flow threshold (W)</label><input type="number" min="0" step="0.1" data-key="flow_threshold_watts" value="${esc((Number(c.flow_threshold ?? 0.0005)*1000).toFixed(1))}"></div><div class="field"><label>Flow animation speed (seconds)</label><input type="number" min="3" max="30" step="0.5" data-key="flow_speed" value="${esc(c.flow_speed??8)}"></div><div class="field"><label>Particle stagger (seconds)</label><input type="number" min="0.15" max="1.5" step="0.05" data-key="flow_stagger" value="${esc(c.flow_stagger??0.55)}"></div></div>
       <h3>Last updated box</h3><div class="hint">Optional small box showing how long ago an entity was updated, e.g. your inverter's data. Uses the entity's own timestamp if it has one. Turns amber when the data is older than the warning time.</div><div class="row"><div class="field"><label style="display:flex;align-items:center;gap:6px;cursor:pointer;margin-top:6px"><input type="checkbox" data-key="updated_enabled" style="width:auto" ${c.updated_enabled===true?'checked':''}> Show last updated box</label></div><div class="field"><label>Label</label><input data-key="updated_label" placeholder="Leave empty for none" value="${esc(c.updated_label===undefined?'Updated':c.updated_label)}"></div><div class="field"><label>Warn after (minutes)</label><input type="number" min="1" step="1" data-key="updated_stale_minutes" value="${esc(c.updated_stale_minutes??10)}"></div><div class="field full"><label>Entity</label><ha-entity-picker data-editor-key="updated_entity" allow-custom-entity></ha-entity-picker></div></div>
       <h3>UK grid mix</h3><div class="hint">Optional box showing how green the GB electricity grid is right now (carbon intensity and generation mix), from the National Grid ESO Carbon Intensity API. Updates every 30 minutes.</div><div class="row"><div class="field"><label style="display:flex;align-items:center;gap:6px;cursor:pointer;margin-top:6px"><input type="checkbox" data-key="grid_mix_enabled" style="width:auto" ${c.grid_mix_enabled===true?'checked':''}> Show grid mix box</label></div><div class="field"><label>Postcode (optional)</label><input data-key="grid_mix_postcode" placeholder="e.g. SW1A, blank = all of GB" value="${esc(c.grid_mix_postcode||'')}"></div></div>
-      <h3>Appearance</h3><div class="hint">Colour theme for the boxes and panels. Your background, flow colours and title colour are set separately.</div><div class="row"><div class="field"><label>Theme</label><select data-key="theme"><option value="auto" ${(c.theme||'dark')==='auto'?'selected':''}>Auto (follow Home Assistant)</option><option value="dark" ${(c.theme||'dark')==='dark'?'selected':''}>Dark</option><option value="light" ${(c.theme||'dark')==='light'?'selected':''}>Light</option><option value="midnight" ${(c.theme||'dark')==='midnight'?'selected':''}>Midnight</option><option value="ocean" ${(c.theme||'dark')==='ocean'?'selected':''}>Ocean</option><option value="forest" ${(c.theme||'dark')==='forest'?'selected':''}>Forest</option><option value="sunset" ${(c.theme||'dark')==='sunset'?'selected':''}>Sunset</option><option value="graphite" ${(c.theme||'dark')==='graphite'?'selected':''}>Graphite</option><option value="custom" ${(c.theme||'dark')==='custom'?'selected':''}>Custom colours</option></select></div>${c.theme==='custom'?`<div class="field"><label>Panel colour</label><div class="ha-color-box"><input class="ha-color-picker" type="color" data-key="theme_panel_color" value="${esc(/^#[0-9a-f]{6}$/i.test(String(c.theme_panel_color||''))?c.theme_panel_color:'#081d34')}"><span class="color-preview" style="background:${esc(c.theme_panel_color||'#081d34')}"></span></div></div><div class="field"><label>Text colour</label><div class="ha-color-box"><input class="ha-color-picker" type="color" data-key="theme_text_color" value="${esc(/^#[0-9a-f]{6}$/i.test(String(c.theme_text_color||''))?c.theme_text_color:'#ffffff')}"><span class="color-preview" style="background:${esc(c.theme_text_color||'#ffffff')}"></span></div></div><div class="field"><label>Panel opacity</label><input type="number" min="0.2" max="1" step="0.05" data-key="theme_opacity" value="${esc(c.theme_opacity??0.8)}"></div>`:''}</div>
+      <h3>Appearance</h3><div class="hint">Colour theme for the boxes and panels. Your background, flow colours and title colour are set separately.</div><div class="row"><div class="field"><label>Theme</label><select data-key="theme"><option value="auto" ${(c.theme||'dark')==='auto'?'selected':''}>Auto (follow Home Assistant)</option><option value="dark" ${(c.theme||'dark')==='dark'?'selected':''}>Dark</option><option value="light" ${(c.theme||'dark')==='light'?'selected':''}>Light</option><option value="midnight" ${(c.theme||'dark')==='midnight'?'selected':''}>Midnight</option><option value="ocean" ${(c.theme||'dark')==='ocean'?'selected':''}>Ocean</option><option value="forest" ${(c.theme||'dark')==='forest'?'selected':''}>Forest</option><option value="sunset" ${(c.theme||'dark')==='sunset'?'selected':''}>Sunset</option><option value="graphite" ${(c.theme||'dark')==='graphite'?'selected':''}>Graphite</option><option value="custom" ${(c.theme||'dark')==='custom'?'selected':''}>Custom colours</option></select></div><div class="field"><label>Flow line style</label><select data-key="flow_style"><option value="curved" ${c.flow_style!=='orthogonal'?'selected':''}>Curved</option><option value="orthogonal" ${c.flow_style==='orthogonal'?'selected':''}>Right angles (avoid boxes)</option></select></div>${c.theme==='custom'?`<div class="field"><label>Panel colour</label><div class="ha-color-box"><input class="ha-color-picker" type="color" data-key="theme_panel_color" value="${esc(/^#[0-9a-f]{6}$/i.test(String(c.theme_panel_color||''))?c.theme_panel_color:'#081d34')}"><span class="color-preview" style="background:${esc(c.theme_panel_color||'#081d34')}"></span></div></div><div class="field"><label>Text colour</label><div class="ha-color-box"><input class="ha-color-picker" type="color" data-key="theme_text_color" value="${esc(/^#[0-9a-f]{6}$/i.test(String(c.theme_text_color||''))?c.theme_text_color:'#ffffff')}"><span class="color-preview" style="background:${esc(c.theme_text_color||'#ffffff')}"></span></div></div><div class="field"><label>Panel opacity</label><input type="number" min="0.2" max="1" step="0.05" data-key="theme_opacity" value="${esc(c.theme_opacity??0.8)}"></div>`:''}</div>
       <h3>Sizing</h3><div class="hint">1 = default size. Small screen scale enlarges boxes on phones (eases in below 900px wide). Max width 0 = fill the available width; the card never grows taller than the screen. The Today panel also shrinks automatically if it would be taller than the card.</div><div class="row compact"><div class="field"><label>Title</label><input type="number" min="0.3" max="3" step="0.05" data-key="title_scale" value="${esc(c.title_scale??1)}"></div><div class="field"><label>Device boxes</label><input type="number" min="0.5" max="2" step="0.05" data-key="device_scale" value="${esc(c.device_scale??1)}"></div><div class="field"><label>Weather box</label><input type="number" min="0.3" max="2" step="0.05" data-key="weather_scale" value="${esc(c.weather_scale??1)}"></div><div class="field"><label>Today panel</label><input type="number" min="0.3" max="1.5" step="0.05" data-key="stats_scale" value="${esc(c.stats_scale??0.8)}"></div><div class="field"><label>Small screen</label><input type="number" min="1" max="2.5" step="0.05" data-key="mobile_scale" value="${esc(c.mobile_scale??1.4)}"></div><div class="field"><label>Max width (px)</label><input type="number" min="0" step="10" data-key="max_width" value="${esc(c.max_width??0)}"></div><div class="field"><label>Grid mix</label><input type="number" min="0.3" max="2" step="0.05" data-key="grid_mix_scale" value="${esc(c.grid_mix_scale??1)}"></div><div class="field"><label>Updated box</label><input type="number" min="0.3" max="3" step="0.05" data-key="updated_scale" value="${esc(c.updated_scale??1)}"></div></div>
       <h3>Visual layout</h3><div class="hint">Drag the device boxes on the template to place them exactly where you want. Positions are saved automatically. New devices without a saved position use the automatic layout.</div><div class="layout-editor" id="layout-editor"><div class="layout-bg"></div>${(c.devices||[]).map((d,i)=>this._layoutNode(d,i)).join('')}${this._layoutSpecial('header','Title','🔤',c.header_position,2.6,2.7)}${this._layoutSpecial('weather','Weather','🌤️',c.weather_position,82,10)}${c.grid_mix_enabled===true?this._layoutSpecial('gridmix','Grid mix','🌍',c.grid_mix_position,83,32):''}${c.updated_enabled===true?this._layoutSpecial('updated','Updated','🕒',c.updated_position,50,95):''}${this._layoutSpecial('stats','Daily Stats','📊',c.stats_position,17,86)}<button class="btn secondary-btn" id="reset-layout" style="position:absolute;right:10px;bottom:10px;z-index:5">Reset positions</button></div><button class="btn secondary-btn" id="reset-layout">↺ Reset positions to automatic</button>
       <h3>Devices</h3><div id="device-list">${(c.devices||[]).map((d,i)=>this._device(d,i)).join('')}</div><button class="btn" id="add">＋ Add device</button>
