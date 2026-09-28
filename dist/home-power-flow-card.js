@@ -10,7 +10,7 @@
  * Issues & feature requests: https://github.com/mimikm/Home-Power-Flow-Card/issues
  */
 (() => {
-  const VERSION = '0.7.6.6';
+  const VERSION = '0.7.6.7';
   const DEFAULT_BG = '/hacsfiles/Home-Power-Flow-Card/smart-home-energy-background.png';
   const DEFAULT_BG_NIGHT = '/hacsfiles/Home-Power-Flow-Card/smart-home-energy-background2.png';
   const TYPES = [
@@ -20,12 +20,15 @@
     ['gateway', '🧠 Gateway'],
     ['house', '🏠 House'],
     ['grid', '⚡ Grid'],
+    ['generator', '⛽ Generator'],
+    ['water', '💧 Water'],
+    ['gas', '🔥 Gas'],
     ['ev', '🚗 EV Charger'],
     ['load', '⚙️ Extra Load'],
   ];
 
   const ICONS = {
-    solar: '☀️', inverter: '⚡', battery: '🔋', gateway: '🧠', house: '🏠', grid: '⚡', ev: '🚗', load: '⚙️'
+    solar: '☀️', inverter: '⚡', battery: '🔋', gateway: '🧠', house: '🏠', grid: '⚡', generator: '⛽', water: '💧', gas: '🔥', ev: '🚗', load: '⚙️'
   };
 
   const LABELS = Object.fromEntries(TYPES);
@@ -37,6 +40,9 @@
     gateway: '#b98cff',
     house: '#ffb52e',
     grid: '#43a5ff',
+    generator: '#ff7eb6',
+    water: '#4dd0e1',
+    gas: '#ff7043',
     ev: '#ffd43b',
     load: '#ff9f2d',
     neutral: '#aab7c4'
@@ -386,6 +392,8 @@
       }
       const rawT = Number(this._config?.title_scale);
       stage.style.setProperty('--hpf-title-scale', String(Number.isFinite(rawT) && rawT > 0 ? Math.max(0.3, Math.min(3, rawT)) : 1));
+      const rawU = Number(this._config?.updated_scale);
+      stage.style.setProperty('--hpf-updated-scale', String(Number.isFinite(rawU) && rawU > 0 ? Math.max(0.3, Math.min(3, rawU)) : 1));
       const rawG = Number(this._config?.grid_mix_scale);
       stage.style.setProperty('--hpf-gridmix-scale', String(Number.isFinite(rawG) && rawG > 0 ? Math.max(0.3, Math.min(2, rawG)) : 1));
       const rawW = Number(this._config?.weather_scale);
@@ -438,6 +446,9 @@
           .header { position:absolute; left:var(--header-x,2.6%); top:var(--header-y,2.7%); z-index:20; transform-origin:top left; transform:scale(calc(var(--hpf-title-scale,1) * var(--hpf-boost,1))); color:var(--hpf-title-color,#fff); white-space:nowrap; }
           .title { font-size:42px; font-weight:700; letter-spacing:-.03em; text-shadow:0 2px 8px rgba(0,0,0,.4); }
           .subtitle { margin-top:4px; font-size:18px; opacity:.88; text-shadow:0 2px 8px rgba(0,0,0,.45); }
+          .updated { position:absolute; z-index:19; left:var(--up-x,50%); top:var(--up-y,95%); transform:translate(-50%,-50%) scale(calc(var(--hpf-updated-scale,1) * var(--hpf-boost,1))); display:flex; align-items:center; gap:6px; padding:6px 12px; border-radius:999px; background:rgba(8,29,52,.78); border:1px solid rgba(255,255,255,.15); box-shadow:0 6px 18px rgba(0,0,0,.25); backdrop-filter:blur(12px); font-size:13px; white-space:nowrap; }
+          .updated ha-icon { --mdc-icon-size:16px; width:16px; height:16px; opacity:.85; }
+          .updated.stale { color:#ffb74d; border-color:rgba(255,183,77,.55); }
           .gridmix { position:absolute; z-index:19; left:var(--gm-x,83%); top:var(--gm-y,32%); transform:translate(-50%,-50%) scale(calc(var(--hpf-gridmix-scale,1) * var(--hpf-boost,1))); width:270px; padding:12px 14px; border-radius:15px; background:rgba(8,29,52,.78); border:1px solid rgba(255,255,255,.15); box-shadow:0 8px 28px rgba(0,0,0,.25); backdrop-filter:blur(12px); font-size:12px; }
           .gridmix .gm-head { display:flex; align-items:center; gap:6px; font-weight:700; font-size:13px; opacity:.9; }
           .gridmix .gm-head ha-icon { --mdc-icon-size:16px; width:16px; height:16px; }
@@ -470,6 +481,7 @@
           <div class="stage">
           ${this._headerHTML()}
           ${this._gridMixBoxHTML()}
+          ${this._updatedBoxHTML()}
           <div class="weather" style="--weather-x:${this._uiPosition(c.weather_position, 82, 10).x}%;--weather-y:${this._uiPosition(c.weather_position, 82, 10).y}%"><div class="date">${esc(date)}</div><div class="clock">${esc(time)}</div><div class="wicon">${weatherIcon}</div><div class="temp">${weatherTemp != null ? esc(weatherTemp) + esc(weatherUnit) : '—'}</div><div class="wstate">${esc(weatherText)}</div></div>
           <div class="canvas"><svg class="flows" viewBox="0 0 1000 667" preserveAspectRatio="none">${this._svgFilterDefs()}${flows}</svg>${nodes}</div>
           ${stats ? stats.replace('<div class="stats">', `<div class="stats" style="--stats-x:${this._uiPosition(c.stats_position, 17, 86).x}%;--stats-y:${this._uiPosition(c.stats_position, 17, 86).y}%">`) : ''}
@@ -551,6 +563,44 @@
       return `<div class="header" style="--header-x:${p.x}%;--header-y:${p.y}%;--hpf-title-color:${color}">${title.trim() ? `<div class="title">${esc(title)}</div>` : ''}${subtitle.trim() ? `<div class="subtitle">${esc(subtitle)}</div>` : ''}</div>`;
     }
 
+    // "Last updated" pill: how long ago an entity's data was updated. If the
+    // entity's own state is a timestamp (e.g. an inverter's "last updated
+    // time" sensor) that time is used; otherwise Home Assistant's
+    // last_updated for the entity. Turns amber once older than the
+    // configured number of minutes.
+    _updatedInfo() {
+      const c = this._config || {};
+      const st = state(this._hass, c.updated_entity);
+      if (!st) return { text: 'No data', stale: true };
+      let ts = NaN;
+      const raw = String(st.state || '');
+      if (/^\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}/.test(raw)) ts = Date.parse(raw.replace(' ', 'T'));
+      if (!Number.isFinite(ts)) ts = Date.parse(st.last_updated || st.last_changed || '');
+      if (!Number.isFinite(ts)) return { text: 'Unknown', stale: true };
+      const sec = Math.max(0, (Date.now() - ts) / 1000);
+      const ago = sec < 60 ? 'just now' : sec < 3600 ? `${Math.floor(sec / 60)}m ago` : sec < 86400 ? `${Math.floor(sec / 3600)}h ${Math.floor((sec % 3600) / 60)}m ago` : `${Math.floor(sec / 86400)}d ago`;
+      const lim = Number(c.updated_stale_minutes);
+      const staleMin = Number.isFinite(lim) && lim > 0 ? lim : 10;
+      return { text: ago, stale: sec > staleMin * 60 };
+    }
+    _updatedInner() {
+      const label = this._config?.updated_label === undefined ? 'Updated' : String(this._config.updated_label || '');
+      const info = this._updatedInfo();
+      return `<ha-icon icon="mdi:update"></ha-icon><span>${label ? esc(label) + ' ' : ''}${esc(info.text)}</span>`;
+    }
+    _updatedBoxHTML() {
+      if (this._config?.updated_enabled !== true) return '';
+      const p = this._uiPosition(this._config.updated_position, 50, 95);
+      return `<div class="updated${this._updatedInfo().stale ? ' stale' : ''}" style="--up-x:${p.x}%;--up-y:${p.y}%">${this._updatedInner()}</div>`;
+    }
+    _updatedRefresh() {
+      const el = this.shadowRoot?.querySelector('.updated');
+      if (!el) return;
+      const h = this._updatedInner();
+      if (el.innerHTML !== h) el.innerHTML = h;
+      el.classList.toggle('stale', this._updatedInfo().stale);
+    }
+
     _gridMixEnabled() { return this._config?.grid_mix_enabled === true; }
     _gridMixBoxHTML() {
       if (!this._gridMixEnabled()) return '';
@@ -596,6 +646,7 @@
       if (!this._hass || !this._config || !this._rendered) return;
       this._gridMixRefresh();
       this._updateStatsValues();
+      this._updatedRefresh();
       const nextBg = this._resolveBackground();
       if (nextBg !== this._currentBg) {
         this._currentBg = nextBg;
@@ -608,7 +659,7 @@
         if (!d) return;
         const power = powerValue(this._hass, d.power_entity);
         const powerEl = node.querySelector('.power');
-        if (powerEl) powerEl.textContent = power == null ? '—' : fmtPower(power);
+        if (powerEl) powerEl.textContent = this._isUtility(d) ? this._utilityText(d) : (power == null ? '—' : fmtPower(power));
         const extrasEl = node.querySelector('.extras');
         if (extrasEl) extrasEl.innerHTML = this._extraEntitiesRows(d);
         const btEl = node.querySelector('.batt-time');
@@ -678,7 +729,7 @@
 
     _layout(devices) {
       const zones = {
-        solar: [18, 23], inverter: [56, 39], battery: [58, 65], gateway: [48, 78], house: [28, 82], grid: [82, 84], ev: [83, 50], load: [76, 67]
+        solar: [18, 23], inverter: [56, 39], battery: [58, 65], gateway: [48, 78], house: [28, 82], grid: [82, 84], generator: [18, 62], water: [14, 90], gas: [40, 92], ev: [83, 50], load: [76, 67]
       };
       const counters = {};
       return devices.map(d => {
@@ -765,6 +816,39 @@
       const label = dir === 'charging' ? (target >= 100 ? 'to full' : `to ${Math.round(target)}%`) : (target <= 0 ? 'to empty' : `to ${Math.round(target)}%`);
       return `${t} ${label}`;
     }
+    // Water: litres (m³ converted). Gas: m³ or kWh (user's choice),
+    // converted with the UK billing formula kWh = m³ × 1.02264 × CV ÷ 3.6
+    // (CV = calorific value, MJ/m³, default 39.5). Rates keep their time
+    // unit (e.g. L/min); a gas rate in kWh per hour is shown as kW.
+    _utilityText(d) {
+      const st = state(this._hass, d.power_entity);
+      const v = parseFloat(st?.state);
+      if (!Number.isFinite(v)) return '—';
+      const rawUnit = String(st?.attributes?.unit_of_measurement || '').trim();
+      const m = rawUnit.match(/^([^/]*)(?:\/(.+))?$/) || [];
+      let base = String(m[1] || '').trim().toLowerCase().replace('m3', 'm³');
+      let per = m[2] ? '/' + m[2].trim() : '';
+      if (['l', 'litre', 'litres', 'liter', 'liters'].includes(base)) base = 'l';
+      const num = x => Math.abs(x) >= 100 ? x.toFixed(0) : Math.abs(x) >= 10 ? x.toFixed(1) : x.toFixed(2);
+      if (d.type === 'water') {
+        if (base === 'm³') return `${num(v * 1000)} L${per}`;
+        if (base === 'l' || base === '') return `${num(v)} L${per}`;
+        return `${num(v)} ${rawUnit}`;
+      }
+      const cvRaw = parseFloat(d.gas_cv);
+      const kwhPerM3 = 1.02264 * (Number.isFinite(cvRaw) && cvRaw > 0 ? cvRaw : 39.5) / 3.6;
+      let kwh = null, m3 = null;
+      if (base === 'm³') m3 = v;
+      else if (base === 'kwh') kwh = v;
+      else if (base === 'wh') kwh = v / 1000;
+      else if (base === 'kw') { kwh = v; per = '/h'; }
+      else if (base === 'w') { kwh = v / 1000; per = '/h'; }
+      else return `${num(v)} ${rawUnit}`.trim();
+      if (d.utility_unit === 'kWh') { const x = kwh ?? m3 * kwhPerM3; return per === '/h' ? `${num(x)} kW` : `${num(x)} kWh${per}`; }
+      return `${num(m3 ?? kwh / kwhPerM3)} m³${per}`;
+    }
+    _isUtility(d) { return d?.type === 'water' || d?.type === 'gas'; }
+
     _batteryTimeHTML(d, value) {
       const t = this._batteryTimeText(d, value);
       return t ? `<ha-icon icon="mdi:timer-sand"></ha-icon><span>${esc(t)}</span>` : '';
@@ -784,7 +868,7 @@
 
     _deviceHTML(d, i, p) {
       const power = powerValue(this._hass, d.power_entity);
-      const powerText = power == null ? '—' : fmtPower(power);
+      const powerText = this._isUtility(d) ? this._utilityText(d) : (power == null ? '—' : fmtPower(power));
       const battState = this._batteryState(d, power);
       return `<div class="node ${esc(d.type || 'load')}" data-device-index="${i}" data-batt-state="${battState || ''}" data-entity-id="${esc(d.power_entity || '')}" title="${esc(d.power_entity ? 'Open ' + d.power_entity : '')}" style="left:${p.x}%;top:${p.y}%;${this._batteryGlowStyle(battState)}"><div class="top"><span class="icon">${esc(ICONS[d.type] || '⚙️')}</span><span class="name">${esc(d.name || LABELS[d.type] || 'Device')}</span></div><div class="power">${esc(powerText)}</div><div class="batt-time">${this._batteryTimeHTML(d, power)}</div><div class="extras">${this._extraEntitiesRows(d)}</div></div>`;
     }
@@ -813,8 +897,12 @@
       const value = source === a ? va : source === b ? vb : null;
 
       if (source) {
-        if (value == null || !Number.isFinite(Number(value)) || Math.abs(Number(value)) < threshold)
+        // Water and gas aren't measured in watts: any usage above zero is
+        // active, and they animate at the base speed (magnitude 1000 W).
+        const utility = source.type === 'water' || source.type === 'gas';
+        if (value == null || !Number.isFinite(Number(value)) || Math.abs(Number(value)) < (utility ? 1e-9 : threshold))
           return {active:false, reverse:false, magnitude:0};
+        if (utility) return {active:true, reverse:false, magnitude:1000};
 
         let reverse = false;
         const t = source.type;
@@ -823,8 +911,8 @@
         // (connects_to) edge happened to place it in.
         const aIsHub = a !== source;
 
-        if (t === 'solar') {
-          // Solar always exports toward the rest of the system.
+        if (t === 'solar' || t === 'generator') {
+          // Solar and generators only produce power: always toward the rest of the system.
           reverse = (b === source);
         } else if (t === 'battery') {
           // positive = charging (hub -> battery). Position-independent: the
@@ -891,12 +979,16 @@
       // behaviour for anyone who hasn't touched this setting.
       devices.forEach((d, i) => {
         if (typeOf(d) === 'inverter') return;
-        const parent = parentOf(d, i) ?? (inverterIdx !== -1 ? inverterIdx : null);
+        // Water and gas are separate supplies: on Automatic they connect to
+        // the first House device (no flow line if there isn't one).
+        const utility = typeOf(d) === 'water' || typeOf(d) === 'gas';
+        const houseIdx = devices.findIndex(x => typeOf(x) === 'house');
+        const parent = parentOf(d, i) ?? (utility ? (houseIdx !== -1 ? houseIdx : null) : (inverterIdx !== -1 ? inverterIdx : null));
         if (parent === null) return;
         // Solar keeps its historical child-first edge order ([solar, hub]);
         // everything else is hub-first ([hub, device]). 4th element (i) is
         // the known child index, used to break both-metered ties.
-        edges.push(typeOf(d) === 'solar' ? [i, parent, 0, i] : [parent, i, 0, i]);
+        edges.push(['solar', 'generator', 'water', 'gas'].includes(typeOf(d)) ? [i, parent, 0, i] : [parent, i, 0, i]);
       });
 
       // Every inverter beyond the first: use its explicit link if set,
@@ -1281,9 +1373,10 @@
       </style><div class="wrap"><h3>Home Power Flow</h3><div class="hint">Bidirectional power flow from live positive/negative values, dotted connections, single moving power dot, invertible device direction, dynamic flow colors and draggable layout. Entity IDs are shown in full below each picker.</div>
       <div class="section"><h3>Backup</h3><div class="hint">Download the whole card configuration as a file, or restore one saved earlier. Importing replaces every setting below (devices, connections, layout, statistics) - it does not save to your dashboard until you click Save.</div><div class="upload-row"><button class="btn secondary-btn" type="button" id="export-config">⬇ Export config</button><button class="btn secondary-btn" type="button" id="import-config-btn">⬆ Import config</button><input type="file" accept="application/json,.json" data-import-config-file style="display:none"></div><div class="upload-status" data-import-status></div></div>
       <div class="row"><div class="field"><label>Title</label><input data-key="title" placeholder="Leave empty for no title" value="${esc(c.title===undefined||c.title===null?'Energy Flow':c.title)}"></div><div class="field"><label>Subtitle</label><input data-key="subtitle" placeholder="Optional" value="${esc(c.subtitle||'')}"></div><div class="field"><label>Title colour</label><div class="ha-color-box"><input class="ha-color-picker" type="color" data-key="title_color" value="${esc(/^#[0-9a-f]{6}$/i.test(String(c.title_color||''))?c.title_color:'#ffffff')}"><span class="color-preview" style="background:${esc(c.title_color||'#ffffff')}"></span></div></div><div class="field"><label>Time format</label><select data-key="time_format"><option value="24h" ${(c.time_format||'24h')==='24h'?'selected':''}>24 hour</option><option value="12h" ${c.time_format==='12h'?'selected':''}>12 hour</option></select></div><div class="field full"><label>Weather entity</label><ha-entity-picker data-editor-key="weather_entity" allow-custom-entity></ha-entity-picker></div><div class="field full">${this._bgUploadField('day','Day background')}</div><div class="field full">${this._bgUploadField('night','Night background')}</div><div class="field full"><label>Sun entity (switches day/night background)</label><ha-entity-picker data-editor-key="sun_entity" allow-custom-entity></ha-entity-picker></div><div class="field"><label>Flow threshold (W)</label><input type="number" min="0" step="0.1" data-key="flow_threshold_watts" value="${esc((Number(c.flow_threshold ?? 0.0005)*1000).toFixed(1))}"></div><div class="field"><label>Flow animation speed (seconds)</label><input type="number" min="3" max="30" step="0.5" data-key="flow_speed" value="${esc(c.flow_speed??8)}"></div><div class="field"><label>Particle stagger (seconds)</label><input type="number" min="0.15" max="1.5" step="0.05" data-key="flow_stagger" value="${esc(c.flow_stagger??0.55)}"></div></div>
+      <h3>Last updated box</h3><div class="hint">Optional small box showing how long ago an entity was updated, e.g. your inverter's data. Uses the entity's own timestamp if it has one. Turns amber when the data is older than the warning time.</div><div class="row"><div class="field"><label style="display:flex;align-items:center;gap:6px;cursor:pointer;margin-top:6px"><input type="checkbox" data-key="updated_enabled" style="width:auto" ${c.updated_enabled===true?'checked':''}> Show last updated box</label></div><div class="field"><label>Label</label><input data-key="updated_label" placeholder="Leave empty for none" value="${esc(c.updated_label===undefined?'Updated':c.updated_label)}"></div><div class="field"><label>Warn after (minutes)</label><input type="number" min="1" step="1" data-key="updated_stale_minutes" value="${esc(c.updated_stale_minutes??10)}"></div><div class="field full"><label>Entity</label><ha-entity-picker data-editor-key="updated_entity" allow-custom-entity></ha-entity-picker></div></div>
       <h3>UK grid mix</h3><div class="hint">Optional box showing how green the GB electricity grid is right now (carbon intensity and generation mix), from the National Grid ESO Carbon Intensity API. Updates every 30 minutes.</div><div class="row"><div class="field"><label style="display:flex;align-items:center;gap:6px;cursor:pointer;margin-top:6px"><input type="checkbox" data-key="grid_mix_enabled" style="width:auto" ${c.grid_mix_enabled===true?'checked':''}> Show grid mix box</label></div><div class="field"><label>Postcode (optional)</label><input data-key="grid_mix_postcode" placeholder="e.g. SW1A, blank = all of GB" value="${esc(c.grid_mix_postcode||'')}"></div></div>
-      <h3>Sizing</h3><div class="hint">1 = default size. Small screen scale enlarges boxes on phones (eases in below 900px wide). Max width 0 = fill the available width; the card never grows taller than the screen. The Today panel also shrinks automatically if it would be taller than the card.</div><div class="row compact"><div class="field"><label>Title</label><input type="number" min="0.3" max="3" step="0.05" data-key="title_scale" value="${esc(c.title_scale??1)}"></div><div class="field"><label>Device boxes</label><input type="number" min="0.5" max="2" step="0.05" data-key="device_scale" value="${esc(c.device_scale??1)}"></div><div class="field"><label>Weather box</label><input type="number" min="0.3" max="2" step="0.05" data-key="weather_scale" value="${esc(c.weather_scale??1)}"></div><div class="field"><label>Today panel</label><input type="number" min="0.3" max="1.5" step="0.05" data-key="stats_scale" value="${esc(c.stats_scale??0.8)}"></div><div class="field"><label>Small screen</label><input type="number" min="1" max="2.5" step="0.05" data-key="mobile_scale" value="${esc(c.mobile_scale??1.4)}"></div><div class="field"><label>Max width (px)</label><input type="number" min="0" step="10" data-key="max_width" value="${esc(c.max_width??0)}"></div><div class="field"><label>Grid mix</label><input type="number" min="0.3" max="2" step="0.05" data-key="grid_mix_scale" value="${esc(c.grid_mix_scale??1)}"></div></div>
-      <h3>Visual layout</h3><div class="hint">Drag the device boxes on the template to place them exactly where you want. Positions are saved automatically. New devices without a saved position use the automatic layout.</div><div class="layout-editor" id="layout-editor"><div class="layout-bg"></div>${(c.devices||[]).map((d,i)=>this._layoutNode(d,i)).join('')}${this._layoutSpecial('header','Title','🔤',c.header_position,2.6,2.7)}${this._layoutSpecial('weather','Weather','🌤️',c.weather_position,82,10)}${c.grid_mix_enabled===true?this._layoutSpecial('gridmix','Grid mix','🌍',c.grid_mix_position,83,32):''}${this._layoutSpecial('stats','Daily Stats','📊',c.stats_position,17,86)}<button class="btn secondary-btn" id="reset-layout" style="position:absolute;right:10px;bottom:10px;z-index:5">Reset positions</button></div><button class="btn secondary-btn" id="reset-layout">↺ Reset positions to automatic</button>
+      <h3>Sizing</h3><div class="hint">1 = default size. Small screen scale enlarges boxes on phones (eases in below 900px wide). Max width 0 = fill the available width; the card never grows taller than the screen. The Today panel also shrinks automatically if it would be taller than the card.</div><div class="row compact"><div class="field"><label>Title</label><input type="number" min="0.3" max="3" step="0.05" data-key="title_scale" value="${esc(c.title_scale??1)}"></div><div class="field"><label>Device boxes</label><input type="number" min="0.5" max="2" step="0.05" data-key="device_scale" value="${esc(c.device_scale??1)}"></div><div class="field"><label>Weather box</label><input type="number" min="0.3" max="2" step="0.05" data-key="weather_scale" value="${esc(c.weather_scale??1)}"></div><div class="field"><label>Today panel</label><input type="number" min="0.3" max="1.5" step="0.05" data-key="stats_scale" value="${esc(c.stats_scale??0.8)}"></div><div class="field"><label>Small screen</label><input type="number" min="1" max="2.5" step="0.05" data-key="mobile_scale" value="${esc(c.mobile_scale??1.4)}"></div><div class="field"><label>Max width (px)</label><input type="number" min="0" step="10" data-key="max_width" value="${esc(c.max_width??0)}"></div><div class="field"><label>Grid mix</label><input type="number" min="0.3" max="2" step="0.05" data-key="grid_mix_scale" value="${esc(c.grid_mix_scale??1)}"></div><div class="field"><label>Updated box</label><input type="number" min="0.3" max="3" step="0.05" data-key="updated_scale" value="${esc(c.updated_scale??1)}"></div></div>
+      <h3>Visual layout</h3><div class="hint">Drag the device boxes on the template to place them exactly where you want. Positions are saved automatically. New devices without a saved position use the automatic layout.</div><div class="layout-editor" id="layout-editor"><div class="layout-bg"></div>${(c.devices||[]).map((d,i)=>this._layoutNode(d,i)).join('')}${this._layoutSpecial('header','Title','🔤',c.header_position,2.6,2.7)}${this._layoutSpecial('weather','Weather','🌤️',c.weather_position,82,10)}${c.grid_mix_enabled===true?this._layoutSpecial('gridmix','Grid mix','🌍',c.grid_mix_position,83,32):''}${c.updated_enabled===true?this._layoutSpecial('updated','Updated','🕒',c.updated_position,50,95):''}${this._layoutSpecial('stats','Daily Stats','📊',c.stats_position,17,86)}<button class="btn secondary-btn" id="reset-layout" style="position:absolute;right:10px;bottom:10px;z-index:5">Reset positions</button></div><button class="btn secondary-btn" id="reset-layout">↺ Reset positions to automatic</button>
       <h3>Devices</h3><div id="device-list">${(c.devices||[]).map((d,i)=>this._device(d,i)).join('')}</div><button class="btn" id="add">＋ Add device</button>
       <h3>Connections</h3><div class="hint">Optional. Leave empty to use the automatic topology. Add connections to take full control of where power flows.</div><div id="connections">${this._connectionsHTML()}</div><button class="btn" id="add-connection">＋ Add connection</button><h3>Today statistics</h3><div class="hint">Add up to 20 custom statistics. Choose your own name, entity and icon.</div><div id="stats-list">${this._statsEditorHTML()}</div><button class="btn" id="add-stat">＋ Add statistic</button>
       <h3 class="section-toggle" data-toggle-section="selfsuff">${this._ssOpen?'▾':'▸'} Self-sufficiency &amp; self-consumption<span class="section-sub">${(()=>{const n=['self_sufficiency_live','self_sufficiency_today','self_consumption_live','self_consumption_today'].filter(k=>c[k]===true).length;return n?`${n} of 4 on`:'off';})()}</span></h3><div class="section-body" data-section-body="selfsuff" ${this._ssOpen?'':'hidden'}><div class="hint"><b>Self-sufficiency</b>: share of your home's electricity that didn't come from the grid. <b>Self-consumption</b>: share of your solar you used yourself instead of exporting. Shown at the top of the Today panel. <b>Now</b> is calculated automatically from your devices; <b>today</b> uses the daily energy sensors below.</div><div class="row"><div class="field"><label style="display:flex;align-items:center;gap:6px;cursor:pointer;margin-top:6px"><input type="checkbox" data-key="self_sufficiency_live" style="width:auto" ${c.self_sufficiency_live===true?'checked':''}> Self-sufficiency now</label></div><div class="field"><label style="display:flex;align-items:center;gap:6px;cursor:pointer;margin-top:6px"><input type="checkbox" data-key="self_sufficiency_today" style="width:auto" ${c.self_sufficiency_today===true?'checked':''}> Self-sufficiency today</label></div><div class="field"><label style="display:flex;align-items:center;gap:6px;cursor:pointer;margin-top:6px"><input type="checkbox" data-key="self_consumption_live" style="width:auto" ${c.self_consumption_live===true?'checked':''}> Self-consumption now</label></div><div class="field"><label style="display:flex;align-items:center;gap:6px;cursor:pointer;margin-top:6px"><input type="checkbox" data-key="self_consumption_today" style="width:auto" ${c.self_consumption_today===true?'checked':''}> Self-consumption today</label></div></div><div class="hint">Daily energy sensors (kWh or Wh). Self-sufficiency today needs import and consumption; self-consumption today needs solar and export.</div><div class="row"><div class="field full"><label>Grid import today</label><ha-entity-picker data-editor-key="self_sufficiency_import_entity" allow-custom-entity></ha-entity-picker></div><div class="field full"><label>Grid export today</label><ha-entity-picker data-editor-key="energy_export_entity" allow-custom-entity></ha-entity-picker></div><div class="field full"><label>Solar production today</label><ha-entity-picker data-editor-key="energy_solar_entity" allow-custom-entity></ha-entity-picker></div><div class="field full"><label>Home consumption today</label><ha-entity-picker data-editor-key="self_sufficiency_consumption_entity" allow-custom-entity></ha-entity-picker></div><div class="field"><label style="display:flex;align-items:center;gap:6px;cursor:pointer;margin-top:6px"><input type="checkbox" data-key="self_sufficiency_calc_consumption" style="width:auto" ${c.self_sufficiency_calc_consumption===true?'checked':''}> Calculate consumption instead (import + solar − export + battery discharge − battery charge)</label></div><div class="field full"><label>Battery charge today (optional, for calculated consumption)</label><ha-entity-picker data-editor-key="energy_battery_charge_entity" allow-custom-entity></ha-entity-picker></div><div class="field full"><label>Battery discharge today (optional, for calculated consumption)</label><ha-entity-picker data-editor-key="energy_battery_discharge_entity" allow-custom-entity></ha-entity-picker></div></div></div>
@@ -1344,7 +1437,7 @@
         this._emit(false);
         this._render();
       }));
-      this.shadowRoot.querySelectorAll('[data-key]').forEach(el=>el.addEventListener('change',e=>{ const k=e.target.dataset.key; if(k==='flow_threshold_watts'){ const watts=Math.max(0,parseFloat(e.target.value)||0); this._config.flow_threshold=watts/1000; this._config.flow_threshold_watts=watts; } else { this._config[k]=e.target.value; if(['flow_threshold','flow_speed','flow_stagger','device_scale','mobile_scale','max_width','stats_scale','weather_scale','title_scale','grid_mix_scale'].includes(k))this._config[k]=parseFloat(e.target.value)||0; if(e.target.type==='checkbox'){this._config[k]=e.target.checked;} } if(['self_sufficiency_live','self_sufficiency_today','self_consumption_live','self_consumption_today'].includes(k)){const sub=this.shadowRoot.querySelector('[data-toggle-section="selfsuff"] .section-sub'); if(sub){const n=['self_sufficiency_live','self_sufficiency_today','self_consumption_live','self_consumption_today'].filter(x=>this._config[x]===true).length; sub.textContent=n?`${n} of 4 on`:'off';}} if(k==='grid_mix_enabled'){this._emit(false);this._render();return;} if(e.target.type==='color'){const pv=e.target.parentElement?.querySelector('.color-preview'); if(pv) pv.style.background=e.target.value;} this._emit(false); }));
+      this.shadowRoot.querySelectorAll('[data-key]').forEach(el=>el.addEventListener('change',e=>{ const k=e.target.dataset.key; if(k==='flow_threshold_watts'){ const watts=Math.max(0,parseFloat(e.target.value)||0); this._config.flow_threshold=watts/1000; this._config.flow_threshold_watts=watts; } else { this._config[k]=e.target.value; if(['flow_threshold','flow_speed','flow_stagger','device_scale','mobile_scale','max_width','stats_scale','weather_scale','title_scale','grid_mix_scale','updated_scale','updated_stale_minutes'].includes(k))this._config[k]=parseFloat(e.target.value)||0; if(e.target.type==='checkbox'){this._config[k]=e.target.checked;} } if(['self_sufficiency_live','self_sufficiency_today','self_consumption_live','self_consumption_today'].includes(k)){const sub=this.shadowRoot.querySelector('[data-toggle-section="selfsuff"] .section-sub'); if(sub){const n=['self_sufficiency_live','self_sufficiency_today','self_consumption_live','self_consumption_today'].filter(x=>this._config[x]===true).length; sub.textContent=n?`${n} of 4 on`:'off';}} if(k==='grid_mix_enabled'||k==='updated_enabled'){this._emit(false);this._render();return;} if(e.target.type==='color'){const pv=e.target.parentElement?.querySelector('.color-preview'); if(pv) pv.style.background=e.target.value;} this._emit(false); }));
       this.shadowRoot.querySelector('#add')?.addEventListener('click',()=>{
         const id=genDeviceId();
         this._config.devices.push({id,type:'solar',name:`Device ${this._config.devices.length+1}`,power_entity:''});
@@ -1422,13 +1515,13 @@
       this.shadowRoot.querySelectorAll('[data-bg-file]').forEach(inp=>inp.addEventListener('change',e=>{const f=e.target.files?.[0];if(f)this._uploadBackground(f,inp.dataset.bgFile);}));
       this.shadowRoot.querySelectorAll('[data-bg-restore]').forEach(b=>b.addEventListener('click',()=>{const slot=b.dataset.bgRestore;delete this._config[slot==='day'?'background_upload_day':'background_upload_night'];this._emit(false);this._render();}));
       this.shadowRoot.querySelectorAll('[data-bg-preview]').forEach(b=>b.addEventListener('click',()=>{this._applyLayoutBg(b.dataset.bgPreview);}));
-      this.shadowRoot.querySelector('#reset-layout')?.addEventListener('click',()=>{this._config.devices.forEach(d=>delete d.position);delete this._config.weather_position;delete this._config.stats_position;delete this._config.header_position;delete this._config.grid_mix_position;this._emit(false);this._render();});
+      this.shadowRoot.querySelector('#reset-layout')?.addEventListener('click',()=>{this._config.devices.forEach(d=>delete d.position);delete this._config.weather_position;delete this._config.stats_position;delete this._config.header_position;delete this._config.grid_mix_position;delete this._config.updated_position;this._emit(false);this._render();});
       this._enlargeDialogPreview();
     }
     _layoutNode(d,i){ const p=d.position && Number.isFinite(Number(d.position.x)) && Number.isFinite(Number(d.position.y)) ? d.position : this._autoPreviewPosition(d,i); return `<div class="layout-node" data-layout-kind="device" data-layout-index="${i}" style="left:${p.x}%;top:${p.y}%"><div class="ln-top">${esc(ICONS[d.type] || '⚙️')} ${esc(d.name || LABELS[d.type] || 'Device')}</div><div class="ln-pos">${Number(p.x).toFixed(1)}% × ${Number(p.y).toFixed(1)}%</div></div>`; }
     _layoutSpecial(kind,label,icon,pos,dx,dy){ const p=pos && Number.isFinite(Number(pos.x)) && Number.isFinite(Number(pos.y)) ? pos : {x:dx,y:dy}; return `<div class="layout-node special" data-layout-kind="${kind}" style="left:${p.x}%;top:${p.y}%"><div class="ln-top">${icon} ${label}</div><div class="ln-pos">${Number(p.x).toFixed(1)}% × ${Number(p.y).toFixed(1)}%</div></div>`; }
-    _autoPreviewPosition(d,i){ const zones={solar:[18,23],inverter:[56,39],battery:[58,65],gateway:[48,78],house:[28,82],grid:[82,84],ev:[83,50],load:[76,67]}; const same=this._config.devices.filter(x=>(x.type||'load')===(d.type||'load')); const n=same.indexOf(d); const [cx,cy]=zones[d.type||'load']||[70,68]; const spacing=Math.min(15,70/Math.max(1,same.length)); let x=cx,y=cy;if(same.length>1)x=cx+(n-(same.length-1)/2)*spacing;if((d.type==='battery'&&same.length>3)){const col=n%3,row=Math.floor(n/3);x=48+col*12;y=64+row*12;}if(d.type==='solar'&&same.length>4){const col=n%4,row=Math.floor(n/4);x=33+col*12;y=22+row*11;}if(d.type==='ev'&&same.length>2){const col=n%2,row=Math.floor(n/2);x=78+col*10;y=45+row*13;}return{x,y}; }
-    _enableLayoutDragging(){ const area=this.shadowRoot.querySelector('#layout-editor'); if(!area)return; area.querySelectorAll('.layout-node').forEach(node=>{ let dragging=false; const move=e=>{if(!dragging)return;const r=area.getBoundingClientRect();let x=((e.clientX-r.left)/r.width)*100;let y=((e.clientY-r.top)/r.height)*100;const kind=node.dataset.layoutKind; if(kind==='header'){x=Math.max(0,Math.min(85,x));y=Math.max(0,Math.min(90,y));} else {x=Math.max(5,Math.min(95,x));y=Math.max(6,Math.min(94,y));} if(kind==='device'){const i=Number(node.dataset.layoutIndex);this._config.devices[i].position={x,y};} else if(kind==='header') this._config.header_position={x,y}; else if(kind==='weather') this._config.weather_position={x,y}; else if(kind==='gridmix') this._config.grid_mix_position={x,y}; else if(kind==='stats') this._config.stats_position={x,y}; node.style.left=x+'%';node.style.top=y+'%';const pos=node.querySelector('.ln-pos');if(pos)pos.textContent=`${x.toFixed(1)}% × ${y.toFixed(1)}%`;}; const up=()=>{if(!dragging)return;dragging=false;node.classList.remove('dragging');window.removeEventListener('pointermove',move);window.removeEventListener('pointerup',up);this._emit(false);}; node.addEventListener('pointerdown',e=>{e.preventDefault();dragging=true;node.classList.add('dragging');node.setPointerCapture?.(e.pointerId);window.addEventListener('pointermove',move);window.addEventListener('pointerup',up);}); }); }
+    _autoPreviewPosition(d,i){ const zones={solar:[18,23],inverter:[56,39],battery:[58,65],gateway:[48,78],house:[28,82],grid:[82,84],generator:[18,62],water:[14,90],gas:[40,92],ev:[83,50],load:[76,67]}; const same=this._config.devices.filter(x=>(x.type||'load')===(d.type||'load')); const n=same.indexOf(d); const [cx,cy]=zones[d.type||'load']||[70,68]; const spacing=Math.min(15,70/Math.max(1,same.length)); let x=cx,y=cy;if(same.length>1)x=cx+(n-(same.length-1)/2)*spacing;if((d.type==='battery'&&same.length>3)){const col=n%3,row=Math.floor(n/3);x=48+col*12;y=64+row*12;}if(d.type==='solar'&&same.length>4){const col=n%4,row=Math.floor(n/4);x=33+col*12;y=22+row*11;}if(d.type==='ev'&&same.length>2){const col=n%2,row=Math.floor(n/2);x=78+col*10;y=45+row*13;}return{x,y}; }
+    _enableLayoutDragging(){ const area=this.shadowRoot.querySelector('#layout-editor'); if(!area)return; area.querySelectorAll('.layout-node').forEach(node=>{ let dragging=false; const move=e=>{if(!dragging)return;const r=area.getBoundingClientRect();let x=((e.clientX-r.left)/r.width)*100;let y=((e.clientY-r.top)/r.height)*100;const kind=node.dataset.layoutKind; if(kind==='header'){x=Math.max(0,Math.min(85,x));y=Math.max(0,Math.min(90,y));} else {x=Math.max(5,Math.min(95,x));y=Math.max(6,Math.min(94,y));} if(kind==='device'){const i=Number(node.dataset.layoutIndex);this._config.devices[i].position={x,y};} else if(kind==='header') this._config.header_position={x,y}; else if(kind==='weather') this._config.weather_position={x,y}; else if(kind==='gridmix') this._config.grid_mix_position={x,y}; else if(kind==='updated') this._config.updated_position={x,y}; else if(kind==='stats') this._config.stats_position={x,y}; node.style.left=x+'%';node.style.top=y+'%';const pos=node.querySelector('.ln-pos');if(pos)pos.textContent=`${x.toFixed(1)}% × ${y.toFixed(1)}%`;}; const up=()=>{if(!dragging)return;dragging=false;node.classList.remove('dragging');window.removeEventListener('pointermove',move);window.removeEventListener('pointerup',up);this._emit(false);}; node.addEventListener('pointerdown',e=>{e.preventDefault();dragging=true;node.classList.add('dragging');node.setPointerCapture?.(e.pointerId);window.addEventListener('pointermove',move);window.addEventListener('pointerup',up);}); }); }
 
     // Shows, under each open device's Invert flow button, which way power is
     // flowing on its connections right now. Uses the card's own edge and
@@ -1440,7 +1533,7 @@
       const devices=this._config.devices||[];
       if(!this._hass){ els.forEach(el=>{ el.textContent=''; }); return; }
       const logic=Object.create(HomePowerFlowCard.prototype);
-      logic._config=this._config;
+      logic._config=this._config; logic._hass=this._hass;
       const values=devices.map(d=>powerValue(this._hass,d.power_entity));
       let edges=[]; try { edges=logic._flowEdges(devices); } catch(e){ edges=[]; }
       const nm=d=>esc(d?.name||LABELS[d?.type]||'Device');
@@ -1453,7 +1546,9 @@
           if(!info.active) return `<div class="fl-off">◦ ${nm(devices[a])} – ${nm(devices[b])}: idle</div>`;
           let reverse=info.reverse; if(Number(dir)===1) reverse=false; if(Number(dir)===2) reverse=true;
           const from=reverse?devices[b]:devices[a], to=reverse?devices[a]:devices[b];
-          return `<div class="fl-on">▶ ${nm(from)} → ${nm(to)} · ${esc(fmtPower(info.magnitude))}</div>`;
+          const src=Number.isInteger(child)?devices[child]:null;
+          const amount=logic._isUtility(src)?logic._utilityText(src):fmtPower(info.magnitude);
+          return `<div class="fl-on">▶ ${nm(from)} → ${nm(to)} · ${esc(amount)}</div>`;
         }).join('');
       });
     }
@@ -1475,8 +1570,9 @@
       const deviceOpen=this._isDeviceOpen(d.id);
       const connectsToField=`<div class="field full"><label>Connects to</label><select data-device="${i}" data-field="connects_to">${this._connectsToOptions(i)}</select><span class="small" style="display:block">Automatic = the (first) inverter, or a Gateway/Distribution Board device for extra inverters. Override this for multi-inverter or custom topologies.</span></div>`;
       const battTimeFields = d.type!=='battery' ? '' : `<div class="field full"><label style="display:flex;align-items:center;gap:6px;cursor:pointer;margin-top:6px"><input type="checkbox" data-device="${i}" data-field="battery_time" style="width:auto" ${d.battery_time===true?'checked':''}> Show time remaining</label><span class="small" style="display:block">Estimated time to full (charging) or to reserve (discharging), shown under the power value.</span></div>`+(d.battery_time!==true?'':`<div class="field full"><label>State of charge (%)</label><ha-entity-picker data-device-picker="${i}" data-field="battery_soc_entity" allow-custom-entity></ha-entity-picker></div><div class="field"><label>Capacity (kWh)</label><input type="number" min="0" step="0.1" data-device="${i}" data-field="battery_capacity" value="${esc(d.battery_capacity??'')}" placeholder="e.g. 13.5"></div><div class="field"><label>Reserve %</label><input type="number" min="0" max="99" step="1" data-device="${i}" data-field="battery_reserve" value="${esc(d.battery_reserve??0)}"></div><div class="field"><label>Charge limit %</label><input type="number" min="1" max="100" step="1" data-device="${i}" data-field="battery_charge_limit" value="${esc(d.battery_charge_limit??100)}"></div><div class="field full"><label>Capacity sensor (optional, overrides the number above)</label><ha-entity-picker data-device-picker="${i}" data-field="battery_capacity_entity" allow-custom-entity></ha-entity-picker></div>`);
+      const utilityFields = d.type==='water' ? `<div class="field full"><span class="small">Shown in litres. Sensors reporting m³ are converted automatically. On Automatic, water connects to your House device.</span></div>` : d.type==='gas' ? `<div class="field"><label>Show gas in</label><select data-device="${i}" data-field="utility_unit"><option value="m³" ${d.utility_unit!=='kWh'?'selected':''}>m³</option><option value="kWh" ${d.utility_unit==='kWh'?'selected':''}>kWh</option></select></div><div class="field"><label>Calorific value (MJ/m³)</label><input type="number" min="30" max="45" step="0.1" data-device="${i}" data-field="gas_cv" value="${esc(d.gas_cv??39.5)}"></div><div class="field full"><span class="small">Used to convert between m³ and kWh (see your gas bill). On Automatic, gas connects to your House device.</span></div>` : '';
       const battGlowField = d.type==='battery' ? `<div class="field"><label style="display:flex;align-items:center;gap:6px;cursor:pointer;margin-top:6px"><input type="checkbox" data-device="${i}" data-field="battery_glow" style="width:auto" ${d.battery_glow===false?'':'checked'}> Show charge/discharge glow</label><span class="small" style="display:block">Pulses the box when actively charging or discharging.</span></div>` : '';
-      const body = deviceOpen ? `<div class="row"><div class="field"><label>Type</label><select data-device="${i}" data-field="type">${TYPES.map(t=>`<option value="${t[0]}" ${d.type===t[0]?'selected':''}>${esc(t[1])}</option>`).join('')}</select></div><div class="field"><label>Name</label><input data-device="${i}" data-field="name" value="${esc(d.name||'')}"></div>${entityField('power_entity','Power entity','data-entity-label')}${connectsToField}<div class="field"><label>Flow colour</label><div class="ha-color-box"><input class="ha-color-picker" type="color" title="Choose flow colour" data-device="${i}" data-field="flow_color" value="${esc(d.flow_color || FLOW_COLORS[d.type] || FLOW_COLORS.neutral)}"><span class="color-preview" style="background:${esc(d.flow_color || FLOW_COLORS[d.type] || FLOW_COLORS.neutral)}"></span></div><span class="small" style="display:block">Only used if this device has its own power entity.</span></div><div class="field"><label>Flow direction</label><button class="btn ${inverted?'secondary-btn':''}" type="button" data-invert-flow="${i}">${inverted?'↔ Inverted':'↔ Normal'}<span class="small" style="display:block">Visual direction only</span></button><div class="flow-live" data-flow-live="${i}"></div></div>${battGlowField}${battTimeFields}</div><button class="btn secondary-btn" type="button" data-toggle-extras="${esc(d.id)}">${expanded?'▾':'▸'} Extra entities${extras.length?` (${extras.length}/5)`:' (optional)'}</button>${extrasBody}` : '';
+      const body = deviceOpen ? `<div class="row"><div class="field"><label>Type</label><select data-device="${i}" data-field="type">${TYPES.map(t=>`<option value="${t[0]}" ${d.type===t[0]?'selected':''}>${esc(t[1])}</option>`).join('')}</select></div><div class="field"><label>Name</label><input data-device="${i}" data-field="name" value="${esc(d.name||'')}"></div>${entityField('power_entity',(d.type==='water'||d.type==='gas')?'Meter or flow entity':'Power entity','data-entity-label')}${connectsToField}<div class="field"><label>Flow colour</label><div class="ha-color-box"><input class="ha-color-picker" type="color" title="Choose flow colour" data-device="${i}" data-field="flow_color" value="${esc(d.flow_color || FLOW_COLORS[d.type] || FLOW_COLORS.neutral)}"><span class="color-preview" style="background:${esc(d.flow_color || FLOW_COLORS[d.type] || FLOW_COLORS.neutral)}"></span></div><span class="small" style="display:block">Only used if this device has its own power entity.</span></div><div class="field"><label>Flow direction</label><button class="btn ${inverted?'secondary-btn':''}" type="button" data-invert-flow="${i}">${inverted?'↔ Inverted':'↔ Normal'}<span class="small" style="display:block">Visual direction only</span></button><div class="flow-live" data-flow-live="${i}"></div></div>${battGlowField}${battTimeFields}${utilityFields}</div><button class="btn secondary-btn" type="button" data-toggle-extras="${esc(d.id)}">${expanded?'▾':'▸'} Extra entities${extras.length?` (${extras.length}/5)`:' (optional)'}</button>${extrasBody}` : '';
       return `<div class="device sort-item" data-sort-index="${i}"><div class="device-head"><span class="drag-handle" data-sort-handle title="Drag to reorder"><ha-icon icon="mdi:drag-horizontal-variant"></ha-icon></span><span class="device-title" data-toggle-device="${esc(d.id)}">${deviceOpen?'▾':'▸'} ${esc(ICONS[d.type]||'⚙️')} ${esc(d.name||'Device')}${!deviceOpen && d.power_entity ? `<span class="device-sub">${esc(d.power_entity)}</span>`:''}</span><span class="device-actions"><button class="dup-btn" title="Duplicate device" data-duplicate="${i}"><ha-icon icon="mdi:content-copy"></ha-icon></button><button title="Remove" data-remove="${i}">×</button></span></div>${body}</div>`;
     }
     _extraEntityField(di,ei,ex){
