@@ -70,7 +70,7 @@ Or manually in HACS:
 - A configurable **noise threshold** keeps idle connections quiet
 
 ### 🔌 Any setup, including multi-inverter
-- Device types: ☀️ Solar, ⚡ Inverter, 🔋 Battery, 🧠 Gateway / distribution board, 🏠 House, 🌐 Grid, 🚗 EV charger and ⚙️ Extra load, as many of each as you need
+- Device types: ☀️ Solar, ⚡ Inverter, 🔋 Battery, 🧠 Gateway / distribution board, 🏠 House, 🌐 Grid, ⛽ Generator, 💧 Water, 🔥 Gas, 🚗 EV charger and ⚙️ Extra load, as many of each as you need
 - **"Connects to"** links let you describe your real wiring (e.g. Solar 2 → Inverter 2)
 - A **Gateway** device can act as the meeting point between several inverters
 - Left on **Automatic**, everything still connects sensibly out of the box
@@ -84,10 +84,10 @@ Or manually in HACS:
 - **Battery time remaining** (optional): e.g. `⏳ 2h 40m to 4%` or `⏳ 1h 15m to full`, from the battery's state of charge and capacity, with its own reserve and charge limit
 
 ### 🖱️ Flexible layout
-- **Drag and drop** devices, the title, the weather box, the Today panel and the grid mix box to exactly where you want them
+- **Drag and drop** devices, the title, the weather box, the Today panel, the grid mix box and the last updated box to exactly where you want them
 - **Custom backgrounds**: separate day and night images, switched automatically by the sun
 - **Title and subtitle** with your own text and colour, or leave them blank
-- **Sizing controls** for the title, device boxes, weather box, Today panel and grid mix box
+- **Sizing controls** for the title, device boxes, weather box, Today panel, grid mix box and last updated box
 
 ### 📱 Fits every screen
 - The whole card scales to the available width, so it looks the same on a monitor, a tablet or a phone
@@ -100,6 +100,7 @@ Or manually in HACS:
 - **Weather & clock** box from any weather entity (12 or 24 hour)
 - **Today panel** with up to 20 statistics (solar yield, grid import/export, anything with a number), each with its own icon, updating live
 - **Self-sufficiency & self-consumption** (optional): how much of your electricity didn't come from the grid, and how much of your solar you used yourself, both live and for today
+- **Last updated** box (optional): a small pill showing how long ago an entity was updated (e.g. `🕒 Updated 2m ago`), turning amber when data goes stale, so you can spot a stalled integration at a glance
 - **UK grid mix** box (optional): live carbon intensity with a colour-coded rating, plus the current generation mix by source, for your region or all of Great Britain
 
 ### ⚙️ Fully visual editor
@@ -147,6 +148,17 @@ Open a Battery device in the editor, tick **Show time remaining**, then pick its
 - **Charging:** time until it reaches its **charge limit**. Default: full.
 - Power is averaged over roughly the last two minutes, so the estimate stays steady instead of jumping with every reading.
 - The line hides when the battery is idle, and follows the same direction as the battery's flow line (including Invert flow).
+
+---
+
+## 💧 Water & 🔥 Gas
+
+Add water and gas meters as devices, using a usage sensor (e.g. litres or m³ today) or a flow-rate sensor (e.g. L/min, m³/h).
+
+- **Water** is always shown in **litres**; sensors reporting m³ are converted automatically.
+- **Gas** can be shown in **m³ or kWh**. Conversion uses the standard UK billing formula: kWh = m³ × 1.02264 × calorific value ÷ 3.6. The calorific value (default 39.5 MJ/m³) is on your gas bill.
+- On **Automatic**, both connect to your **House** device and flow into it whenever usage is above zero. Use **Connects to** to link them elsewhere.
+- The watt-based flow threshold and load-based dot speed don't apply to water and gas.
 
 ---
 
@@ -224,6 +236,10 @@ Each device gets a stable internal `id` automatically. `connects_to` refers to t
 | `background_night` | built-in | Night background image URL |
 | `flow_threshold_watts` | `1` | Minimum power (W) before a flow line shows |
 | `flow_speed` | `8` | Base animation duration in seconds (at 1 kW) |
+| `updated_enabled` | `false` | Show the last updated box |
+| `updated_entity` | — | Entity to watch (uses its own timestamp if its state is one) |
+| `updated_label` | `Updated` | Text before the time; `""` for none |
+| `updated_stale_minutes` | `10` | Minutes before the box turns amber |
 | `grid_mix_enabled` | `false` | Show the UK grid mix box |
 | `grid_mix_postcode` | — | Outward postcode for regional data (e.g. `SW1A`); blank = all of GB |
 | `self_sufficiency_live` | `false` | Show live self-sufficiency (needs a Grid and a House device) |
@@ -247,6 +263,7 @@ Each device gets a stable internal `id` automatically. `connects_to` refers to t
 | `weather_scale` | `1` | Weather box size |
 | `stats_scale` | `0.8` | Today panel size (also shrinks automatically if too tall) |
 | `grid_mix_scale` | `1` | Grid mix box size |
+| `updated_scale` | `1` | Last updated box size |
 | `mobile_scale` | `1.4` | Extra size for boxes on phones |
 | `max_width` | `0` | Maximum card width in px (`0` = fill the available width) |
 
@@ -254,7 +271,7 @@ Each device gets a stable internal `id` automatically. `connects_to` refers to t
 
 | Option | Description |
 |---|---|
-| `type` | `solar`, `inverter`, `battery`, `gateway`, `house`, `grid`, `ev` or `load` |
+| `type` | `solar`, `inverter`, `battery`, `gateway`, `house`, `grid`, `generator`, `water`, `gas`, `ev` or `load` |
 | `name` | Display name |
 | `power_entity` | Power sensor (W) |
 | `connects_to` | `id` of the device it's wired to (blank = Automatic) |
@@ -267,6 +284,8 @@ Each device gets a stable internal `id` automatically. `connects_to` refers to t
 | `battery_capacity_entity` | Batteries only: capacity sensor, overrides `battery_capacity` |
 | `battery_reserve` | Batteries only: reserve % where discharging stops (default `0`) |
 | `battery_charge_limit` | Batteries only: charge limit % (default `100`) |
+| `utility_unit` | Gas only: `m³` (default) or `kWh` |
+| `gas_cv` | Gas only: calorific value in MJ/m³ for m³ ↔ kWh conversion (default `39.5`) |
 | `extra_entities` | Up to 5 extra readings, each with `entity` and `icon` |
 
 Positions and sizes are easiest to set by dragging in the editor's **Visual layout**.
