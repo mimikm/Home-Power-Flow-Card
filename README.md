@@ -67,7 +67,7 @@ Or manually in HACS:
 - Live animated flow lines between every device, with a moving, softly pulsing dot showing the direction of power
 - Dots move **faster on high-power connections** and slower on light ones
 - Evenly spaced flow lines, whatever the distance between devices
-- Choose **curved** lines or **right-angle** lines that route around every box on the card
+- Choose **curved** lines or **right-angle** lines that route around every box on the card and run side by side in parallel lanes instead of overlapping
 - A configurable **noise threshold** keeps idle connections quiet
 
 ### 🔌 Any setup, including multi-inverter
