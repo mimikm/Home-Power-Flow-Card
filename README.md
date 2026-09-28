@@ -93,6 +93,7 @@ Or manually in HACS:
 
 ### 📱 Fits every screen
 - The whole card scales to the available width, so it looks the same on a monitor, a tablet or a phone
+- A separate **phone layout** (portrait) switches on automatically on narrow screens, with its own box positions
 - It never grows taller than your screen
 - Text is boosted automatically on phones so it stays readable
 - Full support for Home Assistant's **Sections** dashboards
@@ -161,6 +162,17 @@ Add water and gas meters as devices, using a usage sensor (e.g. litres or m³ to
 - **Gas** can be shown in **m³ or kWh**. Conversion uses the standard UK billing formula: kWh = m³ × 1.02264 × calorific value ÷ 3.6. The calorific value (default 39.5 MJ/m³) is on your gas bill.
 - On **Automatic**, both connect to your **House** device and flow into it whenever usage is above zero. Use **Connects to** to link them elsewhere.
 - The watt-based flow threshold and load-based dot speed don't apply to water and gas.
+
+---
+
+## 📱 Phone layout
+
+On narrow screens the card switches to a **portrait layout** with its own box positions, so everything is bigger and easier to read on a phone. Your desktop layout is never changed.
+
+- **Automatic:** when the card is narrower than **600 px** (adjustable), or set it to **Always** / **Never**.
+- **Ready out of the box:** boxes you haven't placed are arranged automatically in rows, keeping your desktop's top-to-bottom order.
+- **Arrange it yourself:** in the editor's **Visual layout**, switch to **📱 Phone** and drag boxes. The preview shows the phone layout while you edit.
+- **Copy desktop layout** starts from your desktop positions; **Reset phone layout** goes back to the automatic arrangement.
 
 ---
 
@@ -273,6 +285,8 @@ Each device gets a stable internal `id` automatically. `connects_to` refers to t
 | `updated_scale` | `1` | Last updated box size |
 | `mobile_scale` | `1.4` | Extra size for boxes on phones |
 | `max_width` | `0` | Maximum card width in px (`0` = fill the available width) |
+| `phone_layout` | `auto` | `auto` (narrow screens), `always` or `never` |
+| `phone_breakpoint` | `600` | Card width in px below which the phone layout is used |
 
 ### Devices
 
@@ -306,7 +320,6 @@ Ideas and feedback are welcome, so [open an issue](https://github.com/mimikm/Hom
 **Stability & polish**
 - Editor warnings for misconfigured devices and broken "Connects to" links
 - Respect the system "reduce motion" setting for flow dots
-- Separate phone layout (different positions on small screens)
 
 **Features**
 - Automatic kW formatting for large values (e.g. `3.2 kW` instead of `3200 W`)
