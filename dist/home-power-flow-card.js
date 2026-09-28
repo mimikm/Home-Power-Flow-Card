@@ -10,7 +10,7 @@
  * Issues & feature requests: https://github.com/mimikm/Home-Power-Flow-Card/issues
  */
 (() => {
-  const VERSION = '0.7.6.7';
+  const VERSION = '0.7.6.8';
   const DEFAULT_BG = '/hacsfiles/Home-Power-Flow-Card/smart-home-energy-background.png';
   const DEFAULT_BG_NIGHT = '/hacsfiles/Home-Power-Flow-Card/smart-home-energy-background2.png';
   const TYPES = [
@@ -217,6 +217,35 @@
     return entry;
   }
 
+  // ---- Themes: colours for boxes/panels and their text ------------------
+  // 'dark' holds the card's original colours, so existing cards look the same.
+  const NODE_DARK = 'linear-gradient(145deg,rgba(9,25,40,.87),rgba(15,30,44,.73))';
+  const THEMES = {
+    dark:     { label:'Dark',     node:NODE_DARK, panel:'rgba(8,29,52,.78)', stats:'linear-gradient(145deg,rgba(45,38,33,.74),rgba(18,25,31,.74))', border:'rgba(255,255,255,.16)', text:'#ffffff', track:'rgba(255,255,255,.1)' },
+    light:    { label:'Light',    node:'linear-gradient(145deg,rgba(255,255,255,.9),rgba(236,241,246,.82))', panel:'rgba(250,252,255,.86)', stats:'linear-gradient(145deg,rgba(255,255,255,.88),rgba(235,240,245,.84))', border:'rgba(20,40,60,.14)', text:'#15202b', track:'rgba(0,0,0,.1)' },
+    midnight: { label:'Midnight', node:'linear-gradient(145deg,rgba(0,0,0,.84),rgba(14,14,18,.74))', panel:'rgba(0,0,0,.74)', stats:'linear-gradient(145deg,rgba(0,0,0,.8),rgba(14,14,18,.76))', border:'rgba(255,255,255,.12)', text:'#f5f5f5', track:'rgba(255,255,255,.1)' },
+    ocean:    { label:'Ocean',    node:'linear-gradient(145deg,rgba(0,77,92,.84),rgba(0,51,68,.76))', panel:'rgba(0,64,80,.8)', stats:'linear-gradient(145deg,rgba(0,70,86,.8),rgba(0,45,60,.78))', border:'rgba(128,222,234,.26)', text:'#e0f7fa', track:'rgba(224,247,250,.14)' },
+    forest:   { label:'Forest',   node:'linear-gradient(145deg,rgba(27,67,40,.84),rgba(17,45,28,.76))', panel:'rgba(22,56,34,.8)', stats:'linear-gradient(145deg,rgba(26,62,38,.8),rgba(15,40,25,.78))', border:'rgba(165,214,167,.26)', text:'#f1f8e9', track:'rgba(241,248,233,.14)' },
+    sunset:   { label:'Sunset',   node:'linear-gradient(145deg,rgba(94,33,64,.84),rgba(140,58,33,.74))', panel:'rgba(110,40,60,.8)', stats:'linear-gradient(145deg,rgba(100,36,62,.8),rgba(130,52,32,.78))', border:'rgba(255,183,77,.3)', text:'#fff3e0', track:'rgba(255,243,224,.16)' },
+    graphite: { label:'Graphite', node:'linear-gradient(145deg,rgba(55,60,66,.86),rgba(38,42,47,.78))', panel:'rgba(48,52,58,.82)', stats:'linear-gradient(145deg,rgba(52,56,62,.82),rgba(36,40,45,.8))', border:'rgba(255,255,255,.14)', text:'#eceff1', track:'rgba(255,255,255,.12)' },
+  };
+  function hexRgb(hex) {
+    const m = String(hex || '').trim().match(/^#?([0-9a-f]{3}|[0-9a-f]{6})$/i);
+    if (!m) return null;
+    const h = m[1].length === 3 ? m[1].split('').map(c => c + c).join('') : m[1];
+    return [0, 2, 4].map(i => parseInt(h.slice(i, i + 2), 16));
+  }
+  // Custom theme from a panel colour, text colour and opacity.
+  function customTheme(panelHex, textHex, opacity) {
+    const p = hexRgb(panelHex) || [8, 29, 52];
+    const t = hexRgb(textHex) || [255, 255, 255];
+    const op = Math.max(0.2, Math.min(1, Number.isFinite(Number(opacity)) ? Number(opacity) : 0.8));
+    const d = p.map(v => Math.round(v * 0.72));
+    const rgba = (c, a) => `rgba(${c[0]},${c[1]},${c[2]},${Math.max(0, Math.min(1, a)).toFixed(2)})`;
+    const grad = `linear-gradient(145deg,${rgba(p, op + 0.06)},${rgba(d, op - 0.04)})`;
+    return { node: grad, panel: rgba(p, op), stats: grad, border: rgba(t, 0.18), text: `rgb(${t.join(',')})`, track: rgba(t, 0.12) };
+  }
+
   function state(hass, entity) {
     return entity && hass?.states?.[entity] ? hass.states[entity] : null;
   }
@@ -348,11 +377,13 @@
         this._resizeObserver.observe(this);
       }
       this._applyScale();
+      if (this._rendered) this._updatedTimer();
     }
 
     disconnectedCallback() {
       if (this._timer) clearInterval(this._timer);
       if (this._resizeObserver) { this._resizeObserver.disconnect(); this._resizeObserver = null; }
+      if (this._upTimer) { clearInterval(this._upTimer); this._upTimer = null; }
     }
 
     // Optional maximum card width in px. Unset or 0 = no limit: the card
@@ -361,6 +392,22 @@
     _maxWidthCss() {
       const raw = Number(this._config?.max_width);
       return (Number.isFinite(raw) && raw >= 300 ? Math.round(raw) : 100000) + 'px';
+    }
+
+    _themeColors() {
+      const c = this._config || {};
+      let name = c.theme || 'dark';
+      if (name === 'auto') name = this._hass?.themes?.darkMode === false ? 'light' : 'dark';
+      if (name === 'custom') return customTheme(c.theme_panel_color, c.theme_text_color, c.theme_opacity);
+      return THEMES[name] || THEMES.dark;
+    }
+    _applyTheme() {
+      const card = this.shadowRoot?.querySelector('.card');
+      if (!card) return;
+      const t = this._themeColors();
+      const set = (k, v) => { if (card.style.getPropertyValue(k) !== v) card.style.setProperty(k, v); };
+      set('--hpf-node-bg', t.node); set('--hpf-panel-bg', t.panel); set('--hpf-stats-bg', t.stats);
+      set('--hpf-border', t.border); set('--hpf-text', t.text); set('--hpf-track', t.track);
     }
 
     // Everything is laid out on a fixed 1200x800 design stage and scaled
@@ -439,42 +486,42 @@
         <style>
           :host { display:block; width:100%; }
           * { box-sizing:border-box; }
-          .card { position:relative; width:100%; max-width:min(var(--hpf-max-width,100000px), calc((100vh - 96px) * 1.5)); margin:0 auto; aspect-ratio: 3 / 2; overflow:hidden; border-radius:22px; color:#fff; font-family:var(--primary-font-family,Arial,sans-serif); background:#101820; box-shadow:0 12px 40px rgba(0,0,0,.28); }
+          .card { position:relative; width:100%; max-width:min(var(--hpf-max-width,100000px), calc((100vh - 96px) * 1.5)); margin:0 auto; aspect-ratio: 3 / 2; overflow:hidden; border-radius:22px; color:var(--hpf-text,#fff); font-family:var(--primary-font-family,Arial,sans-serif); background:#101820; box-shadow:0 12px 40px rgba(0,0,0,.28); }
           .bg { position:absolute; inset:0; background-size:cover; background-position:center; }
           .stage { position:absolute; left:0; top:0; width:1200px; height:800px; transform-origin:top left; transform:scale(var(--hpf-scale,1)); }
           .vignette { position:absolute; inset:0; background:radial-gradient(circle at 55% 45%,transparent 25%,rgba(0,0,0,.12) 72%,rgba(0,0,0,.32)); pointer-events:none; }
           .header { position:absolute; left:var(--header-x,2.6%); top:var(--header-y,2.7%); z-index:20; transform-origin:top left; transform:scale(calc(var(--hpf-title-scale,1) * var(--hpf-boost,1))); color:var(--hpf-title-color,#fff); white-space:nowrap; }
           .title { font-size:42px; font-weight:700; letter-spacing:-.03em; text-shadow:0 2px 8px rgba(0,0,0,.4); }
           .subtitle { margin-top:4px; font-size:18px; opacity:.88; text-shadow:0 2px 8px rgba(0,0,0,.45); }
-          .updated { position:absolute; z-index:19; left:var(--up-x,50%); top:var(--up-y,95%); transform:translate(-50%,-50%) scale(calc(var(--hpf-updated-scale,1) * var(--hpf-boost,1))); display:flex; align-items:center; gap:6px; padding:6px 12px; border-radius:999px; background:rgba(8,29,52,.78); border:1px solid rgba(255,255,255,.15); box-shadow:0 6px 18px rgba(0,0,0,.25); backdrop-filter:blur(12px); font-size:13px; white-space:nowrap; }
+          .updated { position:absolute; z-index:19; left:var(--up-x,50%); top:var(--up-y,95%); transform:translate(-50%,-50%) scale(calc(var(--hpf-updated-scale,1) * var(--hpf-boost,1))); display:flex; align-items:center; gap:6px; padding:6px 12px; border-radius:999px; background:var(--hpf-panel-bg,rgba(8,29,52,.78)); border:1px solid var(--hpf-border,rgba(255,255,255,.16)); box-shadow:0 6px 18px rgba(0,0,0,.25); backdrop-filter:blur(12px); font-size:13px; white-space:nowrap; }
           .updated ha-icon { --mdc-icon-size:16px; width:16px; height:16px; opacity:.85; }
           .updated.stale { color:#ffb74d; border-color:rgba(255,183,77,.55); }
-          .gridmix { position:absolute; z-index:19; left:var(--gm-x,83%); top:var(--gm-y,32%); transform:translate(-50%,-50%) scale(calc(var(--hpf-gridmix-scale,1) * var(--hpf-boost,1))); width:270px; padding:12px 14px; border-radius:15px; background:rgba(8,29,52,.78); border:1px solid rgba(255,255,255,.15); box-shadow:0 8px 28px rgba(0,0,0,.25); backdrop-filter:blur(12px); font-size:12px; }
+          .gridmix { position:absolute; z-index:19; left:var(--gm-x,83%); top:var(--gm-y,32%); transform:translate(-50%,-50%) scale(calc(var(--hpf-gridmix-scale,1) * var(--hpf-boost,1))); width:270px; padding:12px 14px; border-radius:15px; background:var(--hpf-panel-bg,rgba(8,29,52,.78)); border:1px solid var(--hpf-border,rgba(255,255,255,.16)); box-shadow:0 8px 28px rgba(0,0,0,.25); backdrop-filter:blur(12px); font-size:12px; }
           .gridmix .gm-head { display:flex; align-items:center; gap:6px; font-weight:700; font-size:13px; opacity:.9; }
           .gridmix .gm-head ha-icon { --mdc-icon-size:16px; width:16px; height:16px; }
           .gridmix .gm-main { display:flex; align-items:baseline; gap:6px; margin:6px 0 8px; }
           .gridmix .gm-val { font-size:24px; font-weight:750; }
           .gridmix .gm-unit { opacity:.7; font-size:11px; }
           .gridmix .gm-badge { margin-left:auto; padding:2px 8px; border-radius:999px; font-size:11px; font-weight:700; color:#fff; }
-          .gridmix .gm-bar { display:flex; height:7px; border-radius:4px; overflow:hidden; margin-bottom:8px; background:rgba(255,255,255,.1); }
+          .gridmix .gm-bar { display:flex; height:7px; border-radius:4px; overflow:hidden; margin-bottom:8px; background:var(--hpf-track,rgba(255,255,255,.1)); }
           .gridmix .gm-list { display:grid; grid-template-columns:1fr 1fr; gap:3px 12px; }
           .gridmix .gm-row { display:flex; align-items:center; gap:5px; white-space:nowrap; }
           .gridmix .gm-row ha-icon { --mdc-icon-size:14px; width:14px; height:14px; flex:none; }
           .gridmix .gm-row b { margin-left:auto; font-weight:650; }
           .gridmix .gm-msg { opacity:.7; margin-top:6px; }
-          .weather { position:absolute; z-index:20; left:var(--weather-x,82%); top:var(--weather-y,10%); transform:translate(-50%,-50%) scale(calc(var(--hpf-weather-scale,1) * var(--hpf-boost,1))); min-width:250px; max-width:31%; padding:13px 17px; border-radius:17px; background:rgba(8,29,52,.78); border:1px solid rgba(255,255,255,.15); box-shadow:0 8px 28px rgba(0,0,0,.25); backdrop-filter:blur(12px); display:grid; grid-template-columns:1fr auto; gap:4px 14px; }
+          .weather { position:absolute; z-index:20; left:var(--weather-x,82%); top:var(--weather-y,10%); transform:translate(-50%,-50%) scale(calc(var(--hpf-weather-scale,1) * var(--hpf-boost,1))); min-width:250px; max-width:31%; padding:13px 17px; border-radius:17px; background:var(--hpf-panel-bg,rgba(8,29,52,.78)); border:1px solid var(--hpf-border,rgba(255,255,255,.16)); box-shadow:0 8px 28px rgba(0,0,0,.25); backdrop-filter:blur(12px); display:grid; grid-template-columns:1fr auto; gap:4px 14px; }
           .date { font-size:14px; opacity:.82; align-self:end; }.clock { font-size:26px; font-weight:700; }.wicon { grid-row:1/3; grid-column:2; font-size:35px; align-self:center; }.temp { font-size:23px; font-weight:600; }.wstate { font-size:13px; opacity:.85; }
-          .stats { position:absolute; z-index:18; left:var(--stats-x,17%); top:var(--stats-y,86%); transform:translate(-50%,-50%) scale(var(--hpf-stats-scale,0.8)); width:min(360px,30%); padding:18px 20px; border-radius:21px; background:linear-gradient(145deg,rgba(45,38,33,.74),rgba(18,25,31,.74)); border:1px solid rgba(255,255,255,.18); box-shadow:0 10px 30px rgba(0,0,0,.24); backdrop-filter:blur(12px); }
+          .stats { position:absolute; z-index:18; left:var(--stats-x,17%); top:var(--stats-y,86%); transform:translate(-50%,-50%) scale(var(--hpf-stats-scale,0.8)); width:min(360px,30%); padding:18px 20px; border-radius:21px; background:var(--hpf-stats-bg,linear-gradient(145deg,rgba(45,38,33,.74),rgba(18,25,31,.74))); border:1px solid var(--hpf-border,rgba(255,255,255,.16)); box-shadow:0 10px 30px rgba(0,0,0,.24); backdrop-filter:blur(12px); }
           .stats h3 { margin:0 0 14px; font-size:20px; }.stat { display:grid; grid-template-columns:28px 1fr auto; align-items:center; gap:7px; padding:8px 0; font-size:14px; }.stat .ico{font-size:19px}.stat .value{font-weight:700;font-size:15px}.co2{border-top:1px solid rgba(255,255,255,.18);margin-top:7px;padding-top:12px;color:#d6f5d0}
           .canvas { position:absolute; inset:0; z-index:5; }
           svg.flows { position:absolute; inset:0; width:100%; height:100%; overflow:visible; pointer-events:none; }
           .flow-path { fill:none; stroke-linecap:round; filter:url(#glow); opacity:.92; }
           .flow-dot { filter:url(#dotglow); }
-          .node { position:absolute; transform:translate(-50%,-50%) scale(calc(${nodeScale} * var(--hpf-boost,1))); width:195px; min-height:74px; padding:11px 13px; border-radius:15px; z-index:10; background:linear-gradient(145deg,rgba(9,25,40,.87),rgba(15,30,44,.73)); border:1px solid rgba(255,255,255,.17); box-shadow:0 8px 22px rgba(0,0,0,.32); backdrop-filter:blur(10px); }
+          .node { position:absolute; transform:translate(-50%,-50%) scale(calc(${nodeScale} * var(--hpf-boost,1))); width:195px; min-height:74px; padding:11px 13px; border-radius:15px; z-index:10; background:var(--hpf-node-bg,linear-gradient(145deg,rgba(9,25,40,.87),rgba(15,30,44,.73))); border:1px solid var(--hpf-border,rgba(255,255,255,.16)); box-shadow:0 8px 22px rgba(0,0,0,.32); backdrop-filter:blur(10px); }
           .node .top { display:flex; align-items:center; gap:8px; }.node .icon { font-size:24px; line-height:1; }.node .name { font-weight:700; font-size:14px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }.node .power { margin-top:5px; font-size:19px; font-weight:750; }.node .batt-time { margin-top:3px; display:flex; align-items:center; gap:4px; font-size:12px; font-weight:600; opacity:.9; }.node .batt-time:empty { display:none; }.node .batt-time ha-icon { --mdc-icon-size:13px; width:13px; height:13px; }.node .extras { margin-top:4px; display:flex; flex-wrap:wrap; gap:2px 8px; }.node .extras:empty { display:none; margin:0; }.node .extra-row { display:inline-flex; align-items:center; gap:3px; font-size:10px; line-height:1.3; opacity:.78; white-space:nowrap; max-width:100%; overflow:hidden; text-overflow:ellipsis; }.node .extra-row ha-icon { --mdc-icon-size:12px; width:12px; height:12px; flex:none; }.node.battery { border-color:rgba(123,255,158,.28); }.node.grid { border-color:rgba(93,191,255,.3); }.node.ev { border-color:rgba(151,255,103,.28); }
           @keyframes hpf-charge-pulse { 0%,100% { box-shadow:0 8px 22px rgba(0,0,0,.32), 0 0 0 0 var(--pulse-color); } 50% { box-shadow:0 8px 22px rgba(0,0,0,.32), 0 0 30px 8px var(--pulse-color); } }
           @media (prefers-reduced-motion: reduce) { .node[data-batt-state="charging"], .node[data-batt-state="discharging"] { animation:none !important; } }
-          .empty { position:absolute; inset:0; display:flex; align-items:center; justify-content:center; z-index:30; }.empty > div { padding:24px 30px; background:rgba(10,25,38,.82); border-radius:18px; border:1px solid rgba(255,255,255,.18); text-align:center; backdrop-filter:blur(10px); }.empty b{display:block;font-size:20px;margin-bottom:6px}.empty span{opacity:.75}
+          .empty { position:absolute; inset:0; display:flex; align-items:center; justify-content:center; z-index:30; }.empty > div { padding:24px 30px; background:rgba(10,25,38,.82); border-radius:18px; border:1px solid var(--hpf-border,rgba(255,255,255,.16)); text-align:center; backdrop-filter:blur(10px); }.empty b{display:block;font-size:20px;margin-bottom:6px}.empty span{opacity:.75}
         </style>
         <div class="card" style="--hpf-max-width:${this._maxWidthCss()}">
           <div class="bg"></div><div class="vignette"></div>
@@ -491,7 +538,9 @@
 
       this._rendered = true;
       this._applyBackground(bg);
+      this._applyTheme();
       this._applyScale();
+      this._updatedTimer();
       this._gridMixRefresh();
       // Clicking a device opens the corresponding Home Assistant entity dialog.
       this.shadowRoot.querySelectorAll('.node[data-entity-id]').forEach(node => {
@@ -568,20 +617,48 @@
     // time" sensor) that time is used; otherwise Home Assistant's
     // last_updated for the entity. Turns amber once older than the
     // configured number of minutes.
+    // Reads the time from the entity's own state when it holds one, in any
+    // common format: full date-time (ISO or 'YYYY-MM-DD HH:MM:SS'), time
+    // only ('HH:MM' / 'HH:MM:SS', today, or yesterday if still ahead), or a
+    // Unix timestamp in seconds or milliseconds. Otherwise falls back to
+    // Home Assistant's last_updated for the entity.
+    _updatedTimestamp(st) {
+      const raw = String(st?.state ?? '').trim();
+      let ts = NaN;
+      if (/^\d{4}-\d{2}-\d{2}[T ]\d{1,2}:\d{2}/.test(raw)) ts = Date.parse(raw.replace(' ', 'T'));
+      else if (/^\d{1,2}:\d{2}(:\d{2})?$/.test(raw)) {
+        const [h, m, sec] = raw.split(':').map(Number);
+        const d = new Date(); d.setHours(h, m, sec || 0, 0);
+        if (h < 24 && m < 60 && (sec || 0) < 60) { ts = d.getTime(); if (ts - Date.now() > 60000) ts -= 86400000; }
+      } else if (/^\d{9,13}(\.\d+)?$/.test(raw)) {
+        const n = Number(raw); const ms = n > 1e12 ? n : n * 1000;
+        if (ms > 946684800000 && ms < Date.now() + 86400000) ts = ms;
+      }
+      if (!Number.isFinite(ts)) ts = Date.parse(st?.last_updated || st?.last_changed || '');
+      return ts;
+    }
     _updatedInfo() {
       const c = this._config || {};
       const st = state(this._hass, c.updated_entity);
       if (!st) return { text: 'No data', stale: true };
-      let ts = NaN;
-      const raw = String(st.state || '');
-      if (/^\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}/.test(raw)) ts = Date.parse(raw.replace(' ', 'T'));
-      if (!Number.isFinite(ts)) ts = Date.parse(st.last_updated || st.last_changed || '');
+      const ts = this._updatedTimestamp(st);
       if (!Number.isFinite(ts)) return { text: 'Unknown', stale: true };
-      const sec = Math.max(0, (Date.now() - ts) / 1000);
-      const ago = sec < 60 ? 'just now' : sec < 3600 ? `${Math.floor(sec / 60)}m ago` : sec < 86400 ? `${Math.floor(sec / 3600)}h ${Math.floor((sec % 3600) / 60)}m ago` : `${Math.floor(sec / 86400)}d ago`;
+      const sec = Math.max(0, Math.floor((Date.now() - ts) / 1000));
+      const p2 = n => String(n).padStart(2, '0');
+      const ago = sec < 2 ? 'just now'
+        : sec < 60 ? `${sec}s ago`
+        : sec < 3600 ? `${Math.floor(sec / 60)}m ${p2(sec % 60)}s ago`
+        : sec < 86400 ? `${Math.floor(sec / 3600)}h ${p2(Math.floor((sec % 3600) / 60))}m ago`
+        : `${Math.floor(sec / 86400)}d ${Math.floor((sec % 86400) / 3600)}h ago`;
       const lim = Number(c.updated_stale_minutes);
       const staleMin = Number.isFinite(lim) && lim > 0 ? lim : 10;
       return { text: ago, stale: sec > staleMin * 60 };
+    }
+    // Ticks the "ago" counter every second while the box is shown.
+    _updatedTimer() {
+      if (this._config?.updated_enabled === true) {
+        if (!this._upTimer) this._upTimer = setInterval(() => this._updatedRefresh(), 1000);
+      } else if (this._upTimer) { clearInterval(this._upTimer); this._upTimer = null; }
     }
     _updatedInner() {
       const label = this._config?.updated_label === undefined ? 'Updated' : String(this._config.updated_label || '');
@@ -644,6 +721,7 @@
 
     _updateLiveValues() {
       if (!this._hass || !this._config || !this._rendered) return;
+      this._applyTheme();
       this._gridMixRefresh();
       this._updateStatsValues();
       this._updatedRefresh();
@@ -1375,6 +1453,7 @@
       <div class="row"><div class="field"><label>Title</label><input data-key="title" placeholder="Leave empty for no title" value="${esc(c.title===undefined||c.title===null?'Energy Flow':c.title)}"></div><div class="field"><label>Subtitle</label><input data-key="subtitle" placeholder="Optional" value="${esc(c.subtitle||'')}"></div><div class="field"><label>Title colour</label><div class="ha-color-box"><input class="ha-color-picker" type="color" data-key="title_color" value="${esc(/^#[0-9a-f]{6}$/i.test(String(c.title_color||''))?c.title_color:'#ffffff')}"><span class="color-preview" style="background:${esc(c.title_color||'#ffffff')}"></span></div></div><div class="field"><label>Time format</label><select data-key="time_format"><option value="24h" ${(c.time_format||'24h')==='24h'?'selected':''}>24 hour</option><option value="12h" ${c.time_format==='12h'?'selected':''}>12 hour</option></select></div><div class="field full"><label>Weather entity</label><ha-entity-picker data-editor-key="weather_entity" allow-custom-entity></ha-entity-picker></div><div class="field full">${this._bgUploadField('day','Day background')}</div><div class="field full">${this._bgUploadField('night','Night background')}</div><div class="field full"><label>Sun entity (switches day/night background)</label><ha-entity-picker data-editor-key="sun_entity" allow-custom-entity></ha-entity-picker></div><div class="field"><label>Flow threshold (W)</label><input type="number" min="0" step="0.1" data-key="flow_threshold_watts" value="${esc((Number(c.flow_threshold ?? 0.0005)*1000).toFixed(1))}"></div><div class="field"><label>Flow animation speed (seconds)</label><input type="number" min="3" max="30" step="0.5" data-key="flow_speed" value="${esc(c.flow_speed??8)}"></div><div class="field"><label>Particle stagger (seconds)</label><input type="number" min="0.15" max="1.5" step="0.05" data-key="flow_stagger" value="${esc(c.flow_stagger??0.55)}"></div></div>
       <h3>Last updated box</h3><div class="hint">Optional small box showing how long ago an entity was updated, e.g. your inverter's data. Uses the entity's own timestamp if it has one. Turns amber when the data is older than the warning time.</div><div class="row"><div class="field"><label style="display:flex;align-items:center;gap:6px;cursor:pointer;margin-top:6px"><input type="checkbox" data-key="updated_enabled" style="width:auto" ${c.updated_enabled===true?'checked':''}> Show last updated box</label></div><div class="field"><label>Label</label><input data-key="updated_label" placeholder="Leave empty for none" value="${esc(c.updated_label===undefined?'Updated':c.updated_label)}"></div><div class="field"><label>Warn after (minutes)</label><input type="number" min="1" step="1" data-key="updated_stale_minutes" value="${esc(c.updated_stale_minutes??10)}"></div><div class="field full"><label>Entity</label><ha-entity-picker data-editor-key="updated_entity" allow-custom-entity></ha-entity-picker></div></div>
       <h3>UK grid mix</h3><div class="hint">Optional box showing how green the GB electricity grid is right now (carbon intensity and generation mix), from the National Grid ESO Carbon Intensity API. Updates every 30 minutes.</div><div class="row"><div class="field"><label style="display:flex;align-items:center;gap:6px;cursor:pointer;margin-top:6px"><input type="checkbox" data-key="grid_mix_enabled" style="width:auto" ${c.grid_mix_enabled===true?'checked':''}> Show grid mix box</label></div><div class="field"><label>Postcode (optional)</label><input data-key="grid_mix_postcode" placeholder="e.g. SW1A, blank = all of GB" value="${esc(c.grid_mix_postcode||'')}"></div></div>
+      <h3>Appearance</h3><div class="hint">Colour theme for the boxes and panels. Your background, flow colours and title colour are set separately.</div><div class="row"><div class="field"><label>Theme</label><select data-key="theme"><option value="auto" ${(c.theme||'dark')==='auto'?'selected':''}>Auto (follow Home Assistant)</option><option value="dark" ${(c.theme||'dark')==='dark'?'selected':''}>Dark</option><option value="light" ${(c.theme||'dark')==='light'?'selected':''}>Light</option><option value="midnight" ${(c.theme||'dark')==='midnight'?'selected':''}>Midnight</option><option value="ocean" ${(c.theme||'dark')==='ocean'?'selected':''}>Ocean</option><option value="forest" ${(c.theme||'dark')==='forest'?'selected':''}>Forest</option><option value="sunset" ${(c.theme||'dark')==='sunset'?'selected':''}>Sunset</option><option value="graphite" ${(c.theme||'dark')==='graphite'?'selected':''}>Graphite</option><option value="custom" ${(c.theme||'dark')==='custom'?'selected':''}>Custom colours</option></select></div>${c.theme==='custom'?`<div class="field"><label>Panel colour</label><div class="ha-color-box"><input class="ha-color-picker" type="color" data-key="theme_panel_color" value="${esc(/^#[0-9a-f]{6}$/i.test(String(c.theme_panel_color||''))?c.theme_panel_color:'#081d34')}"><span class="color-preview" style="background:${esc(c.theme_panel_color||'#081d34')}"></span></div></div><div class="field"><label>Text colour</label><div class="ha-color-box"><input class="ha-color-picker" type="color" data-key="theme_text_color" value="${esc(/^#[0-9a-f]{6}$/i.test(String(c.theme_text_color||''))?c.theme_text_color:'#ffffff')}"><span class="color-preview" style="background:${esc(c.theme_text_color||'#ffffff')}"></span></div></div><div class="field"><label>Panel opacity</label><input type="number" min="0.2" max="1" step="0.05" data-key="theme_opacity" value="${esc(c.theme_opacity??0.8)}"></div>`:''}</div>
       <h3>Sizing</h3><div class="hint">1 = default size. Small screen scale enlarges boxes on phones (eases in below 900px wide). Max width 0 = fill the available width; the card never grows taller than the screen. The Today panel also shrinks automatically if it would be taller than the card.</div><div class="row compact"><div class="field"><label>Title</label><input type="number" min="0.3" max="3" step="0.05" data-key="title_scale" value="${esc(c.title_scale??1)}"></div><div class="field"><label>Device boxes</label><input type="number" min="0.5" max="2" step="0.05" data-key="device_scale" value="${esc(c.device_scale??1)}"></div><div class="field"><label>Weather box</label><input type="number" min="0.3" max="2" step="0.05" data-key="weather_scale" value="${esc(c.weather_scale??1)}"></div><div class="field"><label>Today panel</label><input type="number" min="0.3" max="1.5" step="0.05" data-key="stats_scale" value="${esc(c.stats_scale??0.8)}"></div><div class="field"><label>Small screen</label><input type="number" min="1" max="2.5" step="0.05" data-key="mobile_scale" value="${esc(c.mobile_scale??1.4)}"></div><div class="field"><label>Max width (px)</label><input type="number" min="0" step="10" data-key="max_width" value="${esc(c.max_width??0)}"></div><div class="field"><label>Grid mix</label><input type="number" min="0.3" max="2" step="0.05" data-key="grid_mix_scale" value="${esc(c.grid_mix_scale??1)}"></div><div class="field"><label>Updated box</label><input type="number" min="0.3" max="3" step="0.05" data-key="updated_scale" value="${esc(c.updated_scale??1)}"></div></div>
       <h3>Visual layout</h3><div class="hint">Drag the device boxes on the template to place them exactly where you want. Positions are saved automatically. New devices without a saved position use the automatic layout.</div><div class="layout-editor" id="layout-editor"><div class="layout-bg"></div>${(c.devices||[]).map((d,i)=>this._layoutNode(d,i)).join('')}${this._layoutSpecial('header','Title','🔤',c.header_position,2.6,2.7)}${this._layoutSpecial('weather','Weather','🌤️',c.weather_position,82,10)}${c.grid_mix_enabled===true?this._layoutSpecial('gridmix','Grid mix','🌍',c.grid_mix_position,83,32):''}${c.updated_enabled===true?this._layoutSpecial('updated','Updated','🕒',c.updated_position,50,95):''}${this._layoutSpecial('stats','Daily Stats','📊',c.stats_position,17,86)}<button class="btn secondary-btn" id="reset-layout" style="position:absolute;right:10px;bottom:10px;z-index:5">Reset positions</button></div><button class="btn secondary-btn" id="reset-layout">↺ Reset positions to automatic</button>
       <h3>Devices</h3><div id="device-list">${(c.devices||[]).map((d,i)=>this._device(d,i)).join('')}</div><button class="btn" id="add">＋ Add device</button>
@@ -1437,7 +1516,7 @@
         this._emit(false);
         this._render();
       }));
-      this.shadowRoot.querySelectorAll('[data-key]').forEach(el=>el.addEventListener('change',e=>{ const k=e.target.dataset.key; if(k==='flow_threshold_watts'){ const watts=Math.max(0,parseFloat(e.target.value)||0); this._config.flow_threshold=watts/1000; this._config.flow_threshold_watts=watts; } else { this._config[k]=e.target.value; if(['flow_threshold','flow_speed','flow_stagger','device_scale','mobile_scale','max_width','stats_scale','weather_scale','title_scale','grid_mix_scale','updated_scale','updated_stale_minutes'].includes(k))this._config[k]=parseFloat(e.target.value)||0; if(e.target.type==='checkbox'){this._config[k]=e.target.checked;} } if(['self_sufficiency_live','self_sufficiency_today','self_consumption_live','self_consumption_today'].includes(k)){const sub=this.shadowRoot.querySelector('[data-toggle-section="selfsuff"] .section-sub'); if(sub){const n=['self_sufficiency_live','self_sufficiency_today','self_consumption_live','self_consumption_today'].filter(x=>this._config[x]===true).length; sub.textContent=n?`${n} of 4 on`:'off';}} if(k==='grid_mix_enabled'||k==='updated_enabled'){this._emit(false);this._render();return;} if(e.target.type==='color'){const pv=e.target.parentElement?.querySelector('.color-preview'); if(pv) pv.style.background=e.target.value;} this._emit(false); }));
+      this.shadowRoot.querySelectorAll('[data-key]').forEach(el=>el.addEventListener('change',e=>{ const k=e.target.dataset.key; if(k==='flow_threshold_watts'){ const watts=Math.max(0,parseFloat(e.target.value)||0); this._config.flow_threshold=watts/1000; this._config.flow_threshold_watts=watts; } else { this._config[k]=e.target.value; if(['flow_threshold','flow_speed','flow_stagger','device_scale','mobile_scale','max_width','stats_scale','weather_scale','title_scale','grid_mix_scale','updated_scale','updated_stale_minutes','theme_opacity'].includes(k))this._config[k]=parseFloat(e.target.value)||0; if(e.target.type==='checkbox'){this._config[k]=e.target.checked;} } if(['self_sufficiency_live','self_sufficiency_today','self_consumption_live','self_consumption_today'].includes(k)){const sub=this.shadowRoot.querySelector('[data-toggle-section="selfsuff"] .section-sub'); if(sub){const n=['self_sufficiency_live','self_sufficiency_today','self_consumption_live','self_consumption_today'].filter(x=>this._config[x]===true).length; sub.textContent=n?`${n} of 4 on`:'off';}} if(k==='grid_mix_enabled'||k==='updated_enabled'||k==='theme'){this._emit(false);this._render();return;} if(e.target.type==='color'){const pv=e.target.parentElement?.querySelector('.color-preview'); if(pv) pv.style.background=e.target.value;} this._emit(false); }));
       this.shadowRoot.querySelector('#add')?.addEventListener('click',()=>{
         const id=genDeviceId();
         this._config.devices.push({id,type:'solar',name:`Device ${this._config.devices.length+1}`,power_entity:''});
