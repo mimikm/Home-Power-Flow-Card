@@ -10,7 +10,7 @@
  * Issues & feature requests: https://github.com/mimikm/Home-Power-Flow-Card/issues
  */
 (() => {
-  const VERSION = '0.7.6.9';
+  const VERSION = '0.7.7.0';
   const DEFAULT_BG = '/hacsfiles/Home-Power-Flow-Card/smart-home-energy-background.png';
   const DEFAULT_BG_NIGHT = '/hacsfiles/Home-Power-Flow-Card/smart-home-energy-background2.png';
   const TYPES = [
@@ -1150,11 +1150,32 @@
       const G = 8, W = Math.ceil(1000 / G) + 1, H = Math.ceil(667 / G) + 1, N = W * H;
       const key = `${a}|${b}|${Math.round(x1)}|${Math.round(y1)}|${Math.round(x2)}|${Math.round(y2)}`;
       this._routeCache ||= new Map();
-      if (this._routeCache.has(key)) return this._routeCache.get(key);
+      const lanes = this._lanes;
+      // Marks a finished route's lanes: 2 = the lane itself, 1 = beside it.
+      const markLanes = pts => {
+        if (!lanes) return;
+        for (let i = 1; i < pts.length; i++) {
+          const [ax, ay] = pts[i - 1].map(v => Math.round(v / G)), [bx, by] = pts[i].map(v => Math.round(v / G));
+          const horiz = ay === by, arr = horiz ? lanes.h : lanes.v;
+          const n = Math.max(Math.abs(bx - ax), Math.abs(by - ay));
+          for (let k = 0; k <= n; k++) {
+            const x = ax + Math.sign(bx - ax) * k, y = ay + Math.sign(by - ay) * k;
+            const put = (px, py, v) => { if (px >= 0 && py >= 0 && px < W && py < H) { const c = py * W + px; if (arr[c] < v) arr[c] = v; } };
+            put(x, y, 2);
+            if (horiz) { put(x, y - 1, 1); put(x, y + 1, 1); } else { put(x - 1, y, 1); put(x + 1, y, 1); }
+          }
+        }
+      };
+      if (this._routeCache.has(key)) { const hit = this._routeCache.get(key); if (hit) markLanes(hit.pts); return hit ? hit.path : null; }
       const cl = (v, m) => Math.max(0, Math.min(m - 1, v));
-      const cost = new Float32Array(N), PAD = 6, BOX = 40, BEND = 12;
+      const cost = new Float32Array(N), PAD = 6, BOX = 40, BEND = 12, LANE = 10, NEAR = 4;
+      const own = new Uint8Array(N);
       for (const o of this._obstacles) {
-        if (o.dev === a || o.dev === b) continue;
+        if (o.dev === a || o.dev === b) {
+          const ox1 = cl(Math.floor(o.x1 / G), W), ox2 = cl(Math.ceil(o.x2 / G), W), oy1 = cl(Math.floor(o.y1 / G), H), oy2 = cl(Math.ceil(o.y2 / G), H);
+          for (let y = oy1; y <= oy2; y++) for (let x = ox1; x <= ox2; x++) own[y * W + x] = 1;
+          continue;
+        }
         const cx1 = cl(Math.floor((o.x1 - PAD) / G), W), cx2 = cl(Math.ceil((o.x2 + PAD) / G), W);
         const cy1 = cl(Math.floor((o.y1 - PAD) / G), H), cy2 = cl(Math.ceil((o.y2 + PAD) / G), H);
         for (let y = cy1; y <= cy2; y++) for (let x = cx1; x <= cx2; x++) cost[y * W + x] = BOX;
@@ -1181,7 +1202,9 @@
           const nx = x + DX[nd], ny = y + DY[nd];
           if (nx < 0 || ny < 0 || nx >= W || ny >= H) continue;
           const nc = ny * W + nx, ns = nc * 4 + nd;
-          const ng = gc + 1 + cost[nc] + (nd !== d ? BEND : 0);
+          let lanePen = 0;
+          if (lanes && !own[nc]) { const u = (nd === 0 || nd === 2) ? lanes.h[nc] : lanes.v[nc]; lanePen = u === 2 ? LANE : u === 1 ? NEAR : 0; }
+          const ng = gc + 1 + cost[nc] + lanePen + (nd !== d ? BEND : 0);
           if (ng < g[ns]) { g[ns] = ng; prev[ns] = st; push(ng + hcost(nx, ny), ns); }
         }
       }
@@ -1197,7 +1220,8 @@
       }
       corners.push(pts[pts.length - 1]);
       const path = 'M ' + corners.map(p => `${p[0]} ${p[1]}`).join(' L ');
-      this._routeCache.set(key, path);
+      this._routeCache.set(key, { path, pts: corners });
+      markLanes(corners);
       return path;
     }
     // Re-measures boxes and redraws the flow lines (orthogonal style only).
@@ -1215,6 +1239,11 @@
 
     _flows(devices, pos) {
       if (!devices.length) return '';
+      // Lane memory for orthogonal routing: lines routed earlier in this
+      // build make their lanes (and the lanes beside them) more expensive,
+      // so later lines running the same way pick a parallel lane.
+      const LW = Math.ceil(1000 / 8) + 1, LH = Math.ceil(667 / 8) + 1;
+      this._lanes = { h: new Uint8Array(LW * LH), v: new Uint8Array(LW * LH) };
       const edges = this._flowEdges(devices);
       const seen=new Set();
       const speed=Math.max(3,Math.min(30,num(this._config.flow_speed)||8));
