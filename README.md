@@ -116,6 +116,9 @@ Or manually in HACS:
 - A live preview that always shows the whole card
 - Click any device on the card to open its Home Assistant details
 
+### 🌐 Languages
+The card and its editor are available in **English**, **Polish** and **Spanish**, and automatically follow the language set in your Home Assistant profile. Your own names and titles are never changed. Other languages fall back to English.
+
 ### 💾 Backup & Restore
 Export your whole card configuration as a JSON file with one click, and import it again later. Handy before big changes, or to share a working setup.
 
@@ -336,7 +339,7 @@ Ideas and feedback are welcome, so [open an issue](https://github.com/mimikm/Hom
 - Configurable tap actions per device (more-info, navigate, toggle)
 
 **Project**
-- Translations of the editor
+- More languages (contributions welcome!)
 
 ---
 
