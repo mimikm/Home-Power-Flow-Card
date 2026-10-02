@@ -79,6 +79,7 @@ Or manually in HACS:
 
 ### 🎨 Per-device customisation
 - Own name, power entity and **flow colour** for every device
+- Power shown in **W or kW**: automatically switches to kW from 1000 W (e.g. `3.20 kW`), or set it to always W / always kW
 - **Invert flow** per device, for sensors that report power the other way round
 - Up to **5 extra entities** per device (SoC, voltage, temperature...) with their own icons, shown in small text under the power value
 - **Battery glow**: batteries pulse green when charging and amber when discharging (can be turned off per battery)
@@ -249,6 +250,7 @@ Each device gets a stable internal `id` automatically. `connects_to` refers to t
 | `theme_panel_color` | `#081d34` | Custom theme: panel colour |
 | `theme_text_color` | `#ffffff` | Custom theme: text colour |
 | `theme_opacity` | `0.8` | Custom theme: panel opacity (`0.2` to `1`) |
+| `power_unit` | `auto` | `auto` (kW from 1000 W), `w` (always W) or `kw` (always kW) |
 | `flow_style` | `curved` | `curved`, or `orthogonal` for right-angle lines that avoid boxes |
 | `time_format` | `24h` | `24h` or `12h` for the clock |
 | `weather_entity` | — | Weather entity for the weather box |
@@ -327,7 +329,6 @@ Ideas and feedback are welcome, so [open an issue](https://github.com/mimikm/Hom
 - Respect the system "reduce motion" setting for flow dots
 
 **Features**
-- Automatic kW formatting for large values (e.g. `3.2 kW` instead of `3200 W`)
 - Configurable tap actions per device (more-info, navigate, toggle)
 
 **Project**
