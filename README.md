@@ -79,6 +79,7 @@ Or manually in HACS:
 
 ### 🎨 Per-device customisation
 - Own name, power entity and **flow colour** for every device
+- **History graph** (optional, per device): a faint graph of the device's power history behind its box, in the device's flow colour, with a zero line for signed values like batteries and the grid
 - Power shown in **W or kW**: automatically switches to kW from 1000 W (e.g. `3.20 kW`), or set it to always W / always kW
 - **Invert flow** per device, for sensors that report power the other way round
 - Up to **5 extra entities** per device (SoC, voltage, temperature...) with their own icons, shown in small text under the power value
@@ -250,6 +251,8 @@ Each device gets a stable internal `id` automatically. `connects_to` refers to t
 | `theme_panel_color` | `#081d34` | Custom theme: panel colour |
 | `theme_text_color` | `#ffffff` | Custom theme: text colour |
 | `theme_opacity` | `0.8` | Custom theme: panel opacity (`0.2` to `1`) |
+| `history_hours` | `24` | History graph range: `6`, `12`, `24` or `48` hours |
+| `history_opacity` | `0.35` | History graph opacity (`0.05` to `1`) |
 | `power_unit` | `auto` | `auto` (kW from 1000 W), `w` (always W) or `kw` (always kW) |
 | `flow_style` | `curved` | `curved`, or `orthogonal` for right-angle lines that avoid boxes |
 | `time_format` | `24h` | `24h` or `12h` for the clock |
@@ -315,6 +318,7 @@ Each device gets a stable internal `id` automatically. `connects_to` refers to t
 | `gas_cv` | Gas only: calorific value in MJ/m³ for m³ ↔ kWh conversion (default `39.5`) |
 | `extra_entities` | Up to 5 extra readings, each with `entity` and `icon` |
 | `phone_hidden` | `true` to hide this device (and its flow lines) in the phone layout |
+| `history_graph` | `true` to show a power history graph behind the box |
 
 Positions and sizes are easiest to set by dragging in the editor's **Visual layout**.
 
