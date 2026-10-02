@@ -10,7 +10,7 @@
  * Issues & feature requests: https://github.com/mimikm/Home-Power-Flow-Card/issues
  */
 (() => {
-  const VERSION = '0.7.7.4.2';
+  const VERSION = '0.7.8';
   const DEFAULT_BG = '/hacsfiles/Home-Power-Flow-Card/smart-home-energy-background.png';
   const DEFAULT_BG_NIGHT = '/hacsfiles/Home-Power-Flow-Card/smart-home-energy-background2.png';
   const TYPES = [
@@ -287,6 +287,32 @@
   }
   const validPos = p => p && Number.isFinite(Number(p.x)) && Number.isFinite(Number(p.y)) ? { x: Number(p.x), y: Number(p.y) } : null;
 
+  // ---- Translations ------------------------------------------------------
+  // Card and editor follow the Home Assistant user's language (Polish and
+  // Spanish so far); anything without a translation stays in English.
+  // Keys are the English phrases; {x} placeholders are filled in by tr().
+  const I18N = { pl: {"Today": "Dzisiaj", "Energy Flow": "Przepływ energii", "Self-sufficiency now": "Samowystarczalność teraz", "Self-sufficiency today": "Samowystarczalność dziś", "Self-consumption now": "Autokonsumpcja teraz", "Self-consumption today": "Autokonsumpcja dziś", "Updated": "Aktualizacja", "just now": "przed chwilą", "{n}s ago": "{n} s temu", "{m}m {s}s ago": "{m} min {s} s temu", "{h}h {m}m ago": "{h} godz. {m} min temu", "{d}d {h}h ago": "{d} dn. {h} godz. temu", "No data": "Brak danych", "Unknown": "Nieznane", "to full": "do pełna", "to empty": "do 0%", "to {p}%": "do {p}%", "at reserve": "na rezerwie", "at {p}%": "osiągnięto {p}%", "Grid": "Sieć", "Great Britain": "Wielka Brytania", "Loading grid data…": "Ładowanie danych sieci…", "Grid data unavailable": "Dane sieci niedostępne", "Showing last data (update failed)": "Ostatnie dane (aktualizacja nieudana)", "Wind": "Wiatr", "Solar": "Słońce", "Nuclear": "Jądrowa", "Hydro": "Wodna", "Biomass": "Biomasa", "Gas": "Gaz", "Coal": "Węgiel", "Imports": "Import", "Other": "Inne", "Very low": "Bardzo niska", "Low": "Niska", "Moderate": "Umiarkowana", "High": "Wysoka", "Very high": "Bardzo wysoka", "Add your first device": "Dodaj pierwsze urządzenie", "Open the card editor and add Solar, Inverter, Battery, Grid or House.": "Otwórz edytor karty i dodaj fotowoltaikę, falownik, baterię, sieć lub dom.", "☀️ Solar PV": "☀️ Fotowoltaika", "⚡ Inverter": "⚡ Falownik", "🔋 Battery": "🔋 Bateria", "🧠 Gateway": "🧠 Bramka", "🏠 House": "🏠 Dom", "⚡ Grid": "⚡ Sieć", "⛽ Generator": "⛽ Agregat", "💧 Water": "💧 Woda", "🔥 Gas": "🔥 Gaz", "🚗 EV Charger": "🚗 Ładowarka EV", "⚙️ Extra Load": "⚙️ Dodatkowe obciążenie", "Home Power Flow": "Home Power Flow", "Bidirectional power flow from live positive/negative values, dotted connections, single moving power dot, invertible device direction, dynamic flow colors and draggable layout. Entity IDs are shown in full below each picker.": "Dwukierunkowy przepływ energii na podstawie bieżących wartości dodatnich/ujemnych, kropkowane połączenia, poruszająca się kropka, odwracalny kierunek urządzeń, dynamiczne kolory przepływu i układ z przeciąganiem. Pełne identyfikatory encji są widoczne pod każdym polem wyboru.", "Backup": "Kopia zapasowa", "Download the whole card configuration as a file, or restore one saved earlier. Importing replaces every setting below (devices, connections, layout, statistics) - it does not save to your dashboard until you click Save.": "Pobierz całą konfigurację karty jako plik albo przywróć wcześniej zapisaną. Import zastępuje wszystkie ustawienia poniżej (urządzenia, połączenia, układ, statystyki) - zmiany trafią na pulpit dopiero po kliknięciu Zapisz.", "⬇ Export config": "⬇ Eksportuj konfigurację", "⬆ Import config": "⬆ Importuj konfigurację", "Downloaded.": "Pobrano.", "Export failed - see the browser console for details.": "Eksport nieudany - szczegóły w konsoli przeglądarki.", "Import failed - that file is not a valid Home Power Flow Card config.": "Import nieudany - ten plik nie jest prawidłową konfiguracją Home Power Flow Card.", "Imported. Click Save below to keep it on this dashboard.": "Zaimportowano. Kliknij Zapisz poniżej, aby zachować na tym pulpicie.", "Title": "Tytuł", "Subtitle": "Podtytuł", "Title colour": "Kolor tytułu", "Time format": "Format czasu", "24 hour": "24-godzinny", "12 hour": "12-godzinny", "Weather entity": "Encja pogody", "Day background": "Tło dzienne", "Night background": "Tło nocne", "📤 Upload image": "📤 Prześlij obraz", "👁 Preview this background": "👁 Podgląd tła", "Restore default": "Przywróć domyślne", "Using the default background": "Używane jest domyślne tło", "Uploading…": "Przesyłanie…", "Upload failed - check that you are an admin user and try again.": "Przesyłanie nieudane - sprawdź, czy masz uprawnienia administratora i spróbuj ponownie.", "Sun entity (switches day/night background)": "Encja słońca (przełącza tło dzień/noc)", "Flow threshold (W)": "Próg przepływu (W)", "Flow animation speed (seconds)": "Szybkość animacji przepływu (sekundy)", "Particle stagger (seconds)": "Odstęp cząsteczek (sekundy)", "Not selected": "Nie wybrano", "Last updated box": "Ramka ostatniej aktualizacji", "Optional small box showing how long ago an entity was updated, e.g. your inverter's data. Uses the entity's own timestamp if it has one. Turns amber when the data is older than the warning time.": "Opcjonalna mała ramka pokazująca, jak dawno zaktualizowano encję, np. dane falownika. Używa własnego znacznika czasu encji, jeśli go ma. Zmienia kolor na pomarańczowy, gdy dane są starsze niż czas ostrzeżenia.", "Show last updated box": "Pokaż ramkę ostatniej aktualizacji", "Label": "Etykieta", "Warn after (minutes)": "Ostrzeż po (minutach)", "Entity": "Encja", "UK grid mix": "Miks energetyczny UK", "Optional box showing how green the GB electricity grid is right now (carbon intensity and generation mix), from the National Grid ESO Carbon Intensity API. Updates every 30 minutes.": "Opcjonalna ramka pokazująca, jak „zielona” jest teraz brytyjska sieć (emisyjność i miks wytwarzania), z API Carbon Intensity operatora National Grid ESO. Aktualizacja co 30 minut.", "Show grid mix box": "Pokaż ramkę miksu energetycznego", "Postcode (optional)": "Kod pocztowy (opcjonalnie)", "Appearance": "Wygląd", "Colour theme for the boxes and panels. Your background, flow colours and title colour are set separately.": "Motyw kolorystyczny ramek i paneli. Tło, kolory przepływu i kolor tytułu ustawia się osobno.", "Theme": "Motyw", "Auto (follow Home Assistant)": "Auto (jak w Home Assistant)", "Dark": "Ciemny", "Light": "Jasny", "Midnight": "Północ", "Ocean": "Ocean", "Forest": "Las", "Sunset": "Zachód słońca", "Graphite": "Grafit", "Custom colours": "Własne kolory", "Panel colour": "Kolor paneli", "Text colour": "Kolor tekstu", "Panel opacity": "Krycie paneli", "Flow line style": "Styl linii przepływu", "Curved": "Zaokrąglone", "Right angles (avoid boxes)": "Kąty proste (omijają ramki)", "Power units": "Jednostki mocy", "Auto (W, kW from 1000 W)": "Auto (W, kW od 1000 W)", "Always W": "Zawsze W", "Always kW": "Zawsze kW", "History hours": "Zakres historii", "History opacity": "Krycie historii", "6 h": "6 godz.", "12 h": "12 godz.", "24 h": "24 godz.", "48 h": "48 godz.", "Sizing": "Rozmiary", "1 = default size. Small screen scale enlarges boxes on phones (eases in below 900px wide). Max width 0 = fill the available width; the card never grows taller than the screen. The Today panel also shrinks automatically if it would be taller than the card.": "1 = rozmiar domyślny. Skala małego ekranu powiększa ramki na telefonach (stopniowo poniżej 900 px szerokości). Maks. szerokość 0 = cała dostępna szerokość; karta nigdy nie jest wyższa niż ekran. Panel Dzisiaj zmniejsza się automatycznie, jeśli byłby wyższy niż karta.", "Device boxes": "Ramki urządzeń", "Weather box": "Ramka pogody", "Today panel": "Panel Dzisiaj", "Small screen": "Mały ekran", "Max width (px)": "Maks. szerokość (px)", "Grid mix": "Miks energetyczny", "Updated box": "Ramka aktualizacji", "Visual layout": "Układ wizualny", "🖥️ Desktop": "🖥️ Komputer", "📱 Phone": "📱 Telefon", "Drag the device boxes on the template to place them exactly where you want. Positions are saved automatically. New devices without a saved position use the automatic layout.": "Przeciągaj ramki urządzeń na szablonie, aby ustawić je dokładnie tam, gdzie chcesz. Pozycje zapisują się automatycznie. Nowe urządzenia bez zapisanej pozycji używają układu automatycznego.", "Phone layout: used when the card is narrower than the breakpoint. Drag boxes to arrange it; boxes you have not moved use an automatic arrangement. Your desktop layout is not affected.": "Układ telefonu: używany, gdy karta jest węższa niż próg. Przeciągaj ramki, aby go ułożyć; nieprzesunięte ramki układają się automatycznie. Układ komputerowy pozostaje bez zmian.", "Phone layout": "Układ telefonu", "Auto (narrow screens)": "Auto (wąskie ekrany)", "Always": "Zawsze", "Never": "Nigdy", "Switch below (px)": "Przełącz poniżej (px)", "Background focus ↔": "Punkt skupienia tła ↔", "Background focus ↕": "Punkt skupienia tła ↕", "↺ Reset positions to automatic": "↺ Przywróć automatyczne pozycje", "⧉ Copy desktop layout": "⧉ Kopiuj układ komputerowy", "↺ Reset phone layout": "↺ Resetuj układ telefonu", "Show on phone": "Pokaż na telefonie", "Unticked items are hidden in the phone layout only. Hiding a device also hides its flow lines.": "Odznaczone elementy są ukryte tylko w układzie telefonu. Ukrycie urządzenia ukrywa też jego linie przepływu.", "🔤 Title": "🔤 Tytuł", "🌤️ Weather": "🌤️ Pogoda", "🌍 Grid mix": "🌍 Miks energetyczny", "🕒 Updated": "🕒 Aktualizacja", "📊 Daily Stats": "📊 Statystyki dnia", "Devices": "Urządzenia", "＋ Add device": "＋ Dodaj urządzenie", "Type": "Typ", "Name": "Nazwa", "Power entity": "Encja mocy", "Meter or flow entity": "Encja licznika lub przepływu", "Connects to": "Połączone z", "Automatic": "Automatycznie", "Automatic = the (first) inverter, or a Gateway/Distribution Board device for extra inverters. Override this for multi-inverter or custom topologies.": "Automatycznie = (pierwszy) falownik albo bramka/rozdzielnica dla kolejnych falowników. Zmień to dla wielu falowników lub własnych topologii.", "Flow colour": "Kolor przepływu", "Only used if this device has its own power entity.": "Używany tylko, gdy urządzenie ma własną encję mocy.", "Flow direction": "Kierunek przepływu", "↔ Normal": "↔ Normalny", "↔ Inverted": "↔ Odwrócony", "Visual direction only": "Tylko kierunek wizualny", "Show history graph": "Pokaż wykres historii", "Power history as a faint graph behind the box. Range and opacity are under Appearance.": "Historia mocy jako delikatny wykres w tle ramki. Zakres i krycie ustawisz w sekcji Wygląd.", "Show charge/discharge glow": "Pokaż poświatę ładowania/rozładowania", "Pulses the box when actively charging or discharging.": "Ramka pulsuje podczas ładowania lub rozładowania.", "Show time remaining": "Pokaż pozostały czas", "Estimated time to full (charging) or to reserve (discharging), shown under the power value.": "Szacowany czas do pełna (ładowanie) lub do rezerwy (rozładowanie), wyświetlany pod wartością mocy.", "State of charge (%)": "Stan naładowania (%)", "Capacity (kWh)": "Pojemność (kWh)", "Reserve %": "Rezerwa %", "Charge limit %": "Limit ładowania %", "Capacity sensor (optional, overrides the number above)": "Czujnik pojemności (opcjonalnie, zastępuje liczbę powyżej)", "Shown in litres. Sensors reporting m³ are converted automatically. On Automatic, water connects to your House device.": "Wyświetlane w litrach. Czujniki w m³ są przeliczane automatycznie. W trybie automatycznym woda łączy się z urządzeniem Dom.", "Show gas in": "Pokaż gaz w", "Calorific value (MJ/m³)": "Wartość opałowa (MJ/m³)", "Used to convert between m³ and kWh (see your gas bill). On Automatic, gas connects to your House device.": "Służy do przeliczania m³ i kWh (zob. rachunek za gaz). W trybie automatycznym gaz łączy się z urządzeniem Dom.", "＋ Add extra entity": "＋ Dodaj dodatkową encję", "Maximum of 5 extra entities reached.": "Osiągnięto maksimum 5 dodatkowych encji.", "Icon (Material Design Icons)": "Ikona (Material Design Icons)", "Connections": "Połączenia", "Optional. Leave empty to use the automatic topology. Add connections to take full control of where power flows.": "Opcjonalne. Zostaw puste, aby użyć topologii automatycznej. Dodaj połączenia, aby w pełni kontrolować, dokąd płynie energia.", "From": "Od", "To": "Do", "From → To": "Od → Do", "To → From": "Do → Od", "Auto — use live power signs": "Auto — według znaku bieżącej mocy", "Remove connection": "Usuń połączenie", "＋ Add connection": "＋ Dodaj połączenie", "Today statistics": "Statystyki dnia", "Add up to 20 custom statistics. Choose your own name, entity and icon.": "Dodaj do 20 własnych statystyk. Wybierz nazwę, encję i ikonę.", "Material Design Icon": "Ikona Material Design", "Custom icon override": "Własna ikona (zastępuje)", "＋ Add statistic": "＋ Dodaj statystykę", "No statistics added.": "Nie dodano statystyk.", "Statistic": "Statystyka", "Self-sufficiency": "Samowystarczalność", "Self-consumption": "Autokonsumpcja", ": share of your home's electricity that didn't come from the grid.": ": udział energii w domu, która nie pochodziła z sieci.", ": share of your solar you used yourself instead of exporting. Shown at the top of the Today panel.": ": udział energii słonecznej zużytej na miejscu zamiast oddanej do sieci. Wyświetlane na górze panelu Dzisiaj.", "Now": "Teraz", "is calculated automatically from your devices;": "jest obliczane automatycznie z twoich urządzeń;", "today": "dziś", "uses the daily energy sensors below.": "korzysta z dziennych czujników energii poniżej.", "Daily energy sensors (kWh or Wh). Self-sufficiency today needs import and consumption; self-consumption today needs solar and export.": "Dzienne czujniki energii (kWh lub Wh). Samowystarczalność dziś wymaga poboru i zużycia; autokonsumpcja dziś wymaga produkcji PV i oddania.", "Grid import today": "Pobór z sieci dziś", "Grid export today": "Oddanie do sieci dziś", "Solar production today": "Produkcja PV dziś", "Home consumption today": "Zużycie domu dziś", "Calculate consumption instead (import + solar − export + battery discharge − battery charge)": "Oblicz zużycie zamiast tego (pobór + PV − oddanie + rozładowanie baterii − ładowanie baterii)", "Battery charge today (optional, for calculated consumption)": "Ładowanie baterii dziś (opcjonalnie, do obliczania zużycia)", "Battery discharge today (optional, for calculated consumption)": "Rozładowanie baterii dziś (opcjonalnie, do obliczania zużycia)", "off": "wyłączone", "Choose flow colour": "Wybierz kolor przepływu", "Drag to reorder": "Przeciągnij, aby zmienić kolejność", "Duplicate device": "Duplikuj urządzenie", "Leave empty for no title": "Zostaw puste, aby nie było tytułu", "Leave empty for none": "Zostaw puste, aby nie było etykiety", "Optional": "Opcjonalnie", "Or paste an image URL instead": "Albo wklej adres URL obrazu", "Remove": "Usuń", "e.g. 13.5": "np. 13,5", "e.g. SW1A, blank = all of GB": "np. SW1A, puste = cała Wielka Brytania", "Not connected to anything": "Brak połączeń", "idle": "bezczynne"}, es: {"Today": "Hoy", "Energy Flow": "Flujo de energía", "Self-sufficiency now": "Autosuficiencia ahora", "Self-sufficiency today": "Autosuficiencia hoy", "Self-consumption now": "Autoconsumo ahora", "Self-consumption today": "Autoconsumo hoy", "Updated": "Actualizado", "just now": "ahora mismo", "{n}s ago": "hace {n} s", "{m}m {s}s ago": "hace {m} min {s} s", "{h}h {m}m ago": "hace {h} h {m} min", "{d}d {h}h ago": "hace {d} d {h} h", "No data": "Sin datos", "Unknown": "Desconocido", "to full": "hasta el 100%", "to empty": "hasta el 0%", "to {p}%": "hasta el {p}%", "at reserve": "en reserva", "at {p}%": "al {p}%", "Grid": "Red", "Great Britain": "Gran Bretaña", "Loading grid data…": "Cargando datos de la red…", "Grid data unavailable": "Datos de la red no disponibles", "Showing last data (update failed)": "Últimos datos (falló la actualización)", "Wind": "Eólica", "Solar": "Solar", "Nuclear": "Nuclear", "Hydro": "Hidráulica", "Biomass": "Biomasa", "Gas": "Gas", "Coal": "Carbón", "Imports": "Importaciones", "Other": "Otros", "Very low": "Muy baja", "Low": "Baja", "Moderate": "Moderada", "High": "Alta", "Very high": "Muy alta", "Add your first device": "Añade tu primer dispositivo", "Open the card editor and add Solar, Inverter, Battery, Grid or House.": "Abre el editor de la tarjeta y añade solar, inversor, batería, red o casa.", "☀️ Solar PV": "☀️ Solar FV", "⚡ Inverter": "⚡ Inversor", "🔋 Battery": "🔋 Batería", "🧠 Gateway": "🧠 Pasarela", "🏠 House": "🏠 Casa", "⚡ Grid": "⚡ Red", "⛽ Generator": "⛽ Generador", "💧 Water": "💧 Agua", "🔥 Gas": "🔥 Gas", "🚗 EV Charger": "🚗 Cargador VE", "⚙️ Extra Load": "⚙️ Carga adicional", "Home Power Flow": "Home Power Flow", "Bidirectional power flow from live positive/negative values, dotted connections, single moving power dot, invertible device direction, dynamic flow colors and draggable layout. Entity IDs are shown in full below each picker.": "Flujo de energía bidireccional a partir de valores positivos/negativos en directo, conexiones punteadas, un punto de energía en movimiento, dirección de dispositivo invertible, colores de flujo dinámicos y diseño arrastrable. Los ID de entidad completos se muestran bajo cada selector.", "Backup": "Copia de seguridad", "Download the whole card configuration as a file, or restore one saved earlier. Importing replaces every setting below (devices, connections, layout, statistics) - it does not save to your dashboard until you click Save.": "Descarga toda la configuración de la tarjeta como archivo o restaura una guardada antes. Importar reemplaza todos los ajustes de abajo (dispositivos, conexiones, diseño, estadísticas); no se guarda en tu panel hasta que pulses Guardar.", "⬇ Export config": "⬇ Exportar configuración", "⬆ Import config": "⬆ Importar configuración", "Downloaded.": "Descargado.", "Export failed - see the browser console for details.": "Error al exportar: consulta la consola del navegador.", "Import failed - that file is not a valid Home Power Flow Card config.": "Error al importar: el archivo no es una configuración válida de Home Power Flow Card.", "Imported. Click Save below to keep it on this dashboard.": "Importado. Pulsa Guardar abajo para conservarlo en este panel.", "Title": "Título", "Subtitle": "Subtítulo", "Title colour": "Color del título", "Time format": "Formato de hora", "24 hour": "24 horas", "12 hour": "12 horas", "Weather entity": "Entidad del tiempo", "Day background": "Fondo de día", "Night background": "Fondo de noche", "📤 Upload image": "📤 Subir imagen", "👁 Preview this background": "👁 Vista previa del fondo", "Restore default": "Restaurar predeterminado", "Using the default background": "Usando el fondo predeterminado", "Uploading…": "Subiendo…", "Upload failed - check that you are an admin user and try again.": "Error al subir: comprueba que eres administrador e inténtalo de nuevo.", "Sun entity (switches day/night background)": "Entidad del sol (cambia el fondo día/noche)", "Flow threshold (W)": "Umbral de flujo (W)", "Flow animation speed (seconds)": "Velocidad de la animación (segundos)", "Particle stagger (seconds)": "Separación de partículas (segundos)", "Not selected": "Sin seleccionar", "Last updated box": "Recuadro de última actualización", "Optional small box showing how long ago an entity was updated, e.g. your inverter's data. Uses the entity's own timestamp if it has one. Turns amber when the data is older than the warning time.": "Recuadro pequeño opcional que muestra cuánto hace que se actualizó una entidad, p. ej. los datos del inversor. Usa la marca de tiempo propia de la entidad si la tiene. Se vuelve ámbar cuando los datos superan el tiempo de aviso.", "Show last updated box": "Mostrar recuadro de última actualización", "Label": "Etiqueta", "Warn after (minutes)": "Avisar tras (minutos)", "Entity": "Entidad", "UK grid mix": "Mix eléctrico de Reino Unido", "Optional box showing how green the GB electricity grid is right now (carbon intensity and generation mix), from the National Grid ESO Carbon Intensity API. Updates every 30 minutes.": "Recuadro opcional que muestra lo verde que es ahora la red eléctrica de Gran Bretaña (intensidad de carbono y mix de generación), desde la API Carbon Intensity de National Grid ESO. Se actualiza cada 30 minutos.", "Show grid mix box": "Mostrar recuadro del mix eléctrico", "Postcode (optional)": "Código postal (opcional)", "Appearance": "Apariencia", "Colour theme for the boxes and panels. Your background, flow colours and title colour are set separately.": "Tema de color para los recuadros y paneles. El fondo, los colores de flujo y el color del título se ajustan por separado.", "Theme": "Tema", "Auto (follow Home Assistant)": "Auto (según Home Assistant)", "Dark": "Oscuro", "Light": "Claro", "Midnight": "Medianoche", "Ocean": "Océano", "Forest": "Bosque", "Sunset": "Atardecer", "Graphite": "Grafito", "Custom colours": "Colores personalizados", "Panel colour": "Color de los paneles", "Text colour": "Color del texto", "Panel opacity": "Opacidad de los paneles", "Flow line style": "Estilo de las líneas", "Curved": "Curvas", "Right angles (avoid boxes)": "Ángulos rectos (evitan recuadros)", "Power units": "Unidades de potencia", "Auto (W, kW from 1000 W)": "Auto (W, kW desde 1000 W)", "Always W": "Siempre W", "Always kW": "Siempre kW", "History hours": "Horas de historial", "History opacity": "Opacidad del historial", "6 h": "6 h", "12 h": "12 h", "24 h": "24 h", "48 h": "48 h", "Sizing": "Tamaños", "1 = default size. Small screen scale enlarges boxes on phones (eases in below 900px wide). Max width 0 = fill the available width; the card never grows taller than the screen. The Today panel also shrinks automatically if it would be taller than the card.": "1 = tamaño predeterminado. La escala de pantalla pequeña agranda los recuadros en móviles (gradualmente por debajo de 900 px). Ancho máx. 0 = ocupar todo el ancho; la tarjeta nunca supera la altura de la pantalla. El panel Hoy también se reduce si fuera más alto que la tarjeta.", "Device boxes": "Recuadros de dispositivos", "Weather box": "Recuadro del tiempo", "Today panel": "Panel Hoy", "Small screen": "Pantalla pequeña", "Max width (px)": "Ancho máx. (px)", "Grid mix": "Mix eléctrico", "Updated box": "Recuadro de actualización", "Visual layout": "Diseño visual", "🖥️ Desktop": "🖥️ Escritorio", "📱 Phone": "📱 Móvil", "Drag the device boxes on the template to place them exactly where you want. Positions are saved automatically. New devices without a saved position use the automatic layout.": "Arrastra los recuadros de los dispositivos en la plantilla para colocarlos donde quieras. Las posiciones se guardan automáticamente. Los dispositivos nuevos sin posición guardada usan el diseño automático.", "Phone layout: used when the card is narrower than the breakpoint. Drag boxes to arrange it; boxes you have not moved use an automatic arrangement. Your desktop layout is not affected.": "Diseño móvil: se usa cuando la tarjeta es más estrecha que el punto de corte. Arrastra los recuadros para ordenarlo; los que no muevas se colocan automáticamente. El diseño de escritorio no cambia.", "Phone layout": "Diseño móvil", "Auto (narrow screens)": "Auto (pantallas estrechas)", "Always": "Siempre", "Never": "Nunca", "Switch below (px)": "Cambiar por debajo de (px)", "Background focus ↔": "Enfoque del fondo ↔", "Background focus ↕": "Enfoque del fondo ↕", "↺ Reset positions to automatic": "↺ Restablecer posiciones automáticas", "⧉ Copy desktop layout": "⧉ Copiar diseño de escritorio", "↺ Reset phone layout": "↺ Restablecer diseño móvil", "Show on phone": "Mostrar en el móvil", "Unticked items are hidden in the phone layout only. Hiding a device also hides its flow lines.": "Los elementos desmarcados solo se ocultan en el diseño móvil. Ocultar un dispositivo también oculta sus líneas de flujo.", "🔤 Title": "🔤 Título", "🌤️ Weather": "🌤️ Tiempo", "🌍 Grid mix": "🌍 Mix eléctrico", "🕒 Updated": "🕒 Actualizado", "📊 Daily Stats": "📊 Estadísticas del día", "Devices": "Dispositivos", "＋ Add device": "＋ Añadir dispositivo", "Type": "Tipo", "Name": "Nombre", "Power entity": "Entidad de potencia", "Meter or flow entity": "Entidad de contador o caudal", "Connects to": "Conectado a", "Automatic": "Automático", "Automatic = the (first) inverter, or a Gateway/Distribution Board device for extra inverters. Override this for multi-inverter or custom topologies.": "Automático = el (primer) inversor, o una pasarela/cuadro eléctrico para inversores adicionales. Cámbialo para varios inversores o topologías personalizadas.", "Flow colour": "Color del flujo", "Only used if this device has its own power entity.": "Solo se usa si el dispositivo tiene su propia entidad de potencia.", "Flow direction": "Dirección del flujo", "↔ Normal": "↔ Normal", "↔ Inverted": "↔ Invertido", "Visual direction only": "Solo la dirección visual", "Show history graph": "Mostrar gráfico de historial", "Power history as a faint graph behind the box. Range and opacity are under Appearance.": "Historial de potencia como gráfico tenue detrás del recuadro. El rango y la opacidad están en Apariencia.", "Show charge/discharge glow": "Mostrar brillo de carga/descarga", "Pulses the box when actively charging or discharging.": "El recuadro pulsa al cargar o descargar.", "Show time remaining": "Mostrar tiempo restante", "Estimated time to full (charging) or to reserve (discharging), shown under the power value.": "Tiempo estimado hasta completar (carga) o hasta la reserva (descarga), mostrado bajo el valor de potencia.", "State of charge (%)": "Estado de carga (%)", "Capacity (kWh)": "Capacidad (kWh)", "Reserve %": "Reserva %", "Charge limit %": "Límite de carga %", "Capacity sensor (optional, overrides the number above)": "Sensor de capacidad (opcional, sustituye el número de arriba)", "Shown in litres. Sensors reporting m³ are converted automatically. On Automatic, water connects to your House device.": "Se muestra en litros. Los sensores en m³ se convierten automáticamente. En Automático, el agua se conecta al dispositivo Casa.", "Show gas in": "Mostrar gas en", "Calorific value (MJ/m³)": "Poder calorífico (MJ/m³)", "Used to convert between m³ and kWh (see your gas bill). On Automatic, gas connects to your House device.": "Se usa para convertir entre m³ y kWh (consulta tu factura de gas). En Automático, el gas se conecta al dispositivo Casa.", "＋ Add extra entity": "＋ Añadir entidad adicional", "Maximum of 5 extra entities reached.": "Se ha alcanzado el máximo de 5 entidades adicionales.", "Icon (Material Design Icons)": "Icono (Material Design Icons)", "Connections": "Conexiones", "Optional. Leave empty to use the automatic topology. Add connections to take full control of where power flows.": "Opcional. Déjalo vacío para usar la topología automática. Añade conexiones para controlar por completo hacia dónde fluye la energía.", "From": "Desde", "To": "Hasta", "From → To": "Desde → Hasta", "To → From": "Hasta → Desde", "Auto — use live power signs": "Auto — según el signo de la potencia", "Remove connection": "Eliminar conexión", "＋ Add connection": "＋ Añadir conexión", "Today statistics": "Estadísticas de hoy", "Add up to 20 custom statistics. Choose your own name, entity and icon.": "Añade hasta 20 estadísticas propias. Elige tu nombre, entidad e icono.", "Material Design Icon": "Icono de Material Design", "Custom icon override": "Icono personalizado (sustituye)", "＋ Add statistic": "＋ Añadir estadística", "No statistics added.": "No hay estadísticas añadidas.", "Statistic": "Estadística", "Self-sufficiency": "Autosuficiencia", "Self-consumption": "Autoconsumo", ": share of your home's electricity that didn't come from the grid.": ": parte de la electricidad de tu casa que no vino de la red.", ": share of your solar you used yourself instead of exporting. Shown at the top of the Today panel.": ": parte de tu energía solar que usaste en lugar de exportarla. Se muestra arriba en el panel Hoy.", "Now": "Ahora", "is calculated automatically from your devices;": "se calcula automáticamente a partir de tus dispositivos;", "today": "hoy", "uses the daily energy sensors below.": "usa los sensores de energía diaria de abajo.", "Daily energy sensors (kWh or Wh). Self-sufficiency today needs import and consumption; self-consumption today needs solar and export.": "Sensores de energía diaria (kWh o Wh). La autosuficiencia de hoy necesita importación y consumo; el autoconsumo de hoy necesita solar y exportación.", "Grid import today": "Importación de red hoy", "Grid export today": "Exportación a red hoy", "Solar production today": "Producción solar hoy", "Home consumption today": "Consumo de la casa hoy", "Calculate consumption instead (import + solar − export + battery discharge − battery charge)": "Calcular el consumo (importación + solar − exportación + descarga de batería − carga de batería)", "Battery charge today (optional, for calculated consumption)": "Carga de batería hoy (opcional, para el consumo calculado)", "Battery discharge today (optional, for calculated consumption)": "Descarga de batería hoy (opcional, para el consumo calculado)", "off": "desactivado", "Choose flow colour": "Elige el color del flujo", "Drag to reorder": "Arrastra para reordenar", "Duplicate device": "Duplicar dispositivo", "Leave empty for no title": "Déjalo vacío para no mostrar título", "Leave empty for none": "Déjalo vacío para no mostrar nada", "Optional": "Opcional", "Or paste an image URL instead": "O pega la URL de una imagen", "Remove": "Eliminar", "e.g. 13.5": "p. ej. 13,5", "e.g. SW1A, blank = all of GB": "p. ej. SW1A, vacío = toda Gran Bretaña", "Not connected to anything": "No conectado a nada", "idle": "inactivo"} };
+  // Editor text that contains numbers or a variable part.
+  const I18N_PATTERNS = [
+    [/^([▸▾]) Extra entities \((\d+)\/5\)$/, { pl: m => `${m[1]} Dodatkowe encje (${m[2]}/5)`, es: m => `${m[1]} Entidades adicionales (${m[2]}/5)` }],
+    [/^([▸▾]) Extra entities \(optional\)$/, { pl: m => `${m[1]} Dodatkowe encje (opcjonalnie)`, es: m => `${m[1]} Entidades adicionales (opcional)` }],
+    [/^([▸▾]) Self-sufficiency & self-consumption$/, { pl: m => `${m[1]} Samowystarczalność i autokonsumpcja`, es: m => `${m[1]} Autosuficiencia y autoconsumo` }],
+    [/^(\d+) of 4 on$/, { pl: m => `włączone: ${m[1]} z 4`, es: m => `${m[1]} de 4 activadas` }],
+    [/^🔎 Extra entity (\d+)$/, { pl: m => `🔎 Dodatkowa encja ${m[1]}`, es: m => `🔎 Entidad adicional ${m[1]}` }],
+    [/^Statistic (\d+)$/, { pl: m => `Statystyka ${m[1]}`, es: m => `Estadística ${m[1]}` }],
+    [/^Custom uploaded file: (.+)$/, { pl: m => `Własny przesłany plik: ${m[1]}`, es: m => `Archivo propio subido: ${m[1]}` }],
+  ];
+  function langOf(hass) {
+    const l = String(hass?.locale?.language || hass?.language || 'en').toLowerCase().split('-')[0];
+    return I18N[l] ? l : 'en';
+  }
+  function localeOf(hass) { return hass?.locale?.language || hass?.language || undefined; }
+  function tr(lang, text, vars) {
+    let out = (lang !== 'en' && I18N[lang]?.[text]) || text;
+    if (vars) for (const k of Object.keys(vars)) out = out.split('{' + k + '}').join(String(vars[k]));
+    return out;
+  }
+
   function state(hass, entity) {
     return entity && hass?.states?.[entity] ? hass.states[entity] : null;
   }
@@ -513,8 +539,8 @@
       const weatherText = weather ? (weather.attributes?.friendly_name || weather.state || 'Weather') : '';
       const weatherIcon = weather ? this._weatherIcon(weather.state) : '☀️';
       const now = new Date();
-      const date = new Intl.DateTimeFormat(undefined, { weekday: 'short', day: '2-digit', month: 'short', year: 'numeric' }).format(now);
-      const time = new Intl.DateTimeFormat(undefined, { hour: '2-digit', minute: '2-digit', hour12: c.time_format === '12h' }).format(now);
+      const date = new Intl.DateTimeFormat(localeOf(this._hass), { weekday: 'short', day: '2-digit', month: 'short', year: 'numeric' }).format(now);
+      const time = new Intl.DateTimeFormat(localeOf(this._hass), { hour: '2-digit', minute: '2-digit', hour12: c.time_format === '12h' }).format(now);
 
       const devices = c.devices || [];
       if (!this._flowSnapshot) this._captureFlowSnapshot(devices);
@@ -590,7 +616,7 @@
           ${this._phoneHidden('weather') ? '' : `<div class="weather" style="--weather-x:${this._panelPos('weather').x}%;--weather-y:${this._panelPos('weather').y}%"><div class="date">${esc(date)}</div><div class="clock">${esc(time)}</div><div class="wicon">${weatherIcon}</div><div class="temp">${weatherTemp != null ? esc(weatherTemp) + esc(weatherUnit) : '—'}</div><div class="wstate">${esc(weatherText)}</div></div>`}
           <div class="canvas"><svg class="flows" viewBox="0 0 ${this._vbW()} ${this._vbH()}" preserveAspectRatio="none">${this._svgFilterDefs()}${flows}</svg>${nodes}</div>
           ${stats && !this._phoneHidden('stats') ? stats.replace('<div class="stats">', `<div class="stats" style="--stats-x:${this._panelPos('stats').x}%;--stats-y:${this._panelPos('stats').y}%">`) : ''}
-          ${devices.length ? '' : '<div class="empty"><div><b>Add your first device</b><span>Open the card editor and add Solar, Inverter, Battery, Grid or House.</span></div></div>'}
+          ${devices.length ? '' : `<div class="empty"><div><b>${esc(this._t('Add your first device'))}</b><span>${esc(this._t('Open the card editor and add Solar, Inverter, Battery, Grid or House.'))}</span></div></div>`}
           </div>
         </div>`;
 
@@ -664,7 +690,7 @@
     // emptied title stays blank. Nothing is rendered if both are blank.
     _headerHTML() {
       const c = this._config || {};
-      const title = c.title === undefined || c.title === null ? 'Energy Flow' : String(c.title);
+      const title = c.title === undefined || c.title === null ? this._t('Energy Flow') : String(c.title);
       const subtitle = c.subtitle ? String(c.subtitle) : '';
       if (!title.trim() && !subtitle.trim()) return '';
       if (this._phoneHidden('header')) return '';
@@ -701,16 +727,16 @@
     _updatedInfo() {
       const c = this._config || {};
       const st = state(this._hass, c.updated_entity);
-      if (!st) return { text: 'No data', stale: true };
+      if (!st) return { text: this._t('No data'), stale: true };
       const ts = this._updatedTimestamp(st);
-      if (!Number.isFinite(ts)) return { text: 'Unknown', stale: true };
+      if (!Number.isFinite(ts)) return { text: this._t('Unknown'), stale: true };
       const sec = Math.max(0, Math.floor((Date.now() - ts) / 1000));
       const p2 = n => String(n).padStart(2, '0');
-      const ago = sec < 2 ? 'just now'
-        : sec < 60 ? `${sec}s ago`
-        : sec < 3600 ? `${Math.floor(sec / 60)}m ${p2(sec % 60)}s ago`
-        : sec < 86400 ? `${Math.floor(sec / 3600)}h ${p2(Math.floor((sec % 3600) / 60))}m ago`
-        : `${Math.floor(sec / 86400)}d ${Math.floor((sec % 86400) / 3600)}h ago`;
+      const ago = sec < 2 ? this._t('just now')
+        : sec < 60 ? this._t('{n}s ago', { n: sec })
+        : sec < 3600 ? this._t('{m}m {s}s ago', { m: Math.floor(sec / 60), s: p2(sec % 60) })
+        : sec < 86400 ? this._t('{h}h {m}m ago', { h: Math.floor(sec / 3600), m: p2(Math.floor((sec % 3600) / 60)) })
+        : this._t('{d}d {h}h ago', { d: Math.floor(sec / 86400), h: Math.floor((sec % 86400) / 3600) });
       const lim = Number(c.updated_stale_minutes);
       const staleMin = Number.isFinite(lim) && lim > 0 ? lim : 10;
       return { text: ago, stale: sec > staleMin * 60 };
@@ -722,7 +748,7 @@
       } else if (this._upTimer) { clearInterval(this._upTimer); this._upTimer = null; }
     }
     _updatedInner() {
-      const label = this._config?.updated_label === undefined ? 'Updated' : String(this._config.updated_label || '');
+      const label = this._config?.updated_label === undefined ? this._t('Updated') : String(this._config.updated_label || '');
       const info = this._updatedInfo();
       return `<ha-icon icon="mdi:update"></ha-icon><span>${label ? esc(label) + ' ' : ''}${esc(info.text)}</span>`;
     }
@@ -748,13 +774,13 @@
     _gridMixInner() {
       const e = GRID_MIX_CACHE.get(gridMixPostcode(this._config?.grid_mix_postcode));
       const d = e?.data;
-      const head = `<div class="gm-head"><ha-icon icon="mdi:transmission-tower"></ha-icon><span>Grid · ${esc(d?.region || (gridMixPostcode(this._config?.grid_mix_postcode) || 'Great Britain'))}</span></div>`;
-      if (!d) return head + `<div class="gm-msg">${e?.error ? 'Grid data unavailable' : 'Loading grid data…'}</div>`;
+      const head = `<div class="gm-head"><ha-icon icon="mdi:transmission-tower"></ha-icon><span>${esc(this._t('Grid'))} · ${esc(this._t(d?.region || (gridMixPostcode(this._config?.grid_mix_postcode) || 'Great Britain')))}</span></div>`;
+      if (!d) return head + `<div class="gm-msg">${esc(this._t(e?.error ? 'Grid data unavailable' : 'Loading grid data…'))}</div>`;
       const idx = GRID_INDEX[String(d.index || '').toLowerCase()];
       const mix = (d.mix || []).filter(m => Number(m.perc) > 0).sort((a, b) => b.perc - a.perc);
       const bar = mix.map(m => `<span style="width:${Number(m.perc)}%;background:${(GRID_FUELS[m.fuel] || GRID_FUELS.other).color}"></span>`).join('');
-      const rows = mix.slice(0, 8).map(m => { const f = GRID_FUELS[m.fuel] || { ...GRID_FUELS.other, label: m.fuel }; return `<div class="gm-row"><ha-icon icon="${f.icon}" style="color:${f.color}"></ha-icon><span>${esc(f.label)}</span><b>${Number(m.perc).toFixed(0)}%</b></div>`; }).join('');
-      return head + `<div class="gm-main"><span class="gm-val">${Number.isFinite(Number(d.intensity)) ? Math.round(d.intensity) : '—'}</span><span class="gm-unit">gCO₂/kWh</span>${idx ? `<span class="gm-badge" style="background:${idx.color}">${idx.label}</span>` : ''}</div><div class="gm-bar">${bar}</div><div class="gm-list">${rows}</div>` + (e.error ? `<div class="gm-msg">Showing last data (update failed)</div>` : '');
+      const rows = mix.slice(0, 8).map(m => { const f = GRID_FUELS[m.fuel] || { ...GRID_FUELS.other, label: m.fuel }; return `<div class="gm-row"><ha-icon icon="${f.icon}" style="color:${f.color}"></ha-icon><span>${esc(this._t(f.label))}</span><b>${Number(m.perc).toFixed(0)}%</b></div>`; }).join('');
+      return head + `<div class="gm-main"><span class="gm-val">${Number.isFinite(Number(d.intensity)) ? Math.round(d.intensity) : '—'}</span><span class="gm-unit">gCO₂/kWh</span>${idx ? `<span class="gm-badge" style="background:${idx.color}">${esc(this._t(idx.label))}</span>` : ''}</div><div class="gm-bar">${bar}</div><div class="gm-list">${rows}</div>` + (e.error ? `<div class="gm-msg">${esc(this._t('Showing last data (update failed)'))}</div>` : '');
     }
     // Fetches (via the shared cache) when enabled; cheap to call often.
     _gridMixRefresh() {
@@ -832,8 +858,8 @@
       const weatherText = weather ? (weather.attributes?.friendly_name || weather.state || 'Weather') : '';
       const weatherIcon = weather ? this._weatherIcon(weather.state) : '☀️';
       const now = new Date();
-      const date = new Intl.DateTimeFormat(undefined, { weekday: 'short', day: '2-digit', month: 'short', year: 'numeric' }).format(now);
-      const time = new Intl.DateTimeFormat(undefined, { hour: '2-digit', minute: '2-digit', hour12: c.time_format === '12h' }).format(now);
+      const date = new Intl.DateTimeFormat(localeOf(this._hass), { weekday: 'short', day: '2-digit', month: 'short', year: 'numeric' }).format(now);
+      const time = new Intl.DateTimeFormat(localeOf(this._hass), { hour: '2-digit', minute: '2-digit', hour12: c.time_format === '12h' }).format(now);
       const dateEl=this.shadowRoot.querySelector('.date'), timeEl=this.shadowRoot.querySelector('.clock'), tempEl=this.shadowRoot.querySelector('.temp'), stateEl=this.shadowRoot.querySelector('.wstate'), iconEl=this.shadowRoot.querySelector('.wicon');
       if(dateEl) dateEl.textContent=date; if(timeEl) timeEl.textContent=time; if(tempEl) tempEl.textContent=weatherTemp != null ? `${weatherTemp}${weatherUnit}` : '—'; if(stateEl) stateEl.textContent=weatherText; if(iconEl) iconEl.textContent=weatherIcon;
 
@@ -871,6 +897,7 @@
     }
 
     // Flow canvas size in SVG units (landscape on desktop, portrait on phone).
+    _t(text, vars) { return tr(langOf(this._hass), text, vars); }
     _vbW() { return this._phoneMode ? 667 : 1000; }
     _vbH() { return this._phoneMode ? 1000 : 667; }
     _layout(devices) {
@@ -986,11 +1013,11 @@
       const limit = Math.max(1, Math.min(100, Number.isFinite(parseFloat(d.battery_charge_limit)) ? parseFloat(d.battery_charge_limit) : 100));
       const target = dir === 'charging' ? limit : reserve;
       const pct = dir === 'charging' ? target - soc : soc - target;
-      if (pct <= 0) return dir === 'charging' ? `at ${Math.round(limit)}%` : `at reserve`;
+      if (pct <= 0) return dir === 'charging' ? this._t('at {p}%', { p: Math.round(limit) }) : this._t('at reserve');
       const hours = (pct / 100) * cap * 1000 / avg.w;
       const mins = Math.round(hours * 60);
       const t = mins >= 48 * 60 ? `${Math.floor(mins / 1440)}d` : mins >= 60 ? `${Math.floor(mins / 60)}h ${String(mins % 60).padStart(2, '0')}m` : `${Math.max(1, mins)}m`;
-      const label = dir === 'charging' ? (target >= 100 ? 'to full' : `to ${Math.round(target)}%`) : (target <= 0 ? 'to empty' : `to ${Math.round(target)}%`);
+      const label = dir === 'charging' ? (target >= 100 ? this._t('to full') : this._t('to {p}%', { p: Math.round(target) })) : (target <= 0 ? this._t('to empty') : this._t('to {p}%', { p: Math.round(target) }));
       return `${t} ${label}`;
     }
     // Water: litres (m³ converted). Gas: m³ or kWh (user's choice),
@@ -1457,19 +1484,19 @@
       const rows = [];
       if (c.self_sufficiency_live === true) {
         const v = this._selfSufficiencyLive();
-        rows.push({ icon: 'mdi:home-lightning-bolt-outline', name: 'Self-sufficiency now', value: v == null ? '—' : `${v} %` });
+        rows.push({ icon: 'mdi:home-lightning-bolt-outline', name: this._t('Self-sufficiency now'), value: v == null ? '—' : `${v} %` });
       }
       if (c.self_sufficiency_today === true) {
         const v = this._selfSufficiencyToday();
-        rows.push({ icon: 'mdi:home-clock-outline', name: 'Self-sufficiency today', value: v == null ? '—' : `${v} %` });
+        rows.push({ icon: 'mdi:home-clock-outline', name: this._t('Self-sufficiency today'), value: v == null ? '—' : `${v} %` });
       }
       if (c.self_consumption_live === true) {
         const v = this._selfConsumptionLive();
-        rows.push({ icon: 'mdi:solar-power-variant', name: 'Self-consumption now', value: v == null ? '—' : `${v} %` });
+        rows.push({ icon: 'mdi:solar-power-variant', name: this._t('Self-consumption now'), value: v == null ? '—' : `${v} %` });
       }
       if (c.self_consumption_today === true) {
         const v = this._selfConsumptionToday();
-        rows.push({ icon: 'mdi:sun-clock', name: 'Self-consumption today', value: v == null ? '—' : `${v} %` });
+        rows.push({ icon: 'mdi:sun-clock', name: this._t('Self-consumption today'), value: v == null ? '—' : `${v} %` });
       }
       const list = Array.isArray(c.statistics?.entities) ? c.statistics.entities.slice(0,20) : [];
       list.forEach(r => rows.push({ icon: r.custom_icon || r.icon || 'mdi:chart-line', name: r.name || 'Statistic', value: this._energyEntity(r.entity) }));
@@ -1560,7 +1587,7 @@
     _statsHTML(s) {
       const rows = this._statsRows();
       if (!rows.length) return '';
-      return `<div class="stats"><h3>${esc(s.title || 'Today')}</h3>${rows.map(r=>{
+      return `<div class="stats"><h3>${esc(s.title || this._t('Today'))}</h3>${rows.map(r=>{
         const iconHtml = String(r.icon).startsWith('mdi:') ? `<ha-icon icon="${esc(r.icon)}"></ha-icon>` : esc(r.icon);
         return `<div class="stat"><span class="ico">${iconHtml}</span><span>${esc(r.name)}</span><span class="value">${esc(r.value)}</span></div>`;
       }).join('')}</div>`;
@@ -1606,6 +1633,8 @@
     }
     set hass(h){
       this._hass=h;
+      const lang=langOf(h);
+      if(lang!==this._lang){ this._lang=lang; if(this.shadowRoot.firstElementChild){ this._render(); return; } }
       // Do not rebuild the editor on every HA state update. Rebuilding the
       // DOM destroys focus and closes entity pickers while the user is typing.
       this.shadowRoot.querySelectorAll('ha-entity-picker').forEach(el=>{ el.hass=h; });
@@ -1758,6 +1787,7 @@
       <h3>Connections</h3><div class="hint">Optional. Leave empty to use the automatic topology. Add connections to take full control of where power flows.</div><div id="connections">${this._connectionsHTML()}</div><button class="btn" id="add-connection">＋ Add connection</button><h3>Today statistics</h3><div class="hint">Add up to 20 custom statistics. Choose your own name, entity and icon.</div><div id="stats-list">${this._statsEditorHTML()}</div><button class="btn" id="add-stat">＋ Add statistic</button>
       <h3 class="section-toggle" data-toggle-section="selfsuff">${this._ssOpen?'▾':'▸'} Self-sufficiency &amp; self-consumption<span class="section-sub">${(()=>{const n=['self_sufficiency_live','self_sufficiency_today','self_consumption_live','self_consumption_today'].filter(k=>c[k]===true).length;return n?`${n} of 4 on`:'off';})()}</span></h3><div class="section-body" data-section-body="selfsuff" ${this._ssOpen?'':'hidden'}><div class="hint"><b>Self-sufficiency</b>: share of your home's electricity that didn't come from the grid. <b>Self-consumption</b>: share of your solar you used yourself instead of exporting. Shown at the top of the Today panel. <b>Now</b> is calculated automatically from your devices; <b>today</b> uses the daily energy sensors below.</div><div class="row"><div class="field"><label style="display:flex;align-items:center;gap:6px;cursor:pointer;margin-top:6px"><input type="checkbox" data-key="self_sufficiency_live" style="width:auto" ${c.self_sufficiency_live===true?'checked':''}> Self-sufficiency now</label></div><div class="field"><label style="display:flex;align-items:center;gap:6px;cursor:pointer;margin-top:6px"><input type="checkbox" data-key="self_sufficiency_today" style="width:auto" ${c.self_sufficiency_today===true?'checked':''}> Self-sufficiency today</label></div><div class="field"><label style="display:flex;align-items:center;gap:6px;cursor:pointer;margin-top:6px"><input type="checkbox" data-key="self_consumption_live" style="width:auto" ${c.self_consumption_live===true?'checked':''}> Self-consumption now</label></div><div class="field"><label style="display:flex;align-items:center;gap:6px;cursor:pointer;margin-top:6px"><input type="checkbox" data-key="self_consumption_today" style="width:auto" ${c.self_consumption_today===true?'checked':''}> Self-consumption today</label></div></div><div class="hint">Daily energy sensors (kWh or Wh). Self-sufficiency today needs import and consumption; self-consumption today needs solar and export.</div><div class="row"><div class="field full"><label>Grid import today</label><ha-entity-picker data-editor-key="self_sufficiency_import_entity" allow-custom-entity></ha-entity-picker></div><div class="field full"><label>Grid export today</label><ha-entity-picker data-editor-key="energy_export_entity" allow-custom-entity></ha-entity-picker></div><div class="field full"><label>Solar production today</label><ha-entity-picker data-editor-key="energy_solar_entity" allow-custom-entity></ha-entity-picker></div><div class="field full"><label>Home consumption today</label><ha-entity-picker data-editor-key="self_sufficiency_consumption_entity" allow-custom-entity></ha-entity-picker></div><div class="field"><label style="display:flex;align-items:center;gap:6px;cursor:pointer;margin-top:6px"><input type="checkbox" data-key="self_sufficiency_calc_consumption" style="width:auto" ${c.self_sufficiency_calc_consumption===true?'checked':''}> Calculate consumption instead (import + solar − export + battery discharge − battery charge)</label></div><div class="field full"><label>Battery charge today (optional, for calculated consumption)</label><ha-entity-picker data-editor-key="energy_battery_charge_entity" allow-custom-entity></ha-entity-picker></div><div class="field full"><label>Battery discharge today (optional, for calculated consumption)</label><ha-entity-picker data-editor-key="energy_battery_discharge_entity" allow-custom-entity></ha-entity-picker></div></div></div>
       </div>`;
+      this._translateDom();
       this.shadowRoot.querySelectorAll('ha-entity-picker').forEach(el=>{
         el.hass=this._hass;
         if (el.hasAttribute('data-extra-picker')) {
@@ -1814,7 +1844,7 @@
         this._emit(false);
         this._render();
       }));
-      this.shadowRoot.querySelectorAll('[data-key]').forEach(el=>el.addEventListener('change',e=>{ const k=e.target.dataset.key; if(k==='flow_threshold_watts'){ const watts=Math.max(0,parseFloat(e.target.value)||0); this._config.flow_threshold=watts/1000; this._config.flow_threshold_watts=watts; } else { this._config[k]=e.target.value; if(['flow_threshold','flow_speed','flow_stagger','device_scale','mobile_scale','max_width','stats_scale','weather_scale','title_scale','grid_mix_scale','updated_scale','updated_stale_minutes','theme_opacity','phone_breakpoint','phone_bg_focus_x','phone_bg_focus_y','history_hours','history_opacity'].includes(k))this._config[k]=parseFloat(e.target.value)||0; if(e.target.type==='checkbox'){this._config[k]=e.target.checked;} } if(['self_sufficiency_live','self_sufficiency_today','self_consumption_live','self_consumption_today'].includes(k)){const sub=this.shadowRoot.querySelector('[data-toggle-section="selfsuff"] .section-sub'); if(sub){const n=['self_sufficiency_live','self_sufficiency_today','self_consumption_live','self_consumption_today'].filter(x=>this._config[x]===true).length; sub.textContent=n?`${n} of 4 on`:'off';}} if(k==='grid_mix_enabled'||k==='updated_enabled'||k==='theme'){this._emit(false);this._render();return;} if(e.target.type==='color'){const pv=e.target.parentElement?.querySelector('.color-preview'); if(pv) pv.style.background=e.target.value;} this._emit(false); }));
+      this.shadowRoot.querySelectorAll('[data-key]').forEach(el=>el.addEventListener('change',e=>{ const k=e.target.dataset.key; if(k==='flow_threshold_watts'){ const watts=Math.max(0,parseFloat(e.target.value)||0); this._config.flow_threshold=watts/1000; this._config.flow_threshold_watts=watts; } else { this._config[k]=e.target.value; if(['flow_threshold','flow_speed','flow_stagger','device_scale','mobile_scale','max_width','stats_scale','weather_scale','title_scale','grid_mix_scale','updated_scale','updated_stale_minutes','theme_opacity','phone_breakpoint','phone_bg_focus_x','phone_bg_focus_y','history_hours','history_opacity'].includes(k))this._config[k]=parseFloat(e.target.value)||0; if(e.target.type==='checkbox'){this._config[k]=e.target.checked;} } if(['self_sufficiency_live','self_sufficiency_today','self_consumption_live','self_consumption_today'].includes(k)){const sub=this.shadowRoot.querySelector('[data-toggle-section="selfsuff"] .section-sub'); if(sub){const n=['self_sufficiency_live','self_sufficiency_today','self_consumption_live','self_consumption_today'].filter(x=>this._config[x]===true).length; sub.textContent=n?(langOf(this._hass)==='pl'?`włączone: ${n} z 4`:langOf(this._hass)==='es'?`${n} de 4 activadas`:`${n} of 4 on`):this._t('off');}} if(k==='grid_mix_enabled'||k==='updated_enabled'||k==='theme'){this._emit(false);this._render();return;} if(e.target.type==='color'){const pv=e.target.parentElement?.querySelector('.color-preview'); if(pv) pv.style.background=e.target.value;} this._emit(false); }));
       this.shadowRoot.querySelector('#add')?.addEventListener('click',()=>{
         const id=genDeviceId();
         this._config.devices.push({id,type:'solar',name:`Device ${this._config.devices.length+1}`,power_entity:''});
@@ -1858,7 +1888,7 @@
       this.shadowRoot.querySelectorAll('[data-toggle-section="selfsuff"]').forEach(h=>h.addEventListener('click',()=>{
         this._ssOpen=!this._ssOpen;
         const body=this.shadowRoot.querySelector('[data-section-body="selfsuff"]'); if(body) body.hidden=!this._ssOpen;
-        h.firstChild.textContent=(this._ssOpen?'▾':'▸')+' Self-sufficiency & self-consumption';
+        h.firstChild.textContent=(this._ssOpen?'▾':'▸')+' '+(langOf(this._hass)==='pl'?'Samowystarczalność i autokonsumpcja':langOf(this._hass)==='es'?'Autosuficiencia y autoconsumo':'Self-sufficiency & self-consumption');
       }));
       this._updateFlowLive();
       this._enableSortable('#device-list',(from,to)=>{
@@ -1955,10 +1985,10 @@
       els.forEach(el=>{
         const i=Number(el.dataset.flowLive);
         const mine=edges.filter(([a,b])=>a===i||b===i);
-        if(!mine.length){ el.innerHTML='<span class="fl-off">Not connected to anything</span>'; return; }
+        if(!mine.length){ el.innerHTML=`<span class="fl-off">${esc(this._t('Not connected to anything'))}</span>`; return; }
         el.innerHTML=mine.map(([a,b,dir,child])=>{
           const info=logic._flowDirection(devices[a],devices[b],values[a],values[b],Number.isInteger(child)?devices[child]:null);
-          if(!info.active) return `<div class="fl-off">◦ ${nm(devices[a])} – ${nm(devices[b])}: idle</div>`;
+          if(!info.active) return `<div class="fl-off">◦ ${nm(devices[a])} – ${nm(devices[b])}: ${esc(this._t('idle'))}</div>`;
           let reverse=info.reverse; if(Number(dir)===1) reverse=false; if(Number(dir)===2) reverse=true;
           const from=reverse?devices[b]:devices[a], to=reverse?devices[a]:devices[b];
           const src=Number.isInteger(child)?devices[child]:null;
@@ -1966,6 +1996,24 @@
           return `<div class="fl-on">▶ ${nm(from)} → ${nm(to)} · ${esc(amount)}</div>`;
         }).join('');
       });
+    }
+    _t(text,vars){ return tr(langOf(this._hass),text,vars); }
+    // Translates the drawn editor: every text node and placeholder/title that
+    // exactly matches a known English phrase (or a pattern with numbers) is
+    // replaced. Unknown text - including your own names - stays as it is.
+    _translateDom(){
+      const lang=langOf(this._hass); if(lang==='en'||typeof document==='undefined'||!document.createTreeWalker) return;
+      const dict=I18N[lang];
+      const tw=document.createTreeWalker(this.shadowRoot, 4 /* NodeFilter.SHOW_TEXT */);
+      let n;
+      while((n=tw.nextNode())){
+        if(n.parentNode?.nodeName==='STYLE') continue;
+        const raw=n.nodeValue, t=raw.trim(); if(!t) continue;
+        let r=dict[t];
+        if(r===undefined){ for(const [re,f] of I18N_PATTERNS){ const m=t.match(re); if(m&&f[lang]){ r=f[lang](m); break; } } }
+        if(r!==undefined) n.nodeValue=raw.replace(t,r);
+      }
+      this.shadowRoot.querySelectorAll('[placeholder],[title]').forEach(el=>{ for(const a of ['placeholder','title']){ const v=el.getAttribute(a); if(v&&dict[v]) el.setAttribute(a,dict[v]); } });
     }
     _connectsToOptions(i){
       const cur = this._config.devices[i]?.connects_to;
@@ -2015,10 +2063,10 @@
         a.click();
         a.remove();
         setTimeout(() => URL.revokeObjectURL(url), 1000);
-        if (statusEl) statusEl.textContent = 'Downloaded.';
+        if (statusEl) statusEl.textContent = this._t('Downloaded.');
       } catch (e) {
         console.error('Home Power Flow Card: export failed', e);
-        if (statusEl) statusEl.textContent = 'Export failed - see the browser console for details.';
+        if (statusEl) statusEl.textContent = this._t('Export failed - see the browser console for details.');
       }
     }
     async _importConfigFile(file){
@@ -2036,10 +2084,10 @@
         this._extrasOpen.clear();
         this.setConfig(parsed);
         this._emit(false);
-        if (statusEl) statusEl.textContent = 'Imported. Click Save below to keep it on this dashboard.';
+        if (statusEl) statusEl.textContent = this._t('Imported. Click Save below to keep it on this dashboard.');
       } catch (e) {
         console.error('Home Power Flow Card: import failed', e);
-        if (statusEl) statusEl.textContent = 'Import failed - that file is not a valid Home Power Flow Card config.';
+        if (statusEl) statusEl.textContent = this._t('Import failed - that file is not a valid Home Power Flow Card config.');
       }
     }
     _bgUploadField(slot,label){
@@ -2052,7 +2100,7 @@
     async _uploadBackground(file, slot){
       if (!file || !this._hass) return;
       const statusEl = this.shadowRoot.querySelector(`[data-bg-status="${slot}"]`);
-      if (statusEl) statusEl.textContent = 'Uploading…';
+      if (statusEl) statusEl.textContent = this._t('Uploading…');
       try {
         const ext = (file.name.split('.').pop() || 'png').toLowerCase().replace(/[^a-z0-9]/g,'') || 'png';
         const filename = `home-power-flow-card-${slot}.${ext}`;
@@ -2074,7 +2122,7 @@
         setTimeout(()=>this._applyLayoutBg(slot),200);
       } catch (e) {
         console.error('Home Power Flow Card: background upload failed', e);
-        if (statusEl) statusEl.textContent = 'Upload failed - check that you are an admin user and try again.';
+        if (statusEl) statusEl.textContent = this._t('Upload failed - check that you are an admin user and try again.');
       }
     }
     // Mirrors the card's own _applyBackground: paths under /media/ need an
