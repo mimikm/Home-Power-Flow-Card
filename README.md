@@ -104,6 +104,7 @@ Or manually in HACS:
 ### 🌤️ Weather, stats and grid
 - **Weather & clock** box from any weather entity (12 or 24 hour)
 - **Today panel** with up to 20 statistics (solar yield, grid import/export, anything with a number), each with its own icon, updating live
+- **Dock the Today panel** to any edge of the card like a taskbar: always visible, or **auto-hide** as a small tab that slides out on hover or tap (separately for the phone layout)
 - **Self-sufficiency & self-consumption** (optional): how much of your electricity didn't come from the grid, and how much of your solar you used yourself, both live and for today
 - **Last updated** box (optional): a small pill counting live how long ago an entity was updated (e.g. `🕒 Updated 3m 05s ago`), turning amber when data goes stale, so you can spot a stalled integration at a glance. Understands date-time, time-only and Unix timestamp sensors
 - **UK grid mix** box (optional): live carbon intensity with a colour-coded rating, plus the current generation mix by source, for your region or all of Great Britain
@@ -290,6 +291,11 @@ Each device gets a stable internal `id` automatically. `connects_to` refers to t
 | `title_scale` | `1` | Title and subtitle size |
 | `device_scale` | `1` | Device box size |
 | `weather_scale` | `1` | Weather box size |
+| `stats_mode` | `floating` | Today panel: `floating` (draggable) or `docked` to a card edge |
+| `stats_dock_edge` | `bottom` | Docked edge: `bottom`, `top`, `left` or `right` |
+| `stats_dock_autohide` | `true` | Docked panel hides to a tab and slides out on hover/tap |
+| `phone_stats_mode` | `same` | Phone layout: `same` as desktop, `floating` or `docked` |
+| `phone_stats_dock_edge` / `phone_stats_dock_autohide` | `bottom` / `true` | Dock settings for the phone layout |
 | `stats_scale` | `0.8` | Today panel size (also shrinks automatically if too tall) |
 | `grid_mix_scale` | `1` | Grid mix box size |
 | `updated_scale` | `1` | Last updated box size |
