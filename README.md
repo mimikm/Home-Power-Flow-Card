@@ -90,6 +90,7 @@ Or manually in HACS:
 - **Drag and drop** devices, the title, the weather box, the Today panel, the grid mix box and the last updated box to exactly where you want them
 - **Custom backgrounds**: separate day and night images, switched automatically by the sun
 - **Title and subtitle** with your own text and colour, or leave them blank
+- **Box opacity**: make every box and panel more see-through (down to fully transparent) or more solid, on any theme
 - **Colour themes** for the boxes and panels: Auto (follows Home Assistant's light/dark mode), Dark, Light, Midnight, Ocean, Forest, Sunset and Graphite, or pick your own panel and text colours
 - **Sizing controls** for the title, device boxes, weather box, Today panel, grid mix box and last updated box
 
@@ -252,6 +253,7 @@ Each device gets a stable internal `id` automatically. `connects_to` refers to t
 | `subtitle` | — | Optional second line under the title |
 | `title_color` | `#ffffff` | Colour of the title and subtitle |
 | `theme` | `dark` | `auto`, `dark`, `light`, `midnight`, `ocean`, `forest`, `sunset`, `graphite` or `custom` |
+| `box_opacity` | `1` | Box and panel opacity: `0` (transparent) to `1.5` (more solid); `1` = theme default |
 | `theme_panel_color` | `#081d34` | Custom theme: panel colour |
 | `theme_text_color` | `#ffffff` | Custom theme: text colour |
 | `theme_opacity` | `0.8` | Custom theme: panel opacity (`0.2` to `1`) |
