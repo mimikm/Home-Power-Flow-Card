@@ -12,13 +12,13 @@ Show your whole home energy system (solar, batteries, grid, EV chargers, even mu
 
 ---
 
-## 🧪 Public test release
+## 🚧 Work in progress, fully functioning
 
-The card is feature-complete for most setups and actively developed. It's my **first open-source project**, and it keeps improving thanks to feedback from testers.
+The card is **fully functional** and ready to use on your dashboard. It's also a **work in progress**: new features and improvements arrive regularly, often based on what users ask for. It's my **first open-source project**, and it keeps getting better thanks to your feedback.
 
-**Back up your dashboard before installing** (or export your existing card config, see [Backup & Restore](#-backup--restore)).
+Tip: before big changes, export your card config as a backup (see [Backup & Restore](#-backup--restore)).
 
-Found a problem? [Open an issue](https://github.com/mimikm/Home-Power-Flow-Card/issues) and include:
+Found a problem or have an idea? [Open an issue](https://github.com/mimikm/Home-Power-Flow-Card/issues). For bugs, please include:
 - Home Assistant version
 - Card version (shown in the browser console on load)
 - Your card configuration (YAML or an exported config file)
@@ -89,6 +89,8 @@ Or manually in HACS:
 ### 🖱️ Flexible layout
 - **Drag and drop** devices, the title, the weather box, the Today panel, the grid mix box and the last updated box to exactly where you want them
 - **Custom backgrounds**: separate day and night images, switched automatically by the sun
+- **Any card shape**, including ultra-wide: 3:2, 4:3, 16:10, 16:9, 2:1, 21:9 and 32:9, **match your background image**, or **fill the screen** for an almost full-screen dashboard
+- **Fit whole image**: show the entire background picture, with soft blurred edges filling any gaps
 - **Title and subtitle** with your own text and colour, or leave them blank
 - **Box opacity**: make every box and panel more see-through (down to fully transparent) or more solid, on any theme
 - **Colour themes** for the boxes and panels: Auto (follows Home Assistant's light/dark mode), Dark, Light, Midnight, Ocean, Forest, Sunset and Graphite, or pick your own panel and text colours
@@ -253,6 +255,8 @@ Each device gets a stable internal `id` automatically. `connects_to` refers to t
 | `subtitle` | — | Optional second line under the title |
 | `title_color` | `#ffffff` | Colour of the title and subtitle |
 | `theme` | `dark` | `auto`, `dark`, `light`, `midnight`, `ocean`, `forest`, `sunset`, `graphite` or `custom` |
+| `card_aspect` | `3:2` | Card shape: `3:2`, `4:3`, `16:10`, `16:9`, `2:1`, `21:9`, `32:9`, `image` (match background) or `screen` (fill screen) |
+| `background_fit` | `cover` | `cover` (fill, cropping the image) or `contain` (whole image, blurred edges) |
 | `box_opacity` | `1` | Box and panel opacity: `0` (transparent) to `1.5` (more solid); `1` = theme default |
 | `theme_panel_color` | `#081d34` | Custom theme: panel colour |
 | `theme_text_color` | `#ffffff` | Custom theme: text colour |
