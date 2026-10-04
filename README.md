@@ -67,6 +67,7 @@ Or manually in HACS:
 - Live animated flow lines between every device, with a moving, softly pulsing dot showing the direction of power
 - Dots move **faster on high-power connections** and slower on light ones
 - Evenly spaced flow lines, whatever the distance between devices
+- Optionally keep **idle connections** visible as faint lines
 - Choose **curved** lines or **right-angle** lines that route around every box on the card and run side by side in parallel lanes instead of overlapping
 - A configurable **noise threshold** keeps idle connections quiet
 
@@ -79,6 +80,7 @@ Or manually in HACS:
 
 ### 🎨 Per-device customisation
 - Own name, power entity and **flow colour** for every device
+- **Batteries and grid work with one or two sensors**: a single sensor with positive/negative values, or **separate** charge/discharge (import/export) sensors as provided by e.g. Growatt
 - **History graph** (optional, per device): a faint graph of the device's power history behind its box, in the device's flow colour, with a zero line for signed values like batteries and the grid
 - Power shown in **W or kW**: automatically switches to kW from 1000 W (e.g. `3.20 kW`), or set it to always W / always kW
 - **Invert flow** per device, for sensors that report power the other way round
@@ -149,6 +151,17 @@ Two optional figures shown at the top of the Today panel. Turn them on in the ed
 - **Today** uses your daily energy sensors (kWh or Wh, converted automatically).
 - **No reliable consumption sensor?** Tick *Calculate consumption instead* and the card works it out: import + solar − export + battery discharge − battery charge (battery sensors optional).
 - Both follow the same direction as your Grid flow line. If the grid dots flow the wrong way, tick **Invert flow** on the Grid device to fix both.
+
+---
+
+## 🔌 One sensor or two?
+
+Batteries and the grid can be set up either way (device setting **Power sensors**):
+
+- **One sensor (+ and −)**, the default: battery positive = discharging, negative = charging; grid positive = export, negative = import. If yours is the other way round, use **Flow direction**.
+- **Separate sensors**: two sensors that both report positive values, e.g. Growatt's *Charge W* and *Discharge W*. The card combines them, so flow direction, battery glow, time remaining, self-sufficiency and the history graph all work as usual.
+
+Put **state of charge (%)** in the battery's *State of charge* field (under *Show time remaining*) or as an extra entity, not as the power sensor.
 
 ---
 
@@ -263,6 +276,7 @@ Each device gets a stable internal `id` automatically. `connects_to` refers to t
 | `theme_opacity` | `0.8` | Custom theme: panel opacity (`0.2` to `1`) |
 | `history_hours` | `24` | History graph range: `6`, `12`, `24` or `48` hours |
 | `history_opacity` | `0.35` | History graph opacity (`0.05` to `1`) |
+| `show_idle_lines` | `false` | Keep idle connections visible as faint lines |
 | `power_unit` | `auto` | `auto` (kW from 1000 W), `w` (always W) or `kw` (always kW) |
 | `flow_style` | `curved` | `curved`, or `orthogonal` for right-angle lines that avoid boxes |
 | `time_format` | `24h` | `24h` or `12h` for the clock |
@@ -319,6 +333,9 @@ Each device gets a stable internal `id` automatically. `connects_to` refers to t
 | `type` | `solar`, `inverter`, `battery`, `gateway`, `house`, `grid`, `generator`, `water`, `gas`, `ev` or `load` |
 | `name` | Display name |
 | `power_entity` | Power sensor (W) |
+| `power_mode` | Battery/Grid only: `single` (one sensor, + and −; default) or `split` (two separate sensors) |
+| `battery_charge_power_entity` / `battery_discharge_power_entity` | Battery with `split`: charging and discharging power sensors (both positive) |
+| `grid_import_power_entity` / `grid_export_power_entity` | Grid with `split`: import and export power sensors (both positive) |
 | `connects_to` | `id` of the device it's wired to (blank = Automatic) |
 | `flow_color` | Flow line colour, e.g. `#ffd54f` |
 | `invert_flow` | `true` to reverse the flow direction |
