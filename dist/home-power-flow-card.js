@@ -10,7 +10,7 @@
  * Issues & feature requests: https://github.com/mimikm/Home-Power-Flow-Card/issues
  */
 (() => {
-  const VERSION = '0.7.9.1';
+  const VERSION = '0.7.9.2';
   const DEFAULT_BG = '/hacsfiles/Home-Power-Flow-Card/smart-home-energy-background.png';
   const DEFAULT_BG_NIGHT = '/hacsfiles/Home-Power-Flow-Card/smart-home-energy-background2.png';
   const TYPES = [
@@ -2276,7 +2276,12 @@
       if (statusEl) statusEl.textContent = this._t('Uploading…');
       try {
         const ext = (file.name.split('.').pop() || 'png').toLowerCase().replace(/[^a-z0-9]/g,'') || 'png';
-        const filename = `home-power-flow-card-${slot}.${ext}`;
+        // A unique name for every upload: the old fixed name meant a new
+        // picture had the same address as the previous one, so the card,
+        // Home Assistant and the app kept showing the cached old picture.
+        const filename = `home-power-flow-card-${slot}-${Date.now()}.${ext}`;
+        const key = slot === 'day' ? 'background_upload_day' : 'background_upload_night';
+        const previous = this._config[key];
         const fd = new FormData();
         fd.append('media_content_id', 'media-source://media_source/local');
         fd.append('file', file, filename);
@@ -2289,8 +2294,12 @@
         if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
         const data = await resp.json();
         const path = '/media/' + String(data.media_content_id).replace('media-source://media_source/', '');
-        this._config[slot === 'day' ? 'background_upload_day' : 'background_upload_night'] = path;
+        this._config[key] = path;
         this._emit(false);
+        // Tidy up: remove this card's own previous upload for this slot.
+        if (previous && previous !== path && /\/home-power-flow-card-(day|night)[^/]*$/.test(previous) && this._hass?.callWS) {
+          this._hass.callWS({ type: 'media_source/local_source/remove', media_content_id: 'media-source://media_source/' + previous.replace(/^\/media\//, '') }).catch(() => {});
+        }
         this._render();
         setTimeout(()=>this._applyLayoutBg(slot),200);
       } catch (e) {
