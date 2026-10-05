@@ -10,7 +10,7 @@
  * Issues & feature requests: https://github.com/mimikm/Home-Power-Flow-Card/issues
  */
 (() => {
-  const VERSION = '0.7.12';
+  const VERSION = '0.7.12.1';
   const DEFAULT_BG = '/hacsfiles/Home-Power-Flow-Card/smart-home-energy-background.png';
   const DEFAULT_BG_NIGHT = '/hacsfiles/Home-Power-Flow-Card/smart-home-energy-background2.png';
   const TYPES = [
@@ -2013,9 +2013,17 @@
         // The card keeps a fixed 3:2 aspect ratio and scales its own contents
         // to its width, so fitting the preview only needs a width cap that
         // keeps the card's height inside the dialog.
-        const heightCandidates=[window.innerHeight*0.6];
-        if(surface?.clientHeight) heightCandidates.push(surface.clientHeight*0.62);
-        const availH=Math.max(320, Math.min(...heightCandidates));
+        // Height available for the preview: from the preview's (fixed) top
+        // edge to the bottom of the window, minus the dialog's button bar.
+        // Measured once per window size and then kept, so editing boxes
+        // (which changes the dialog's content height) never resizes it.
+        const winKey=`${window.innerWidth}x${window.innerHeight}`;
+        if(this._previewAvail?.key!==winKey){
+          const top=preview.getBoundingClientRect?.().top||0;
+          const h=top>0&&top<window.innerHeight*0.6 ? window.innerHeight-top-90 : window.innerHeight*0.6;
+          this._previewAvail={key:winKey,h:Math.max(320,Math.round(h))};
+        }
+        const availH=this._previewAvail.h;
         inner.style.display='block';
         inner.style.height=''; inner.style.overflow='';
         inner.style.width='100%';
@@ -2596,6 +2604,10 @@
       // Emit the config without rebuilding this editor. Home Assistant may call
       // setConfig afterwards; setConfig now ignores identical configs.
       fire(this,'config-changed',{config:JSON.parse(JSON.stringify(this._config))});
+      // Home Assistant swaps in a fresh preview card after a change: size it
+      // straight away instead of waiting for the next update (no flash/jump).
+      if(typeof requestAnimationFrame==='function') requestAnimationFrame(()=>this._enlargeDialogPreview());
+      clearTimeout(this._previewT); this._previewT=setTimeout(()=>this._enlargeDialogPreview(),150);
     }
   }
 
