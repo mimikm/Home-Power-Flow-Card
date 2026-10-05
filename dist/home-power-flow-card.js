@@ -10,7 +10,7 @@
  * Issues & feature requests: https://github.com/mimikm/Home-Power-Flow-Card/issues
  */
 (() => {
-  const VERSION = '0.7.9.2';
+  const VERSION = '0.7.9.3';
   const DEFAULT_BG = '/hacsfiles/Home-Power-Flow-Card/smart-home-energy-background.png';
   const DEFAULT_BG_NIGHT = '/hacsfiles/Home-Power-Flow-Card/smart-home-energy-background2.png';
   const TYPES = [
@@ -304,6 +304,10 @@
   // picture, 'screen' fills the available screen area.
   const CARD_RATIOS = { '3:2': 1.5, '4:3': 4 / 3, '16:10': 1.6, '16:9': 16 / 9, '2:1': 2, '21:9': 21 / 9, '32:9': 32 / 9 };
   const clampRatio = r => Math.max(1, Math.min(4, Number(r) || 1.5));
+  // Last 'Fill the screen' shape measured by a dashboard card on this page.
+  // The editor preview uses it instead of measuring itself: the preview
+  // resizes the card to fit its shape, so measuring there would loop.
+  let SCREEN_RATIO_HINT = null;
   // Battery and Grid can use either one signed power sensor (default) or two
   // separate sensors that both report positive values (e.g. Growatt). The
   // pair is combined into the card's convention: battery positive =
@@ -530,7 +534,8 @@
       // Switch between desktop and phone layout when needed (full redraw).
       const phone = this._computePhone();
       if (this._rendered && phone !== this._phoneMode) { this._render(); return; }
-      if (this._rendered && !this._phoneMode && Math.abs(this._computeRatio() - (this._ratio || 1.5)) > 0.02) { this._render(); return; }
+      const ratioTol = this._config?.card_aspect === 'screen' ? 0.05 : 0.02;
+      if (this._rendered && !this._phoneMode && Math.abs(this._computeRatio() - (this._ratio || 1.5)) > ratioTol) { this._render(); return; }
       const w = card.clientWidth;
       if (!w) return;
       stage.style.setProperty('--hpf-scale', String(w / (this._phoneMode ? 800 : this._stageW())));
@@ -1023,9 +1028,17 @@
       if (CARD_RATIOS[a]) return CARD_RATIOS[a];
       if (a === 'image') return clampRatio(this._bgRatio || 1.5);
       if (a === 'screen') {
-        const w = this.clientWidth || this.getBoundingClientRect?.().width || 0;
         const h = Math.max(300, (typeof window !== 'undefined' ? window.innerHeight : 900) - 96);
-        return w > 0 ? clampRatio(w / h) : 1.5;
+        if (typeof this._editorPhone === 'boolean') {
+          // In the card editor's preview: use the dashboard's shape (or the
+          // screen's proportions), never this preview's own width.
+          return SCREEN_RATIO_HINT || clampRatio((typeof window !== 'undefined' ? window.innerWidth : 1600) / h);
+        }
+        const w = this.clientWidth || this.getBoundingClientRect?.().width || 0;
+        if (!(w > 0)) return SCREEN_RATIO_HINT || 1.5;
+        const r = clampRatio(w / h);
+        SCREEN_RATIO_HINT = r;
+        return r;
       }
       return 1.5;
     }
