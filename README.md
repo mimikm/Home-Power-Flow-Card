@@ -69,7 +69,8 @@ Or manually in HACS:
 - Evenly spaced flow lines, whatever the distance between devices
 - Optionally keep **idle connections** visible as faint lines
 - Switch off flow lines **per device** with a simple tick box
-- Choose **curved** lines or **right-angle** lines that route around every box on the card and run side by side in parallel lanes instead of overlapping
+- Choose **curved** lines, **right-angle** lines that route around every box on the card (running side by side in parallel lanes instead of overlapping), or **manual** lines you shape yourself
+- **Manual lines**: click a line in the layout editor to add bend points, drag them where you want (they snap into line for clean right angles), double-click to remove. Separate shapes for desktop and phone
 - A configurable **noise threshold** keeps idle connections quiet
 
 ### 🔌 Any setup, including multi-inverter
@@ -280,7 +281,8 @@ Each device gets a stable internal `id` automatically. `connects_to` refers to t
 | `history_opacity` | `0.35` | History graph opacity (`0.05` to `1`) |
 | `show_idle_lines` | `false` | Keep idle connections visible as faint lines |
 | `power_unit` | `auto` | `auto` (kW from 1000 W), `w` (always W) or `kw` (always kW) |
-| `flow_style` | `curved` | `curved`, or `orthogonal` for right-angle lines that avoid boxes |
+| `flow_style` | `curved` | `curved`, `orthogonal` (right-angle lines that avoid boxes) or `manual` (your own bend points) |
+| `flow_routes` / `phone_flow_routes` | — | Manual line bend points per connection (set in the layout editor) |
 | `time_format` | `24h` | `24h` or `12h` for the clock |
 | `weather_entity` | — | Weather entity for the weather box |
 | `sun_entity` | `sun.sun` | Switches between the day and night backgrounds |
