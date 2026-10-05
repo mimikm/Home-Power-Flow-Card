@@ -68,6 +68,7 @@ Or manually in HACS:
 - Dots move **faster on high-power connections** and slower on light ones
 - Evenly spaced flow lines, whatever the distance between devices
 - Optionally keep **idle connections** visible as faint lines
+- Switch off flow lines **per device** with a simple tick box
 - Choose **curved** lines or **right-angle** lines that route around every box on the card and run side by side in parallel lanes instead of overlapping
 - A configurable **noise threshold** keeps idle connections quiet
 
@@ -338,7 +339,8 @@ Each device gets a stable internal `id` automatically. `connects_to` refers to t
 | `grid_import_power_entity` / `grid_export_power_entity` | Grid with `split`: import and export power sensors (both positive) |
 | `connects_to` | `id` of the device it's wired to (blank = Automatic) |
 | `flow_color` | Flow line colour, e.g. `#ffd54f` |
-| `invert_flow` | `true` to reverse the flow direction |
+| `invert_flow` | `true` to reverse the flow direction (for batteries and the grid this also swaps charging/discharging or import/export) |
+| `flow_lines` | `false` to hide this device's flow lines (the box and values stay) |
 | `battery_glow` | Batteries only: `false` to turn off the charge/discharge glow |
 | `battery_time` | Batteries only: `true` to show time remaining |
 | `battery_soc_entity` | Batteries only: state of charge sensor (%) |
