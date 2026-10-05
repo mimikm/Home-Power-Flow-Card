@@ -90,6 +90,7 @@ Or manually in HACS:
 - **Battery time remaining** (optional): e.g. `⏳ 2h 40m to 4%` or `⏳ 1h 15m to full`, from the battery's state of charge and capacity, with its own reserve and charge limit
 
 ### 🖱️ Flexible layout
+- **Resize any device box** like a window: drag its right or bottom edge or corner in the layout editor. The text scales so everything (value, extras, battery time) always fits. Separate sizes for desktop and phone; double-click the corner to reset
 - **Drag and drop** devices, the title, the weather box, the Today panel, the grid mix box and the last updated box to exactly where you want them
 - **Custom backgrounds**: separate day and night images, switched automatically by the sun
 - **Any card shape**, including ultra-wide: 3:2, 4:3, 16:10, 16:9, 2:1, 21:9 and 32:9, **match your background image**, or **fill the screen** for an almost full-screen dashboard
@@ -340,6 +341,8 @@ Each device gets a stable internal `id` automatically. `connects_to` refers to t
 | `connects_to` | `id` of the device it's wired to (blank = Automatic) |
 | `flow_color` | Flow line colour, e.g. `#ffd54f` |
 | `invert_flow` | `true` to reverse the flow direction (for batteries and the grid this also swaps charging/discharging or import/export) |
+| `box_w` / `box_h` | Custom box width/height (design px, min 110×60); set by resizing in the layout editor |
+| `phone_box_w` / `phone_box_h` | Custom box size for the phone layout |
 | `flow_lines` | `false` to hide this device's flow lines (the box and values stay) |
 | `battery_glow` | Batteries only: `false` to turn off the charge/discharge glow |
 | `battery_time` | Batteries only: `true` to show time remaining |
