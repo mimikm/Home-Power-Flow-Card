@@ -67,6 +67,8 @@ Or manually in HACS:
 - Live animated flow lines between every device, with a moving, softly pulsing dot showing the direction of power
 - Dots move **faster on high-power connections** and slower on light ones
 - Evenly spaced flow lines, whatever the distance between devices
+- **Seven flow line looks**: Classic, Neon (glowing comet), Energy stream (more particles and thicker lines with more power), Marching dashes, Minimal, Blueprint (travelling arrows) and Static, with **separate looks for day and night**
+- Respects your device's **reduce motion** setting (lines become static)
 - Optionally keep **idle connections** visible as faint lines
 - Switch off flow lines **per device** with a simple tick box
 - Choose **curved** lines, **right-angle** lines that route around every box on the card (running side by side in parallel lanes instead of overlapping), or **manual** lines you shape yourself
@@ -281,6 +283,8 @@ Each device gets a stable internal `id` automatically. `connects_to` refers to t
 | `history_opacity` | `0.35` | History graph opacity (`0.05` to `1`) |
 | `show_idle_lines` | `false` | Keep idle connections visible as faint lines |
 | `power_unit` | `auto` | `auto` (kW from 1000 W), `w` (always W) or `kw` (always kW) |
+| `flow_look_day` | `classic` | Flow line look: `classic`, `neon`, `stream`, `marching`, `minimal`, `blueprint` or `static` |
+| `flow_look_night` | `same` | Look at night (sun below the horizon): `same` as day or any look above |
 | `flow_style` | `curved` | `curved`, `orthogonal` (right-angle lines that avoid boxes) or `manual` (your own bend points) |
 | `flow_routes` / `phone_flow_routes` | — | Manual line bend points per connection (set in the layout editor) |
 | `time_format` | `24h` | `24h` or `12h` for the clock |
@@ -369,7 +373,6 @@ Ideas and feedback are welcome, so [open an issue](https://github.com/mimikm/Hom
 
 **Stability & polish**
 - Editor warnings for misconfigured devices and broken "Connects to" links
-- Respect the system "reduce motion" setting for flow dots
 
 **Features**
 - Configurable tap actions per device (more-info, navigate, toggle)
