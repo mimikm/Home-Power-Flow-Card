@@ -122,6 +122,7 @@ Or manually in HACS:
 
 ### ⚙️ Fully visual editor
 - Everything is configurable without YAML, using Home Assistant's own entity, icon and colour pickers
+- **Built-in warnings** that spot common mistakes: missing or misspelled sensors, unavailable entities, a power sensor with the wrong unit (e.g. `%`), broken or looping *Connects to* links, devices not connected to anything, and incomplete battery settings
 - Collapsible, **drag-to-reorder** devices and statistics, plus collapsible optional sections to keep the editor tidy
 - **Duplicate** any device with one click, handy for multi-inverter or multi-string setups
 - A **live direction readout** under each device's Invert flow toggle (e.g. `▶ Solar PV → Inverter · 450 W`), so you can check flow directions before saving
@@ -375,9 +376,6 @@ Positions and sizes are easiest to set by dragging in the editor's **Visual layo
 ## 🗺️ Roadmap
 
 Ideas and feedback are welcome, so [open an issue](https://github.com/mimikm/Home-Power-Flow-Card/issues) if there's something you'd like to see.
-
-**Stability & polish**
-- Editor warnings for misconfigured devices and broken "Connects to" links
 
 **Features**
 - Configurable tap actions per device (more-info, navigate, toggle)
