@@ -84,6 +84,7 @@ Or manually in HACS:
 
 ### 🎨 Per-device customisation
 - Own name, power entity and **flow colour** for every device
+- **Flow colour by direction**: batteries can use the glow colours (green charging, amber discharging) or your own charging/discharging colours; the grid can use your own import/export colours
 - **Batteries and grid work with one or two sensors**: a single sensor with positive/negative values, or **separate** charge/discharge (import/export) sensors as provided by e.g. Growatt
 - **History graph** (optional, per device): a faint graph of the device's power history behind its box, in the device's flow colour, with a zero line for signed values like batteries and the grid
 - Power shown in **W or kW**: automatically switches to kW from 1000 W (e.g. `3.20 kW`), or set it to always W / always kW
@@ -319,6 +320,7 @@ Each device gets a stable internal `id` automatically. `connects_to` refers to t
 | `title_scale` | `1` | Title and subtitle size |
 | `device_scale` | `1` | Device box size |
 | `weather_scale` | `1` | Weather box size |
+| `stats_decimals` | `2` | Decimal places for Today panel values (`0` to `3`) |
 | `stats_mode` | `floating` | Today panel: `floating` (draggable) or `docked` to a card edge |
 | `stats_dock_edge` | `bottom` | Docked edge: `bottom`, `top`, `left` or `right` |
 | `stats_dock_autohide` | `true` | Docked panel hides to a tab and slides out on hover/tap |
@@ -349,6 +351,9 @@ Each device gets a stable internal `id` automatically. `connects_to` refers to t
 | `invert_flow` | `true` to reverse the flow direction (for batteries and the grid this also swaps charging/discharging or import/export) |
 | `box_w` / `box_h` | Custom box width/height (design px, min 110×60); set by resizing in the layout editor |
 | `phone_box_w` / `phone_box_h` | Custom box size for the phone layout |
+| `flow_color_mode` | Battery: `single` (default), `glow` or `custom`; Grid: `single` or `custom` |
+| `flow_color_charge` / `flow_color_discharge` | Battery with `custom`: line colours when charging / discharging |
+| `flow_color_import` / `flow_color_export` | Grid with `custom`: line colours when importing / exporting |
 | `flow_lines` | `false` to hide this device's flow lines (the box and values stay) |
 | `battery_glow` | Batteries only: `false` to turn off the charge/discharge glow |
 | `battery_time` | Batteries only: `true` to show time remaining |
@@ -376,6 +381,8 @@ Ideas and feedback are welcome, so [open an issue](https://github.com/mimikm/Hom
 
 **Features**
 - Configurable tap actions per device (more-info, navigate, toggle)
+- **Extra backgrounds**: more background pictures beyond day and night, e.g. a winter or seasonal picture, chosen automatically by date/season or by any Home Assistant entity
+- **Bin collection day**: a small box or badge showing which bin goes out next and when (e.g. "🟢 Garden waste – tomorrow"), using your bin collection sensor or calendar
 
 **Project**
 - More languages (contributions welcome!)
