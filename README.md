@@ -97,6 +97,8 @@ Or manually in HACS:
 - **Resize any device box** like a window: drag its right or bottom edge or corner in the layout editor. The text scales so everything (value, extras, battery time) always fits. Separate sizes for desktop and phone; double-click the corner to reset
 - **Drag and drop** devices, the title, the weather box, the Today panel, the grid mix box and the last updated box to exactly where you want them
 - **Custom backgrounds**: separate day and night images, switched automatically by the sun
+- **Seasonal background**: a day and night picture for Halloween, Christmas, Easter or your own dates, coming back by itself every year
+- **Animated rain & snow**: falling rain, snow, sleet, hail and lightning drawn live over any background whenever your weather entity reports them
 - **Any card shape**, including ultra-wide: 3:2, 4:3, 16:10, 16:9, 2:1, 21:9 and 32:9, **match your background image**, or **fill the screen** for an almost full-screen dashboard
 - **Fit whole image**: show the entire background picture, with soft blurred edges filling any gaps
 - **Title and subtitle** with your own text and colour, or leave them blank
@@ -207,6 +209,46 @@ On narrow screens the card switches to a **portrait layout** with its own box po
 
 ---
 
+## 🎃 Seasonal background
+
+Tick **Seasonal background** under your day and night backgrounds to add a picture for a time of year:
+
+| Season | Shown |
+|---|---|
+| 🎃 Halloween | 25 Oct – 1 Nov |
+| 🎄 Christmas | 1 Dec – 6 Jan |
+| 🐣 Easter | Palm Sunday – Easter Monday (calculated each year) |
+| 📅 Custom dates | Any range you choose; it can cross New Year |
+
+- **Day and night pictures:** tap a tile to upload, or use 🔗 to paste an image URL. 👁 previews it in the layout editor, ✕ removes it.
+- **Leave Night empty** to use the Day picture all the time.
+- It comes back by itself every year; outside the dates your normal day/night background shows.
+- **Animated rain & snow** still play over it.
+- Unticking the box keeps your pictures for next time.
+
+## 🌧️ Animated rain & snow
+
+Tick **Animated rain & snow** under the backgrounds and the card draws the weather live over whatever background is showing. No extra pictures needed. Your boxes and flow lines always stay on top.
+
+| Weather entity reports | Effect |
+|---|---|
+| rainy | Rain |
+| pouring | Heavy rain |
+| lightning-rainy | Heavy rain with lightning flashes |
+| lightning | Lightning flashes only |
+| hail | Hail with some rain |
+| snowy | Snow |
+| snowy-rainy | Sleet (snow and rain together) |
+
+- **Amount** slider from light drizzle to a downpour.
+- **Wind:** the rain tilts with the wind speed and direction from your weather entity.
+- **Lightning flashes** can be switched off.
+- **Try it:** preview buttons in the editor show each effect on the card, even on a dry day.
+- **Light on your device:** it eases in and out as the weather changes, and stops completely when it's dry, when the card is off screen, or when the app is in the background. It's off if your device is set to reduce motion.
+- Shows over every background, including your seasonal pictures.
+
+---
+
 ## 🔌 Multi-inverter setups
 
 With a single inverter there is nothing to configure.
@@ -294,6 +336,13 @@ Each device gets a stable internal `id` automatically. `connects_to` refers to t
 | `sun_entity` | `sun.sun` | Switches between the day and night backgrounds |
 | `background` | built-in | Day background image URL |
 | `background_night` | built-in | Night background image URL |
+| `weather_effects` | `false` | Animated rain, snow, hail and lightning over the background |
+| `weather_effects_amount` | `1` | How much rain/snow, `0.25` to `2` |
+| `weather_effects_lightning` | `true` | Lightning flashes in thunderstorms |
+| `seasonal_background` | `false` | Turns on the seasonal background |
+| `background_season_day` / `background_season_night` | | Seasonal pictures (night falls back to day) |
+| `season` | `halloween` | `halloween`, `christmas`, `easter` or `custom` |
+| `season_start_day` / `season_start_month` / `season_end_day` / `season_end_month` | | Dates for `season: custom` (the range can cross New Year) |
 | `flow_threshold_watts` | `1` | Minimum power (W) before a flow line shows |
 | `flow_speed` | `8` | Base animation duration in seconds (at 1 kW) |
 | `updated_enabled` | `false` | Show the last updated box |
@@ -379,7 +428,6 @@ Ideas and feedback are welcome, so [open an issue](https://github.com/mimikm/Hom
 
 **Features**
 - Configurable tap actions per device (more-info, navigate, toggle)
-- **Extra backgrounds**: more background pictures beyond day and night, e.g. a winter or seasonal picture, chosen automatically by date/season or by any Home Assistant entity
 - **Bin collection day**: a small box or badge showing which bin goes out next and when (e.g. "🟢 Garden waste – tomorrow"), using your bin collection sensor or calendar
 
 **Project**
