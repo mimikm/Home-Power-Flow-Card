@@ -10,7 +10,7 @@
  * Issues & feature requests: https://github.com/mimikm/Home-Power-Flow-Card/issues
  */
 (() => {
-  const VERSION = '0.7.16';
+  const VERSION = '0.7.16.1';
   const DEFAULT_BG = '/hacsfiles/Home-Power-Flow-Card/smart-home-energy-background.png';
   const DEFAULT_BG_NIGHT = '/hacsfiles/Home-Power-Flow-Card/smart-home-energy-background2.png';
   const TYPES = [
@@ -2107,9 +2107,18 @@
       next.statistics ||= {};
       migrateDeviceIdsAndLinks(next);
       migrateFlowThreshold(next);
-      const changed=JSON.stringify(next)!==JSON.stringify(this._config);
+      const nextStr=JSON.stringify(next);
+      // Same as what we already have (usually Home Assistant echoing our own
+      // change back): keep our object, so nothing in progress is lost.
+      if(nextStr===JSON.stringify(this._config)){ if(!this.shadowRoot.firstElementChild) this._render(); return; }
+      // An OLDER copy of something we sent a moment ago, arriving after a
+      // newer change (e.g. a quick drag or reorder): keep the newer one and
+      // send it again, otherwise the older order/position would be saved.
+      const now=Date.now(); this._sent=(this._sent||[]).filter(x=>now-x.t<2500);
+      const at=this._sent.findIndex(x=>x.s===nextStr);
+      if(at>=0 && at<this._sent.length-1){ this._emit(false); return; }
       this._config=next;
-      if(changed || !this.shadowRoot.firstElementChild) this._render();
+      this._render();
     }
     set hass(h){
       this._hass=h;
@@ -2284,7 +2293,7 @@
         if (el.hasAttribute('data-extra-picker')) {
           const di=Number(el.dataset.deviceIndex), ei=Number(el.dataset.extraIndex);
           el.value = this._config.devices[di]?.extra_entities?.[ei]?.entity || '';
-          el.addEventListener('value-changed', e=>{
+          el.addEventListener('value-changed',e=>{ if(!e.currentTarget?.isConnected) return;
             this._config.devices[di].extra_entities[ei].entity = e.detail.value || '';
             const lab = el.parentElement?.querySelector('.entity-id');
             if (lab) lab.textContent = e.detail.value || 'Not selected';
@@ -2293,7 +2302,7 @@
           return;
         }
         el.value = el.dataset.editorKey ? (this._config[el.dataset.editorKey] || '') : el.dataset.devicePicker ? (this._config.devices[Number(el.dataset.devicePicker)][el.dataset.field] || '') : (this._config.statistics?.[el.dataset.stat] || '');
-        el.addEventListener('value-changed', e=>{
+        el.addEventListener('value-changed',e=>{ if(!e.currentTarget?.isConnected) return;
           if (el.dataset.editorKey) this._config[el.dataset.editorKey]=e.detail.value || '';
           else if (el.dataset.devicePicker) { const i=Number(el.dataset.devicePicker); this._config.devices[i][el.dataset.field]=e.detail.value || ''; const labels={power_entity:'[data-entity-label]'}; const lab=el.parentElement?.querySelector(labels[el.dataset.field] || '[data-entity-label]'); if(lab) lab.textContent=e.detail.value||'Not selected'; }
           else if (el.dataset.stat) { this._config.statistics ||= {}; this._config.statistics[el.dataset.stat]=e.detail.value || ''; }
@@ -2301,7 +2310,7 @@
         });
       });
       this.shadowRoot.querySelectorAll('[data-extra-icon]').forEach(el=>{
-        el.addEventListener('value-changed', e=>{
+        el.addEventListener('value-changed',e=>{ if(!e.currentTarget?.isConnected) return;
           const di=Number(el.dataset.deviceIndex), ei=Number(el.dataset.extraIndex);
           this._config.devices[di].extra_entities[ei].icon = e.detail.value || '';
           this._emit(false);
@@ -2335,7 +2344,7 @@
         this._emit(false);
         this._render();
       }));
-      this.shadowRoot.querySelectorAll('[data-key]').forEach(el=>el.addEventListener('change',e=>{ const k=e.target.dataset.key; if(k==='flow_threshold_watts'){ const watts=Math.max(0,parseFloat(e.target.value)||0); this._config.flow_threshold=watts/1000; this._config.flow_threshold_watts=watts; } else { this._config[k]=e.target.value; if(['flow_threshold','flow_speed','flow_stagger','device_scale','mobile_scale','max_width','stats_scale','weather_scale','title_scale','grid_mix_scale','updated_scale','updated_stale_minutes','theme_opacity','phone_breakpoint','phone_bg_focus_x','phone_bg_focus_y','history_hours','history_opacity','box_opacity','stats_decimals','season_start_day','season_start_month','season_end_day','season_end_month'].includes(k))this._config[k]=parseFloat(e.target.value)||0; if(e.target.type==='checkbox'){this._config[k]=e.target.checked;} } if(['self_sufficiency_live','self_sufficiency_today','self_consumption_live','self_consumption_today'].includes(k)){const sub=this.shadowRoot.querySelector('[data-toggle-section="selfsuff"] .section-sub'); if(sub){const n=['self_sufficiency_live','self_sufficiency_today','self_consumption_live','self_consumption_today'].filter(x=>this._config[x]===true).length; sub.textContent=n?(langOf(this._hass)==='pl'?`włączone: ${n} z 4`:langOf(this._hass)==='es'?`${n} de 4 activadas`:`${n} of 4 on`):this._t('off');}} if(['grid_mix_enabled','updated_enabled','theme','stats_mode','phone_stats_mode','card_aspect','background_fit','flow_style','weather_effects','seasonal_background','season','season_start_day','season_start_month','season_end_day','season_end_month'].includes(k)||/^background_season_(day|night)$/.test(k)){this._emit(false);this._render();return;} if(e.target.type==='color'){const pv=e.target.parentElement?.querySelector('.color-preview'); if(pv) pv.style.background=e.target.value;} this._emit(false); }));
+      this.shadowRoot.querySelectorAll('[data-key]').forEach(el=>el.addEventListener('change',e=>{ if(!e.currentTarget?.isConnected) return; const k=e.target.dataset.key; if(k==='flow_threshold_watts'){ const watts=Math.max(0,parseFloat(e.target.value)||0); this._config.flow_threshold=watts/1000; this._config.flow_threshold_watts=watts; } else { this._config[k]=e.target.value; if(['flow_threshold','flow_speed','flow_stagger','device_scale','mobile_scale','max_width','stats_scale','weather_scale','title_scale','grid_mix_scale','updated_scale','updated_stale_minutes','theme_opacity','phone_breakpoint','phone_bg_focus_x','phone_bg_focus_y','history_hours','history_opacity','box_opacity','stats_decimals','season_start_day','season_start_month','season_end_day','season_end_month'].includes(k))this._config[k]=parseFloat(e.target.value)||0; if(e.target.type==='checkbox'){this._config[k]=e.target.checked;} } if(['self_sufficiency_live','self_sufficiency_today','self_consumption_live','self_consumption_today'].includes(k)){const sub=this.shadowRoot.querySelector('[data-toggle-section="selfsuff"] .section-sub'); if(sub){const n=['self_sufficiency_live','self_sufficiency_today','self_consumption_live','self_consumption_today'].filter(x=>this._config[x]===true).length; sub.textContent=n?(langOf(this._hass)==='pl'?`włączone: ${n} z 4`:langOf(this._hass)==='es'?`${n} de 4 activadas`:`${n} of 4 on`):this._t('off');}} if(['grid_mix_enabled','updated_enabled','theme','stats_mode','phone_stats_mode','card_aspect','background_fit','flow_style','weather_effects','seasonal_background','season','season_start_day','season_start_month','season_end_day','season_end_month'].includes(k)||/^background_season_(day|night)$/.test(k)){this._emit(false);this._render();return;} if(e.target.type==='color'){const pv=e.target.parentElement?.querySelector('.color-preview'); if(pv) pv.style.background=e.target.value;} this._emit(false); }));
       this.shadowRoot.querySelector('#add')?.addEventListener('click',()=>{
         const id=genDeviceId();
         this._config.devices.push({id,type:'solar',name:`Device ${this._config.devices.length+1}`,power_entity:''});
@@ -2360,7 +2369,7 @@
       }));
       this.shadowRoot.querySelectorAll('[data-remove]').forEach(b=>b.addEventListener('click',()=>{this._config.devices.splice(Number(b.dataset.remove),1);this._emit(false);this._render();}));
       this.shadowRoot.querySelectorAll('[data-conn-remove]').forEach(b=>b.addEventListener('click',()=>{this._config.connections.splice(Number(b.dataset.connRemove),1);this._emit(false);this._render();}));
-      this.shadowRoot.querySelectorAll('[data-conn]').forEach(el=>el.addEventListener('change',e=>{
+      this.shadowRoot.querySelectorAll('[data-conn]').forEach(el=>el.addEventListener('change',e=>{ if(!e.currentTarget?.isConnected) return;
         const i=Number(el.dataset.conn),k=el.dataset.field;
         this._config.connections[i][k] = k==='direction' ? Number(e.target.value) : e.target.value;
         this._emit(false);
@@ -2369,7 +2378,7 @@
       this.shadowRoot.querySelector('#add-stat')?.addEventListener('click',()=>{this._config.statistics ||= {}; this._config.statistics.entities ||= []; if(this._config.statistics.entities.length<20){this._config.statistics.entities.push({name:'Statistic',entity:'',icon:'mdi:chart-line',custom_icon:''});this._statsOpen.set(this._config.statistics.entities.length-1,true);this._emit(false);this._render();}});
       this.shadowRoot.querySelector('#export-config')?.addEventListener('click',()=>{this._exportConfig();});
       this.shadowRoot.querySelector('#import-config-btn')?.addEventListener('click',()=>{this.shadowRoot.querySelector('[data-import-config-file]')?.click();});
-      this.shadowRoot.querySelector('[data-import-config-file]')?.addEventListener('change',e=>{const f=e.target.files?.[0]; if(f) this._importConfigFile(f); e.target.value='';});
+      this.shadowRoot.querySelector('[data-import-config-file]')?.addEventListener('change',e=>{ if(!e.currentTarget?.isConnected) return;const f=e.target.files?.[0]; if(f) this._importConfigFile(f); e.target.value='';});
       this.shadowRoot.querySelectorAll('[data-remove-stat]').forEach(b=>b.addEventListener('click',()=>{const r=Number(b.dataset.removeStat);this._config.statistics.entities.splice(r,1);this._remapStatsOpen(k=>k===r?null:(k>r?k-1:k));this._emit(false);this._render();}));
       this._enableSortable('#stats-list',(from,to)=>{
         const a=this._config.statistics.entities; const [m]=a.splice(from,1); a.splice(to,0,m);
@@ -2389,10 +2398,10 @@
       this.shadowRoot.querySelectorAll('[data-toggle-stat]').forEach(el=>el.addEventListener('click',()=>{
         const i=Number(el.dataset.toggleStat); this._statsOpen.set(i,!(this._statsOpen.get(i)===true)); this._render();
       }));
-      this.shadowRoot.querySelectorAll('[data-stat-field]').forEach(el=>el.addEventListener('change',e=>{const i=Number(el.dataset.index); const k=el.dataset.statField; this._config.statistics.entities[i][k]=e.target.value; this._emit(false);}));
-      this.shadowRoot.querySelectorAll('[data-stat-icon]').forEach(el=>{el.addEventListener('value-changed',e=>{const i=Number(el.dataset.index);this._config.statistics.entities[i].icon=e.detail.value||'mdi:chart-line';this._emit(false);});});
-      this.shadowRoot.querySelectorAll('[data-stat-picker]').forEach(el=>{el.hass=this._hass; el.value=this._config.statistics.entities[Number(el.dataset.index)]?.entity||''; el.addEventListener('value-changed',e=>{this._config.statistics.entities[Number(el.dataset.index)].entity=e.detail.value||'';this._emit(false);});});
-      this.shadowRoot.querySelectorAll('[data-device]').forEach(el=>el.addEventListener('change',e=>{
+      this.shadowRoot.querySelectorAll('[data-stat-field]').forEach(el=>el.addEventListener('change',e=>{ if(!e.currentTarget?.isConnected) return;const i=Number(el.dataset.index); const k=el.dataset.statField; this._config.statistics.entities[i][k]=e.target.value; this._emit(false);}));
+      this.shadowRoot.querySelectorAll('[data-stat-icon]').forEach(el=>{el.addEventListener('value-changed',e=>{ if(!e.currentTarget?.isConnected) return;const i=Number(el.dataset.index);this._config.statistics.entities[i].icon=e.detail.value||'mdi:chart-line';this._emit(false);});});
+      this.shadowRoot.querySelectorAll('[data-stat-picker]').forEach(el=>{el.hass=this._hass; el.value=this._config.statistics.entities[Number(el.dataset.index)]?.entity||''; el.addEventListener('value-changed',e=>{ if(!e.currentTarget?.isConnected) return;this._config.statistics.entities[Number(el.dataset.index)].entity=e.detail.value||'';this._emit(false);});});
+      this.shadowRoot.querySelectorAll('[data-device]').forEach(el=>el.addEventListener('change',e=>{ if(!e.currentTarget?.isConnected) return;
         const i=Number(el.dataset.device),k=el.dataset.field;
         if (k==='connects_to') {
           const v=e.target.value;
@@ -2411,7 +2420,7 @@
       this._enableRouteEditing();
       this._applyLayoutBg();
       this.shadowRoot.querySelectorAll('[data-bg-upload-btn]').forEach(b=>b.addEventListener('click',()=>{this.shadowRoot.querySelector(`[data-bg-file="${b.dataset.bgUploadBtn}"]`)?.click();}));
-      this.shadowRoot.querySelectorAll('[data-bg-file]').forEach(inp=>inp.addEventListener('change',e=>{const f=e.target.files?.[0];if(f)this._uploadBackground(f,inp.dataset.bgFile);}));
+      this.shadowRoot.querySelectorAll('[data-bg-file]').forEach(inp=>inp.addEventListener('change',e=>{ if(!e.currentTarget?.isConnected) return;const f=e.target.files?.[0];if(f)this._uploadBackground(f,inp.dataset.bgFile);}));
       this.shadowRoot.querySelectorAll('[data-bg-restore]').forEach(b=>b.addEventListener('click',()=>{const slot=b.dataset.bgRestore;delete this._config[slot==='day'?'background_upload_day':'background_upload_night'];this._emit(false);this._render();}));
       this.shadowRoot.querySelectorAll('[data-wx-preview]').forEach(b=>b.addEventListener('click',()=>{WX_FX_PREVIEW=b.dataset.wxPreview||null; this.shadowRoot.querySelectorAll('[data-wx-preview]').forEach(x=>x.classList.toggle('on',(x.dataset.wxPreview||null)===WX_FX_PREVIEW&&!!WX_FX_PREVIEW)); try{window.dispatchEvent(new Event('hpf-wx-preview'));}catch(e){}}));
       this.shadowRoot.querySelectorAll('[data-bg-clear]').forEach(b=>b.addEventListener('click',()=>{delete this._config[bgKeyFor(b.dataset.bgClear)];this._emit(false);this._render();}));
@@ -2958,13 +2967,18 @@
             if(before){ if(item.nextElementSibling!==before) list.insertBefore(item,before); }
             else { const last=others[others.length-1]; if(last&&last.nextElementSibling!==item) last.after(item); }
           };
+          // Listen on the window, not the handle: moving the row in the page
+          // makes the browser drop pointer capture, so the handle often never
+          // saw the release and the new order was never saved.
+          let done=false;
           const up=()=>{
-            h.removeEventListener('pointermove',move); h.removeEventListener('pointerup',up); h.removeEventListener('pointercancel',up);
+            if(done) return; done=true;
+            window.removeEventListener('pointermove',move); window.removeEventListener('pointerup',up); window.removeEventListener('pointercancel',up);
             item.classList.remove('sorting');
             const to=[...list.querySelectorAll(':scope > .sort-item')].indexOf(item);
             if(to>=0&&to!==from) onMove(from,to); else this._render();
           };
-          h.addEventListener('pointermove',move); h.addEventListener('pointerup',up); h.addEventListener('pointercancel',up);
+          window.addEventListener('pointermove',move); window.addEventListener('pointerup',up); window.addEventListener('pointercancel',up);
         });
       });
     }
@@ -2974,7 +2988,9 @@
       if(syncStats) this.shadowRoot.querySelectorAll('[data-stat]').forEach(el=>this._config.statistics[el.dataset.stat]=el.value);
       // Emit the config without rebuilding this editor. Home Assistant may call
       // setConfig afterwards; setConfig now ignores identical configs.
-      fire(this,'config-changed',{config:JSON.parse(JSON.stringify(this._config))});
+      const sent=JSON.stringify(this._config);
+      (this._sent ||= []).push({s:sent,t:Date.now()}); if(this._sent.length>20) this._sent.shift();
+      fire(this,'config-changed',{config:JSON.parse(sent)});
       try { this._refreshWarnings(); } catch(e) {}
       // Home Assistant swaps in a fresh preview card after a change: size it
       // straight away instead of waiting for the next update (no flash/jump).
