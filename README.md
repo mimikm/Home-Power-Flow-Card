@@ -136,6 +136,10 @@ Pick a style under **View style** at the top of the editor. All styles use the s
 - Full support for Home Assistant's **Sections** dashboards
 - Tested on desktop browsers and the iOS app
 
+### 🗑️ Bin collection
+- Shows which bins go out **all day before collection** ("Tomorrow") and **on collection day** ("Today"), with a coloured wheelie bin for each
+- Dates from **your Home Assistant calendars** (one per bin, or one shared calendar with match words) or a simple **repeating schedule**
+
 ### 🌤️ Weather, stats and grid
 - **Weather & clock** box from any weather entity (12 or 24 hour)
 - **Today panel** with up to 20 statistics (solar yield, grid import/export, anything with a number), each with its own icon, updating live
@@ -271,6 +275,22 @@ Tick **Animated rain & snow** under the backgrounds and the card draws the weath
 
 ---
 
+## 🗑️ Bin collection
+
+Turn on **Show bin collection** in the editor and add up to 5 bins. Each bin has a name and a colour, and gets its dates from either:
+
+- **A calendar:** pick the Home Assistant calendar for that bin. If one calendar holds several bins, add **match words** (e.g. `recycling, blue`) so each bin only picks its own events. Works with any calendar, including the [Waste Collection Schedule](https://github.com/mampfes/hacs_waste_collection_schedule) integration. Bank holiday changes in your calendar come through automatically.
+- **A repeating schedule:** enter any one collection date and how often it repeats (every 1 to 8 weeks). For bins that alternate fortnightly, give both "every 2 weeks" with dates a week apart. Optional **skip dates** and **extra dates** handle holiday changes.
+
+What you see:
+- A small badge with coloured wheelie bins, e.g. **General waste & Recycling · Tomorrow**, shown all day before collection and all day on collection day. On collection day it gets an amber border.
+- Or choose **Always show the next collection** to see the next date, e.g. "Garden waste · Thu 22 Oct", the rest of the week too.
+- In **Classic** the badge is draggable in the visual layout (🗑️ handle) and can be resized under Sizing. In the other styles it appears as a chip in the header.
+- Tap the badge to open the calendar.
+- The editor shows each bin's **next collection date**, so you can check the right events are found.
+
+---
+
 ## 🔌 Multi-inverter setups
 
 With a single inverter there is nothing to configure.
@@ -338,6 +358,10 @@ Each device gets a stable internal `id` automatically. `connects_to` refers to t
 | `title` | `Energy Flow` | Card title. Set to `""` for no title |
 | `subtitle` | — | Optional second line under the title |
 | `title_color` | `#ffffff` | Colour of the title and subtitle |
+| `bins_enabled` | `false` | Shows the bin collection badge |
+| `bins_mode` | `near` | `near` (all day before and on collection day) or `always` (always show the next collection) |
+| `bins` | — | Up to 5 bins: `name`, `color`, `source` (`calendar` or `manual`); calendar: `calendar`, optional `match` (comma-separated words); manual: `start` (YYYY-MM-DD), `every` (weeks, 1–8), optional `skip` and `extra` (comma-separated dates) |
+| `bins_scale` | `1` | Size of the bins badge (Classic) |
 | `view_style` | `classic` | `classic`, `rings`, `river`, `tiles`, `glance` or `schematic` (see [View styles](#-view-styles)) |
 | `theme` | `dark` | `auto`, `dark`, `light`, `midnight`, `ocean`, `forest`, `sunset`, `graphite` or `custom` |
 | `card_aspect` | `3:2` | Card shape: `3:2`, `4:3`, `16:10`, `16:9`, `2:1`, `21:9`, `32:9`, `image` (match background) or `screen` (fill screen) |
@@ -451,7 +475,6 @@ Ideas and feedback are welcome, so [open an issue](https://github.com/mimikm/Hom
 
 **Features**
 - Configurable tap actions per device (more-info, navigate, toggle)
-- **Bin collection day**: a small box or badge showing which bin goes out next and when (e.g. "🟢 Garden waste – tomorrow"), using your bin collection sensor or calendar
 
 **Project**
 - More languages (contributions welcome!)
