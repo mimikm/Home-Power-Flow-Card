@@ -10,6 +10,8 @@ Show your whole home energy system (solar, batteries, grid, EV chargers, even mu
 
 ![Home Power Flow Card](https://github.com/mimikm/Home-Power-Flow-Card/raw/main/images/preview2.png)
 
+**New in 0.8:** five more [view styles](#-view-styles) to choose from: compact rings, an energy river, tiles, an at-a-glance headline and a technical schematic.
+
 ---
 
 ## 🚧 Work in progress, fully functioning
@@ -58,6 +60,26 @@ Or manually in HACS:
 4. Add the card to a dashboard
 
 > **Not seeing an update?** Browsers cache card files aggressively. Hard-refresh (Ctrl/Cmd+Shift+R), and on phones fully close and reopen the Home Assistant app.
+
+---
+
+## 🎨 View styles
+
+Pick a style under **View style** at the top of the editor. All styles use the same devices, sensors, colours, theme and Today statistics, so you can switch at any time without setting anything up again.
+
+| | |
+|---|---|
+| ![Compact rings](https://github.com/mimikm/Home-Power-Flow-Card/raw/main/images/style-rings.png) **⭕ Compact rings**<br>Round icons around a hub, with battery level and self-sufficiency as rings. Small and tidy, great for phones and Sections dashboards. | ![Energy river](https://github.com/mimikm/Home-Power-Flow-Card/raw/main/images/style-river.png) **🌊 Energy river**<br>Where your power comes from and where it goes, as flowing bands as wide as the power they carry. |
+| ![Tiles](https://github.com/mimikm/Home-Power-Flow-Card/raw/main/images/style-tiles.png) **🔲 Tiles**<br>Big numbers in tidy tiles with history graphs behind them, a self-sufficiency ring and battery bars. Ideal for wall tablets. | ![At a glance](https://github.com/mimikm/Home-Power-Flow-Card/raw/main/images/style-glance.png) **👀 At a glance**<br>One plain-language headline, like "Running on sunshine" or "Running on battery", that you can read from across the room. The colour changes with the situation. |
+| ![Schematic](https://github.com/mimikm/Home-Power-Flow-Card/raw/main/images/style-schematic.png) **📐 Schematic**<br>A technical one-line diagram with electrical symbols on grid paper, Blueprint arrows and an engineering title block. | |
+
+**🖼️ Classic**, the original style with your own background picture and freely placed boxes, stays the default and works exactly as before.
+
+- Every style is **responsive**: layouts adapt to narrow screens, and text is enlarged on small cards.
+- Tap any device to open its Home Assistant details, in every style.
+- **Classic only:** background pictures (including seasonal), animated rain & snow, box positions and sizes, line shapes (curved, right angles, manual), the UK grid mix box and the phone layout settings.
+- **Tiles** shows history graphs for every device by default. Untick *Show history graph* on a device to hide its graph.
+- **Schematic** uses Blueprint arrows unless you choose another flow line look.
 
 ---
 
@@ -316,6 +338,7 @@ Each device gets a stable internal `id` automatically. `connects_to` refers to t
 | `title` | `Energy Flow` | Card title. Set to `""` for no title |
 | `subtitle` | — | Optional second line under the title |
 | `title_color` | `#ffffff` | Colour of the title and subtitle |
+| `view_style` | `classic` | `classic`, `rings`, `river`, `tiles`, `glance` or `schematic` (see [View styles](#-view-styles)) |
 | `theme` | `dark` | `auto`, `dark`, `light`, `midnight`, `ocean`, `forest`, `sunset`, `graphite` or `custom` |
 | `card_aspect` | `3:2` | Card shape: `3:2`, `4:3`, `16:10`, `16:9`, `2:1`, `21:9`, `32:9`, `image` (match background) or `screen` (fill screen) |
 | `background_fit` | `cover` | `cover` (fill, cropping the image) or `contain` (whole image, blurred edges) |
