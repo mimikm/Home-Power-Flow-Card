@@ -10,7 +10,7 @@ Show your whole home energy system (solar, batteries, grid, EV chargers, even mu
 
 ![Home Power Flow Card](https://github.com/mimikm/Home-Power-Flow-Card/raw/main/images/preview2.png)
 
-**New in 0.8:** five more [view styles](#-view-styles) to choose from: compact rings, an energy river, tiles, an at-a-glance headline and a technical schematic.
+**New in 0.9:** a redesigned editor with tabs and fold-away sections, plus a [bin collection](#️-bin-collection) badge. Since 0.8: five more [view styles](#-view-styles) to choose from (compact rings, an energy river, tiles, an at-a-glance headline and a technical schematic).
 
 ---
 
@@ -150,8 +150,9 @@ Pick a style under **View style** at the top of the editor. All styles use the s
 
 ### ⚙️ Fully visual editor
 - Everything is configurable without YAML, using Home Assistant's own entity, icon and colour pickers
+- A tidy editor with four tabs (**🎨 Look**, **🔌 Devices**, **🧩 Panels** and **⚙️ More**) and framed sections that fold away. Each section header shows a short summary of its settings, and optional features have an on/off switch right in the header
 - **Built-in warnings** that spot common mistakes: missing or misspelled sensors, unavailable entities, a power sensor with the wrong unit (e.g. `%`), broken or looping *Connects to* links, devices not connected to anything, and incomplete battery settings
-- Collapsible, **drag-to-reorder** devices and statistics, plus collapsible optional sections to keep the editor tidy
+- Collapsible, **drag-to-reorder** devices and statistics
 - **Duplicate** any device with one click, handy for multi-inverter or multi-string setups
 - A **live direction readout** under each device's Invert flow toggle (e.g. `▶ Solar PV → Inverter · 450 W`), so you can check flow directions before saving
 - A live preview that always shows the whole card
