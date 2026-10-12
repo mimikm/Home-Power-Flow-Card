@@ -287,7 +287,7 @@ What you see:
 - Or choose **Always show the next collection** to see the next date, e.g. "Garden waste · Thu 22 Oct", the rest of the week too.
 - In **Classic** the badge is draggable in the visual layout (🗑️ handle) and can be resized under Sizing. In the other styles it appears as a chip in the header.
 - Tap the badge to open the calendar.
-- The editor shows each bin's **next collection date**, so you can check the right events are found.
+- The editor shows each bin's **next collection date**, so you can check the right events are found. The section and each bin fold away, so the editor stays short.
 
 ---
 
