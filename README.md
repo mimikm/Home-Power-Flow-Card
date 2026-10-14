@@ -134,6 +134,7 @@ Pick a style under **View style** at the top of the editor. All styles use the s
 - It never grows taller than your screen
 - Text is boosted automatically on phones so it stays readable
 - Full support for Home Assistant's **Sections** dashboards
+- **⛶ Full screen** for wall tablets and room displays: tap the button in the corner and the card fills the whole screen with no corners or borders, and keeps the screen awake. Where a device doesn't allow true full screen, the card fills the whole app window instead (covering Home Assistant's header and sidebar). Portrait screens use the portrait layout. Tap the button again, or press Esc, to leave
 - Tested on desktop browsers and the iOS app
 
 ### 🗑️ Bin collection
@@ -363,6 +364,8 @@ Each device gets a stable internal `id` automatically. `connects_to` refers to t
 | `bins_mode` | `near` | `near` (all day before and on collection day) or `always` (always show the next collection) |
 | `bins` | — | Up to 5 bins: `name`, `color`, `source` (`calendar` or `manual`); calendar: `calendar`, optional `match` (comma-separated words); manual: `start` (YYYY-MM-DD), `every` (weeks, 1–8), optional `skip` and `extra` (comma-separated dates) |
 | `bins_scale` | `1` | Size of the bins badge (Classic) |
+| `fullscreen_button` | `true` | Shows the full-screen button in the bottom-right corner |
+| `fullscreen_wake` | `true` | Keeps the screen on while in full screen (needs Home Assistant over HTTPS) |
 | `view_style` | `classic` | `classic`, `rings`, `river`, `tiles`, `glance` or `schematic` (see [View styles](#-view-styles)) |
 | `theme` | `dark` | `auto`, `dark`, `light`, `midnight`, `ocean`, `forest`, `sunset`, `graphite` or `custom` |
 | `card_aspect` | `3:2` | Card shape: `3:2`, `4:3`, `16:10`, `16:9`, `2:1`, `21:9`, `32:9`, `image` (match background) or `screen` (fill screen) |
