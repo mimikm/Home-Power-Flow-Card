@@ -10,7 +10,7 @@
  * Issues & feature requests: https://github.com/mimikm/Home-Power-Flow-Card/issues
  */
 (() => {
-  const VERSION = '0.9.2';
+  const VERSION = '0.9.3';
   const DEFAULT_BG = '/hacsfiles/Home-Power-Flow-Card/smart-home-energy-background.png';
   const DEFAULT_BG_NIGHT = '/hacsfiles/Home-Power-Flow-Card/smart-home-energy-background2.png';
   const TYPES = [
@@ -4061,7 +4061,7 @@
         if(native){
           const el=document.createElement('ha-selector');
           el.hass=this._hass; el.selector={ui_action:{default_action:k==='tap'?'more-info':'none'}}; el.value=this._actGet(path,k); el.label='';
-          el.addEventListener('value-changed',e=>{ e.stopPropagation(); this._actSet(path,k,e.detail.value); });
+          el.addEventListener('value-changed',e=>{ e.stopPropagation(); const v=e.detail.value&&typeof e.detail.value==='object'?JSON.parse(JSON.stringify(e.detail.value)):e.detail.value; el.value=v; this._actSet(path,k,v); });
           slot.appendChild(el);
         } else this._actSimple(slot,path,k);
       });
