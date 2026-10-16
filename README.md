@@ -76,7 +76,7 @@ Pick a style under **View style** at the top of the editor. All styles use the s
 **🖼️ Classic**, the original style with your own background picture and freely placed boxes, stays the default and works exactly as before.
 
 - Every style is **responsive**: layouts adapt to narrow screens, and text is enlarged on small cards.
-- Tap any device to open its Home Assistant details, in every style.
+- Tap any device to open its Home Assistant details, in every style, or set your own [tap actions](#-tap-actions).
 - **Classic only:** background pictures (including seasonal), animated rain & snow, box positions and sizes, line shapes (curved, right angles, manual), the UK grid mix box and the phone layout settings.
 - **Tiles** shows history graphs for every device by default. Untick *Show history graph* on a device to hide its graph.
 - **Schematic** uses Blueprint arrows unless you choose another flow line look.
@@ -157,7 +157,7 @@ Pick a style under **View style** at the top of the editor. All styles use the s
 - **Duplicate** any device with one click, handy for multi-inverter or multi-string setups
 - A **live direction readout** under each device's Invert flow toggle (e.g. `▶ Solar PV → Inverter · 450 W`), so you can check flow directions before saving
 - A live preview that always shows the whole card
-- Click any device on the card to open its Home Assistant details
+- Tap any device to open its Home Assistant details, or choose your own **tap, hold and double-tap actions** per device and panel
 
 ### 🌐 Languages
 The card and its editor are available in **English**, **Polish** and **Spanish**, and automatically follow the language set in your Home Assistant profile. Your own names and titles are never changed. Other languages fall back to English.
@@ -277,6 +277,42 @@ Tick **Animated rain & snow** under the backgrounds and the card draws the weath
 
 ---
 
+## 👆 Tap actions
+
+Every device, every Today row and the weather, bins, last updated and grid mix panels can have their own **tap**, **hold** and **double-tap** actions:
+
+| Action | What it does |
+|---|---|
+| **Details** | Opens the Home Assistant details pop-up (the default for tap) |
+| **Go to page** | Opens another dashboard or view, e.g. `/lovelace/battery` |
+| **Toggle** | Switches something on or off, e.g. an EV charger switch |
+| **Run action** | Runs any Home Assistant action, e.g. force a battery charge or change a Predbat mode |
+| **Open link** | Opens a web page |
+| **Nothing** | Does nothing, handy for a look-only wall display |
+
+- Set them in the editor: in each device's settings (Devices tab), in each Today row's settings, and under **Panels → Tap actions**. Each one is a single folded line until you open it.
+- **Ask first** adds an "Are you sure?" confirmation, recommended for toggles and actions on a wall display.
+- Hold for half a second; the item brightens as you hold. Sliding your finger (scrolling) never triggers anything.
+- The card uses Home Assistant's own action format (`tap_action`, `hold_action`, `double_tap_action`), the same as built-in cards, so YAML examples from elsewhere work too.
+- Unset actions keep today's behaviour: a tap opens the details, while hold and double tap do nothing.
+
+```yaml
+devices:
+  - type: ev
+    name: EV charger
+    power_entity: sensor.ev_power
+    hold_action:
+      action: toggle
+      entity: switch.ev_charger
+      confirmation: true
+    double_tap_action:
+      action: navigate
+      navigation_path: /lovelace/ev
+weather_tap_action:
+  action: url
+  url_path: https://www.metoffice.gov.uk
+```
+
 ## 🗑️ Bin collection
 
 Turn on **Show bin collection** in the editor and add up to 5 bins. Each bin has a name and a colour, and gets its dates from either:
@@ -366,6 +402,7 @@ Each device gets a stable internal `id` automatically. `connects_to` refers to t
 | `bins_scale` | `1` | Size of the bins badge (Classic) |
 | `fullscreen_button` | `true` | Shows the full-screen button in the bottom-right corner |
 | `fullscreen_wake` | `true` | Keeps the screen on while in full screen (needs Home Assistant over HTTPS) |
+| `weather_tap_action` (and `_hold_action`, `_double_tap_action`) | | Optional. Actions for the weather box; the same for `bins_`, `updated_` and `gridmix_` |
 | `view_style` | `classic` | `classic`, `rings`, `river`, `tiles`, `glance` or `schematic` (see [View styles](#-view-styles)) |
 | `theme` | `dark` | `auto`, `dark`, `light`, `midnight`, `ocean`, `forest`, `sunset`, `graphite` or `custom` |
 | `card_aspect` | `3:2` | Card shape: `3:2`, `4:3`, `16:10`, `16:9`, `2:1`, `21:9`, `32:9`, `image` (match background) or `screen` (fill screen) |
@@ -442,6 +479,7 @@ Each device gets a stable internal `id` automatically. `connects_to` refers to t
 | Option | Description |
 |---|---|
 | `type` | `solar`, `inverter`, `battery`, `gateway`, `house`, `grid`, `generator`, `water`, `gas`, `ev` or `load` |
+| `tap_action` / `hold_action` / `double_tap_action` | Optional. What tapping, holding or double-tapping the device does (Home Assistant's standard action format) |
 | `name` | Display name |
 | `power_entity` | Power sensor (W) |
 | `power_mode` | Battery/Grid only: `single` (one sensor, + and −; default) or `split` (two separate sensors) |
@@ -476,9 +514,6 @@ Positions and sizes are easiest to set by dragging in the editor's **Visual layo
 ## 🗺️ Roadmap
 
 Ideas and feedback are welcome, so [open an issue](https://github.com/mimikm/Home-Power-Flow-Card/issues) if there's something you'd like to see.
-
-**Features**
-- Configurable tap actions per device (more-info, navigate, toggle)
 
 **Project**
 - More languages (contributions welcome!)
