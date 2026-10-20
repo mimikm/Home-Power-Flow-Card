@@ -1,7 +1,8 @@
 # ⚡ Home Power Flow Card
 
-[![HACS Custom](https://img.shields.io/badge/HACS-Custom-41BDF5.svg)](https://github.com/hacs/integration)
+[![HACS Default](https://img.shields.io/badge/HACS-Default-41BDF5.svg)](https://hacs.xyz)
 [![GitHub Release](https://img.shields.io/github/v/release/mimikm/Home-Power-Flow-Card)](https://github.com/mimikm/Home-Power-Flow-Card/releases)
+[![Downloads](https://img.shields.io/github/downloads/mimikm/Home-Power-Flow-Card/total?label=downloads)](https://github.com/mimikm/Home-Power-Flow-Card/releases)
 [![Validate](https://github.com/mimikm/Home-Power-Flow-Card/actions/workflows/validate.yml/badge.svg)](https://github.com/mimikm/Home-Power-Flow-Card/actions/workflows/validate.yml)
 
 An animated, real-time energy flow card for Home Assistant dashboards, built by **Dom** ([@mimikm](https://github.com/mimikm)).
@@ -44,20 +45,20 @@ If you enjoy the card and want to support its development:
 
 [![Open your Home Assistant instance and open this repository in HACS.](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=mimikm&repository=Home-Power-Flow-Card&category=plugin)
 
-Or manually in HACS:
+Or in HACS itself (the card is in the HACS default list, so no custom repository is needed):
 1. Open **HACS** in Home Assistant
-2. Open the **⋮** menu → **Custom repositories**
-3. Add `https://github.com/mimikm/Home-Power-Flow-Card` with the type **Dashboard**
-4. Search for **Home Power Flow Card** and download it
-5. Reload your browser
-6. Add the card to a dashboard (search for "Home Power Flow Card")
+2. Search for **Home Power Flow Card** and download it
+3. Reload your browser
+4. Add the card to a dashboard (search for "Home Power Flow Card")
 
 ### Manual
 
-1. Download `home-power-flow-card.js` and the background images from the [latest release](https://github.com/mimikm/Home-Power-Flow-Card/releases)
-2. Copy them into `/config/www/`
+1. Download `home-power-flow-card.js` from the [latest release](https://github.com/mimikm/Home-Power-Flow-Card/releases)
+2. Copy it into `/config/www/`
 3. Add a dashboard resource: **Settings → Dashboards → ⋮ → Resources** → `/local/home-power-flow-card.js`, type **JavaScript module**
 4. Add the card to a dashboard
+
+> **Built-in backgrounds** load from this GitHub repository, so there's nothing extra to copy. If your Home Assistant has no internet access, download the two pictures from the [`images`](https://github.com/mimikm/Home-Power-Flow-Card/tree/main/images) folder into `/config/www/` and set them as your day and night backgrounds (e.g. `/local/smart-home-energy-background.png`).
 
 > **Not seeing an update?** Browsers cache card files aggressively. Hard-refresh (Ctrl/Cmd+Shift+R), and on phones fully close and reopen the Home Assistant app.
 
@@ -70,7 +71,7 @@ Pick a style under **View style** at the top of the editor. All styles use the s
 | | |
 |---|---|
 | ![Compact rings](https://github.com/mimikm/Home-Power-Flow-Card/raw/main/images/style-rings.png) **⭕ Compact rings**<br>Round icons around a hub, with battery level and self-sufficiency as rings. Small and tidy, great for phones and Sections dashboards. | ![Energy river](https://github.com/mimikm/Home-Power-Flow-Card/raw/main/images/style-river.png) **🌊 Energy river**<br>Where your power comes from and where it goes, as flowing bands as wide as the power they carry. |
-| ![Tiles](https://github.com/mimikm/Home-Power-Flow-Card/raw/main/images/style-tiles.png) **🔲 Tiles**<br>Big numbers in tidy tiles with history graphs behind them, a self-sufficiency ring and battery bars. Ideal for wall tablets. | ![At a glance](https://github.com/mimikm/Home-Power-Flow-Card/raw/main/images/style-glance.png) **👀 At a glance**<br>One plain-language headline, like "Running on sunshine" or "Running on battery", that you can read from across the room. The colour changes with the situation. |
+| ![Tiles](https://github.com/mimikm/Home-Power-Flow-Card/raw/main/images/style-tiles.png) **🔲 Tiles**<br>Big numbers in tidy tiles with history graphs behind them, a self-sufficiency ring and battery bars. Ideal for wall tablets. | ![At a glance](https://github.com/mimikm/Home-Power-Flow-Card/raw/main/images/style-glance.png) **👀 At a glance**<br>One plain-language headline, like "Running on sunshine" or "Running on battery", that you can read from across the room. The colour changes with the situation. Each battery with a state of charge sensor gets its own tile with its charge level, a fill bar and time left. |
 | ![Schematic](https://github.com/mimikm/Home-Power-Flow-Card/raw/main/images/style-schematic.png) **📐 Schematic**<br>A technical one-line diagram with electrical symbols on grid paper, Blueprint arrows and an engineering title block. | |
 
 **🖼️ Classic**, the original style with your own background picture and freely placed boxes, stays the default and works exactly as before.
@@ -422,7 +423,7 @@ Each device gets a stable internal `id` automatically. `connects_to` refers to t
 | `time_format` | `24h` | `24h` or `12h` for the clock |
 | `weather_entity` | — | Weather entity for the weather box |
 | `sun_entity` | `sun.sun` | Switches between the day and night backgrounds |
-| `background` | built-in | Day background image URL |
+| `background` | built-in | Day background image URL (the built-in pictures load from this GitHub repository) |
 | `background_night` | built-in | Night background image URL |
 | `weather_effects` | `false` | Animated rain, snow, hail and lightning over the background |
 | `weather_effects_amount` | `1` | How much rain/snow, `0.25` to `2` |
