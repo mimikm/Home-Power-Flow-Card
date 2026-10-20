@@ -10,9 +10,19 @@
  * Issues & feature requests: https://github.com/mimikm/Home-Power-Flow-Card/issues
  */
 (() => {
-  const VERSION = '0.9.3';
-  const DEFAULT_BG = '/hacsfiles/Home-Power-Flow-Card/smart-home-energy-background.png';
-  const DEFAULT_BG_NIGHT = '/hacsfiles/Home-Power-Flow-Card/smart-home-energy-background2.png';
+  const VERSION = '0.9.4';
+  // The built-in backgrounds load from the GitHub repo (via the jsDelivr
+  // CDN). HACS installs the card from the release file, which carries only
+  // the .js, so the pictures are no longer copied into /hacsfiles/.
+  const BG_BASE = 'https://cdn.jsdelivr.net/gh/mimikm/Home-Power-Flow-Card@main/images/';
+  const DEFAULT_BG = BG_BASE + 'smart-home-energy-background.png';
+  const DEFAULT_BG_NIGHT = BG_BASE + 'smart-home-energy-background2.png';
+  // Older configs saved the built-in pictures by their local path; point
+  // those at the hosted copies.
+  const legacyBg = v => {
+    const m = String(v || '').trim().match(/^\/(?:hacsfiles|local)\/(?:community\/)?home-power-flow-card\/(?:dist\/)?(smart-home-energy-background2?\.png)$/i);
+    return m ? BG_BASE + m[1].toLowerCase() : v;
+  };
   const TYPES = [
     ['solar', '☀️ Solar PV'],
     ['inverter', '⚡ Inverter'],
@@ -769,6 +779,16 @@
     .gl-chip.on { border-color:color-mix(in srgb, var(--c) 75%, transparent); }
     .gl-chip.charging .gc-r, .gl-chip.exporting .gc-r, .gl-chip.producing .gc-r { color:var(--hpf-good); opacity:1; }
     .gl-chip.discharging .gc-r, .gl-chip.importing .gc-r { color:var(--hpf-warn); opacity:1; }
+    .gl-batts { display:flex; flex-wrap:wrap; gap:8px; margin-bottom:8px; }
+    .gl-batt { width:170px; max-width:100%; padding:6px 10px 7px; border-radius:12px; background:var(--hpf-panel-bg,rgba(8,29,52,.78)); border:1px solid var(--hpf-border,rgba(255,255,255,.16)); box-sizing:border-box; }
+    .gl-batt.charging, .gl-batt.discharging { border-color:color-mix(in srgb, var(--c) 75%, transparent); }
+    .gb-hd { display:flex; align-items:center; gap:5px; font-size:12px; } .gb-nm { flex:1; min-width:0; opacity:.85; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    .gl-batt b { font-size:16px; font-weight:800; }
+    .gb-bar { height:4px; border-radius:2px; background:var(--hpf-track,rgba(255,255,255,.1)); margin-top:5px; overflow:hidden; }
+    .gb-bar i { display:block; height:100%; background:#4dd0e1; border-radius:2px; transition:width .6s; }
+    .gl-batt.charging .gb-bar i { background:var(--hpf-good); } .gl-batt.discharging .gb-bar i { background:var(--hpf-warn); } .gl-batt.low .gb-bar i { background:#ef5350; }
+    .gb-sub { font-size:11px; opacity:.75; margin-top:4px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .gl-batt.charging .gb-sub { color:var(--hpf-good); opacity:1; } .gl-batt.discharging .gb-sub { color:var(--hpf-warn); opacity:1; }
     @container (max-width:640px) { .gl-line { font-size:28px; } .gl-sub { font-size:15px; } .gl-ic { font-size:48px; } .gl-big b { font-size:30px; } }
     @container (max-width:460px) { .gl-main { flex-wrap:wrap; gap:12px; } .gl-big { text-align:left; width:100%; } .gl-line { font-size:24px; } }
     /* ---- Energy river ---- */
@@ -867,8 +887,8 @@
       // stale/corrupted value (see migrateFlowThreshold).
       migrateFlowThreshold(this._config);
       if (!this._config.flow_speed) this._config.flow_speed = 7;
-      if (!this._config.background || this._config.background === '/hacsfiles/home-power-flow-card/smart-home-energy-background.png' || this._config.background === '/local/home-power-flow-card/smart-home-energy-background.png') this._config.background = DEFAULT_BG;
-      if (!this._config.background_night) this._config.background_night = DEFAULT_BG_NIGHT;
+      this._config.background = legacyBg(this._config.background) || DEFAULT_BG;
+      this._config.background_night = legacyBg(this._config.background_night) || DEFAULT_BG_NIGHT;
       if (!this._config.sun_entity) this._config.sun_entity = 'sun.sun';
       this._currentBg = null;
       this._render();
@@ -2877,15 +2897,24 @@
       return { color: '#90a4ae', icon: m.night ? '🌙' : '😌', line: this._t('All quiet'), sub: m.soc != null ? this._t('Battery {b}', { b: `${m.soc}%` }) : this._t('Nothing is flowing right now') };
     },
     _glanceChipRole(x) {
-      if (x.t === 'battery') return [x.soc != null ? Math.round(x.soc) + '%' : '', this._altRole(x)].filter(Boolean).join(' · ');
+      // A battery with a charge level has its own tile, so the chip just says what it's doing.
+      if (x.t === 'battery') return this._altRole(x);
       return this._altRole(x);
+    },
+    // One tile per battery that has a state of charge sensor: big %, a fill
+    // bar and what it's doing (or the time left).
+    _glanceBattSub(x) { return [this._altRole(x), x.battTime].filter(Boolean).join(' · ') || this._t('Idle'); },
+    _glanceBattsHTML(m) {
+      const bs = m.devs.filter(x => x.t === 'battery' && x.soc != null);
+      if (!bs.length) return '';
+      return `<div class="gl-batts">${bs.map(x => `<div class="gl-batt ${x.role}${x.soc < 20 ? ' low' : ''}" data-gbi="${x.i}" data-act="dev:${x.i}" style="--c:${x.color}"><div class="gb-hd"><span>🔋</span><span class="gb-nm">${esc(x.name)}</span><b data-gbv>${Math.round(x.soc)}%</b></div><div class="gb-bar"><i data-gbb style="width:${x.soc}%"></i></div><div class="gb-sub" data-gbs>${esc(this._glanceBattSub(x))}</div></div>`).join('')}</div>`;
     },
     _v_glance(m) {
       const s = this._glance(m);
       const chips = m.devs.filter(x => !x.hub && !x.util).map(x => `<span class="gl-chip ${x.role}${x.active ? ' on' : ''}" data-i="${x.i}" data-act="dev:${x.i}" title="${esc(x.name)}" style="--c:${x.color}"><span>${x.icon}</span><b data-gcv>${esc(x.text)}</b><span class="gc-r" data-gcr>${esc(this._glanceChipRole(x))}</span></span>`).join('')
         + (m.ss != null ? `<span class="gl-chip"><span>🏡</span><b data-gss>${m.ss}%</b><span class="gc-r">${esc(this._t('self-powered'))}</span></span>` : '');
       const big = m.devs.length ? `<div class="gl-big"><b data-glb>${esc(fmtPower(m.tot.use, m.unit))}</b><span>${esc(this._t('in use'))}</span></div>` : '';
-      return `${this._altHeadHTML()}<div class="gl-main"><div class="gl-ic" data-gli>${s.icon}</div><div class="gl-txt"><div class="gl-line" data-gll>${esc(s.line)}</div><div class="gl-sub" data-gls>${esc(s.sub)}</div></div>${big}</div><div class="gl-chips">${chips}</div>${this._altTodayHTML()}`;
+      return `${this._altHeadHTML()}<div class="gl-main"><div class="gl-ic" data-gli>${s.icon}</div><div class="gl-txt"><div class="gl-line" data-gll>${esc(s.line)}</div><div class="gl-sub" data-gls>${esc(s.sub)}</div></div>${big}</div>${this._glanceBattsHTML(m)}<div class="gl-chips">${chips}</div>${this._altTodayHTML()}`;
     },
     _u_glance(m) {
       const r = this.shadowRoot, s = this._glance(m);
@@ -2897,6 +2926,12 @@
         const el = r.querySelector(`.gl-chip[data-i="${x.i}"]`); if (!el) return;
         const cls = `gl-chip ${x.role}${x.active ? ' on' : ''}`; if (el.className !== cls) el.className = cls;
         this._setText(el.querySelector('[data-gcv]'), x.text); this._setText(el.querySelector('[data-gcr]'), this._glanceChipRole(x));
+      });
+      m.devs.forEach(x => {
+        const el = r.querySelector(`.gl-batt[data-gbi="${x.i}"]`); if (!el || x.soc == null) return;
+        const cls = `gl-batt ${x.role}${x.soc < 20 ? ' low' : ''}`; if (el.className.replace(/ act-\S+/g, '') !== cls) { const keep = [...el.classList].filter(c => c.startsWith('act-')); el.className = cls; keep.forEach(c => el.classList.add(c)); }
+        this._setText(el.querySelector('[data-gbv]'), `${Math.round(x.soc)}%`); this._setText(el.querySelector('[data-gbs]'), this._glanceBattSub(x));
+        const bar = el.querySelector('[data-gbb]'), w = `${x.soc}%`; if (bar && bar.style.width !== w) bar.style.width = w;
       });
     },
 
@@ -4163,7 +4198,7 @@
     _slotBg(slot){
       const c=this._config;
       if(isExtraSlot(slot)){ const [kind,time]=slot.split('_'); return extraBgFor(c,kind,time==='night') || this._slotBg(time); }
-      return slot==='night' ? (c.background_upload_night || c.background_night || DEFAULT_BG_NIGHT) : (c.background_upload_day || c.background || DEFAULT_BG);
+      return slot==='night' ? (c.background_upload_night || legacyBg(c.background_night) || DEFAULT_BG_NIGHT) : (c.background_upload_day || legacyBg(c.background) || DEFAULT_BG);
     }
     // /media/ paths need the access token, so fetch them into blob URLs
     // (cached, so redraws don't download the picture again).
