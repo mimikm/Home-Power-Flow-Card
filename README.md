@@ -386,7 +386,7 @@ grid_mix_postcode: SW1A
 
 ### Advanced example
 
-A bigger home: two inverters joined by a gateway, two batteries (one with separate charge and discharge sensors), two solar arrays, a grid meter with separate import and export sensors, an EV charger, a heat pump and gas, plus the Today panel, bin collection, weather effects, a seasonal background and tap actions. It's also in the repo as [`examples/advanced-config.yaml`](examples/advanced-config.yaml).
+A bigger home: two inverters joined by a gateway, two batteries (one with separate charge and discharge sensors), two solar arrays, a grid meter with separate import and export sensors, an EV charger, a heat pump and gas, plus the Today panel, bin collection, weather effects, a seasonal background and tap actions. It's also in the repo as [`example/advanced-config.yaml`](https://github.com/mimikm/Home-Power-Flow-Card/blob/main/example/advanced-config.yaml).
 
 <details>
 <summary>Show the advanced example</summary>
