@@ -10,7 +10,7 @@
  * Issues & feature requests: https://github.com/mimikm/Home-Power-Flow-Card/issues
  */
 (() => {
-  const VERSION = '0.9.4';
+  const VERSION = '0.9.4.1';
   // The built-in backgrounds load from the GitHub repo (via the jsDelivr
   // CDN). HACS installs the card from the release file, which carries only
   // the .js, so the pictures are no longer copied into /hacsfiles/.
