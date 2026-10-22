@@ -1,0 +1,232 @@
+# Home Power Flow Card - advanced example
+#
+# A bigger home: two inverters joined by a gateway, two batteries (one
+# with separate charge/discharge sensors), two solar arrays, a grid meter
+# with separate import/export sensors, an EV charger, a heat pump, gas,
+# the Today panel, bin collection, weather effects and tap actions.
+#
+# Replace the entity ids with your own. Everything here can also be set up
+# in the visual editor; device positions and sizes are easiest to set by
+# dragging in the editor's Visual layout, so they are left out.
+
+type: custom:home-power-flow-card
+title: Home Energy
+subtitle: Live power
+view_style: classic          # classic, rings, river, tiles, glance or schematic
+theme: auto                  # follows Home Assistant's light/dark mode
+card_aspect: "16:9"
+power_unit: auto             # W below 1 kW, kW above
+flow_look_day: classic
+flow_look_night: neon
+flow_style: curved
+flow_threshold_watts: 20     # hide flows below 20 W (sensor noise)
+show_idle_lines: true
+history_hours: 24
+time_format: 24h
+
+# ---------- Background, weather and seasons ----------
+weather_entity: weather.home
+sun_entity: sun.sun
+weather_effects: true
+weather_effects_amount: 1
+weather_effects_lightning: true
+seasonal_background: true
+season: christmas            # 1 Dec to 6 Jan
+background_season_day: /local/christmas-day.jpg
+background_season_night: /local/christmas-night.jpg
+
+# ---------- Devices ----------
+devices:
+  # The gateway joins both inverters to the house and grid.
+  - type: gateway
+    id: gw
+    name: Gateway
+
+  # Inverter 1 with its own solar array and battery.
+  - type: inverter
+    id: inv1
+    name: Inverter 1
+    power_entity: sensor.inverter_1_power
+    connects_to: gw
+
+  - type: solar
+    id: pv_south
+    name: Solar South
+    power_entity: sensor.pv_south_power
+    connects_to: inv1
+    flow_color: "#ffd54f"
+    history_graph: true
+    extra_entities:
+      - entity: sensor.pv_south_energy_today
+        icon: mdi:solar-power-variant
+
+  - type: battery
+    id: bat1
+    name: Battery 1
+    power_entity: sensor.battery_1_power      # one sensor: + discharging, - charging
+    connects_to: inv1
+    battery_soc_entity: sensor.battery_1_soc
+    battery_capacity: 9.5
+    battery_reserve: 4
+    battery_time: true
+    flow_color_mode: custom
+    flow_color_charge: "#3ddc84"
+    flow_color_discharge: "#ff9800"
+    hold_action:
+      action: navigate
+      navigation_path: /lovelace/battery
+
+  # Inverter 2 (an all-in-one) with the second array and battery.
+  - type: inverter
+    id: inv2
+    name: AiO
+    power_entity: sensor.inverter_2_power
+    connects_to: gw
+
+  - type: solar
+    id: pv_west
+    name: Solar West
+    power_entity: sensor.pv_west_power
+    connects_to: inv2
+    flow_color: "#ffb74d"
+
+  - type: battery
+    id: bat2
+    name: AiO Battery
+    power_mode: split                          # two sensors, both positive
+    battery_charge_power_entity: sensor.aio_battery_charge_power
+    battery_discharge_power_entity: sensor.aio_battery_discharge_power
+    connects_to: inv2
+    battery_soc_entity: sensor.aio_battery_soc
+    battery_capacity_entity: sensor.aio_battery_capacity
+    battery_charge_limit: 100
+    battery_time: true
+    flow_color_mode: glow
+    double_tap_action:
+      action: perform-action
+      perform_action: select.select_option
+      target:
+        entity_id: select.predbat_mode
+      data:
+        option: Control charge
+      confirmation: true
+
+  - type: grid
+    id: grid
+    name: Grid
+    power_mode: split
+    grid_import_power_entity: sensor.grid_import_power
+    grid_export_power_entity: sensor.grid_export_power
+    connects_to: gw
+    flow_color_mode: custom
+    flow_color_import: "#ef5350"
+    flow_color_export: "#42a5f5"
+    extra_entities:
+      - entity: sensor.grid_voltage
+        icon: mdi:sine-wave
+      - entity: sensor.electricity_price
+        icon: mdi:currency-gbp
+
+  - type: house
+    id: house
+    name: House
+    power_entity: sensor.house_load_power
+    connects_to: gw
+    history_graph: true
+
+  - type: ev
+    id: ev
+    name: EV Charger
+    power_entity: sensor.ev_charger_power
+    connects_to: house
+    phone_hidden: true                         # hide on narrow screens
+    hold_action:
+      action: toggle
+      entity: switch.ev_charger
+      confirmation: true
+
+  - type: load
+    id: heat_pump
+    name: Heat Pump
+    power_entity: sensor.heat_pump_power
+    connects_to: house
+    flow_color: "#ff7043"
+
+  - type: gas
+    id: gas
+    name: Gas
+    power_entity: sensor.gas_meter_rate
+    utility_unit: kWh
+    gas_cv: 39.5
+
+# ---------- Today panel ----------
+self_sufficiency_live: true
+self_sufficiency_today: true
+self_consumption_today: true
+self_sufficiency_import_entity: sensor.grid_import_today
+self_sufficiency_consumption_entity: sensor.house_consumption_today
+energy_export_entity: sensor.grid_export_today
+energy_solar_entity: sensor.solar_energy_today
+stats_mode: docked
+stats_dock_edge: bottom
+stats_dock_autohide: false
+stats_decimals: 2
+statistics:
+  entities:
+    - name: Solar today
+      entity: sensor.solar_energy_today
+      icon: mdi:solar-power
+    - name: Imported
+      entity: sensor.grid_import_today
+      icon: mdi:transmission-tower-import
+    - name: Exported
+      entity: sensor.grid_export_today
+      icon: mdi:transmission-tower-export
+      tap_action:
+        action: navigate
+        navigation_path: /energy
+    - name: Cost today
+      entity: sensor.electricity_cost_today
+      icon: mdi:cash
+
+# ---------- Panels ----------
+updated_enabled: true
+updated_entity: sensor.inverter_1_last_updated
+updated_stale_minutes: 5
+
+grid_mix_enabled: true
+grid_mix_postcode: SW1A
+
+bins_enabled: true
+bins_mode: near                # the day before and on collection day
+bins:
+  - name: General waste
+    color: "#3a3f45"
+    source: calendar
+    calendar: calendar.bin_general
+  - name: Recycling
+    color: "#1e73d2"
+    source: calendar
+    calendar: calendar.bins
+    match: recycling, blue      # one calendar holding several bins
+  - name: Garden waste
+    color: "#2e9e4f"
+    source: manual
+    start: "2026-10-08"
+    every: 2
+    skip: "2026-12-24"
+    extra: "2026-12-27"
+
+weather_tap_action:
+  action: url
+  url_path: https://www.metoffice.gov.uk
+bins_tap_action:
+  action: more-info
+  entity: calendar.bin_general
+
+# ---------- Phones and wall displays ----------
+phone_layout: auto
+phone_breakpoint: 600
+phone_hide_gridmix: true
+fullscreen_button: true
+fullscreen_wake: true
