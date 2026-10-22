@@ -71,7 +71,7 @@ Pick a style under **View style** at the top of the editor. All styles use the s
 | | |
 |---|---|
 | ![Compact rings](https://github.com/mimikm/Home-Power-Flow-Card/raw/main/images/style-rings.png) **⭕ Compact rings**<br>Round icons around a hub, with battery level and self-sufficiency as rings. Small and tidy, great for phones and Sections dashboards. | ![Energy river](https://github.com/mimikm/Home-Power-Flow-Card/raw/main/images/style-river.png) **🌊 Energy river**<br>Where your power comes from and where it goes, as flowing bands as wide as the power they carry. |
-| ![Tiles](https://github.com/mimikm/Home-Power-Flow-Card/raw/main/images/style-tiles.png) **🔲 Tiles**<br>Big numbers in tidy tiles with history graphs behind them, a self-sufficiency ring and battery bars. Ideal for wall tablets. | ![At a glance](https://github.com/mimikm/Home-Power-Flow-Card/raw/main/images/style-glance.png) **👀 At a glance**<br>One plain-language headline, like "Running on sunshine" or "Running on battery", that you can read from across the room. The colour changes with the situation. Each battery with a state of charge sensor gets its own tile with its charge level, a fill bar and time left. |
+| ![Tiles](https://github.com/mimikm/Home-Power-Flow-Card/raw/main/images/style-tiles.png) **🔲 Tiles**<br>Big numbers in tidy tiles with history graphs behind them, a self-sufficiency ring and battery bars. Ideal for wall tablets. | ![At a glance](https://github.com/mimikm/Home-Power-Flow-Card/raw/main/images/style-glance.png) **👀 At a glance**<br>One plain-language headline, like "Running on sunshine" or "Running on battery", that you can read from across the room. The colour changes with the situation. Each battery with a state of charge sensor gets a small tile with its charge, a fill bar, power and what it's doing (switch **Battery tiles** off for plain chips instead). |
 | ![Schematic](https://github.com/mimikm/Home-Power-Flow-Card/raw/main/images/style-schematic.png) **📐 Schematic**<br>A technical one-line diagram with electrical symbols on grid paper, Blueprint arrows and an engineering title block. | |
 
 **🖼️ Classic**, the original style with your own background picture and freely placed boxes, stays the default and works exactly as before.
@@ -407,6 +407,7 @@ type: custom:home-power-flow-card
 title: Home Energy
 subtitle: Live power
 view_style: classic          # classic, rings, river, tiles, glance or schematic
+glance_battery_tiles: true   # At a glance: a small tile per battery
 theme: auto                  # follows Home Assistant's light/dark mode
 card_aspect: "16:9"
 power_unit: auto             # W below 1 kW, kW above
@@ -649,6 +650,7 @@ Each device gets a stable internal `id` automatically. `connects_to` refers to t
 | `fullscreen_wake` | `true` | Keeps the screen on while in full screen (needs Home Assistant over HTTPS) |
 | `weather_tap_action` (and `_hold_action`, `_double_tap_action`) | | Optional. Actions for the weather box; the same for `bins_`, `updated_` and `gridmix_` |
 | `view_style` | `classic` | `classic`, `rings`, `river`, `tiles`, `glance` or `schematic` (see [View styles](#-view-styles)) |
+| `glance_battery_tiles` | `true` | At a glance: a tile for each battery with a state of charge sensor; `false` shows batteries as chips with their charge level |
 | `theme` | `dark` | `auto`, `dark`, `light`, `midnight`, `ocean`, `forest`, `sunset`, `graphite` or `custom` |
 | `card_aspect` | `3:2` | Card shape: `3:2`, `4:3`, `16:10`, `16:9`, `2:1`, `21:9`, `32:9`, `image` (match background) or `screen` (fill screen) |
 | `background_fit` | `cover` | `cover` (fill, cropping the image) or `contain` (whole image, blurred edges) |
