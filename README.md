@@ -11,6 +11,8 @@ Show your whole home energy system (solar, batteries, grid, EV chargers, even mu
 
 ![Home Power Flow Card](https://github.com/mimikm/Home-Power-Flow-Card/raw/main/images/preview2.png)
 
+**Available in the HACS default store**: search for *Home Power Flow Card* in HACS, no custom repository needed ([install](#-installation)).
+
 **New in 0.9:** a redesigned editor with tabs and fold-away sections, plus a [bin collection](#️-bin-collection) badge. Since 0.8: five more [view styles](#-view-styles) to choose from (compact rings, an energy river, tiles, an at-a-glance headline and a technical schematic).
 
 ---
@@ -43,13 +45,20 @@ If you enjoy the card and want to support its development:
 
 ### HACS (recommended)
 
+Home Power Flow Card is in the **HACS default store**, so there's no custom repository to add.
+
 [![Open your Home Assistant instance and open this repository in HACS.](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=mimikm&repository=Home-Power-Flow-Card&category=plugin)
 
-Or in HACS itself (the card is in the HACS default list, so no custom repository is needed):
+Click the button above, or:
 1. Open **HACS** in Home Assistant
-2. Search for **Home Power Flow Card** and download it
-3. Reload your browser
-4. Add the card to a dashboard (search for "Home Power Flow Card")
+2. Search for **Home Power Flow Card**
+3. Open it and click **Download**
+4. Reload your browser when asked
+5. Add the card to a dashboard: **Edit dashboard → Add card** and search for "Home Power Flow Card"
+
+HACS adds the dashboard resource for you, and shows new versions under **HACS → Updates** (or in **Settings** next to other updates).
+
+> **Added it earlier as a custom repository?** Nothing to do: it's the same repository, so it keeps updating as usual.
 
 ### Manual
 
@@ -108,11 +117,11 @@ Pick a style under **View style** at the top of the editor. All styles use the s
 ### 🎨 Per-device customisation
 - Own name, power entity and **flow colour** for every device
 - **Flow colour by direction**: batteries can use the glow colours (green charging, amber discharging) or your own charging/discharging colours; the grid can use your own import/export colours
-- **Batteries and grid work with one or two sensors**: a single sensor with positive/negative values, or **separate** charge/discharge (import/export) sensors as provided by e.g. Growatt. **Three-phase grid** supplies can use one sensor per phase
+- **Batteries and grid work with one or two sensors**: a single sensor with positive/negative values, or **separate** charge/discharge (import/export) sensors as provided by e.g. Growatt. **Three-phase** grid, inverter, house, EV, generator and loads can use one sensor per phase
 - **History graph** (optional, per device): a faint graph of the device's power history behind its box, in the device's flow colour, with a zero line for signed values like batteries and the grid
 - Power shown in **W or kW**: automatically switches to kW from 1000 W (e.g. `3.20 kW`), or set it to always W / always kW
 - **Invert flow** per device, for sensors that report power the other way round
-- Up to **5 extra entities** per device (SoC, voltage, temperature...) with their own icons, shown in small text under the power value
+- Up to **10 extra entities** per device (SoC, voltage, temperature...) with their own icons, shown in small text under the power value
 - **Battery glow**: batteries pulse green when charging and amber when discharging (can be turned off per battery)
 - **Battery time remaining** (optional): e.g. `⏳ 2h 40m to 4%` or `⏳ 1h 15m to full`, from the battery's state of charge and capacity, with its own reserve and charge limit
 
@@ -198,7 +207,7 @@ Batteries and the grid can be set up either way (device setting **Power sensors*
 
 - **One sensor (+ and −)**, the default: battery positive = discharging, negative = charging; grid positive = export, negative = import. If yours is the other way round, use **Flow direction**.
 - **Separate sensors**: two sensors that both report positive values, e.g. Growatt's *Charge W* and *Discharge W*. The card combines them, so flow direction, battery glow, time remaining, self-sufficiency and the history graph all work as usual.
-- **Three phases (L1, L2, L3)**, grid only: one sensor per phase, e.g. from a Shelly 3EM, each positive = export and negative = import. The card adds them up for the flow, self-sufficiency and history graph, and shows each phase in the grid box with ↓ for import and ↑ for export (e.g. `L1 ↓1.50 kW  L2 ↓300 W  L3 ↑200 W`). Turn off **Show each phase in the box** to show just the total. The phases appear in the Classic and Tiles styles; the other styles show the total.
+- **Three phases (L1, L2, L3)** for the grid: one sensor per phase, e.g. from a Shelly 3EM, each positive = export and negative = import. The card adds them up for the flow, self-sufficiency and history graph, and shows each phase in the grid box with ↓ for import and ↑ for export (e.g. `L1 ↓1.50 kW  L2 ↓300 W  L3 ↑200 W`). Turn off **Show each phase in the box** to show just the total. The phases appear in the Classic and Tiles styles; the other styles show the total.
 
 ```yaml
 - type: grid
@@ -207,6 +216,17 @@ Batteries and the grid can be set up either way (device setting **Power sensors*
   grid_l1_power_entity: sensor.grid_l1_power
   grid_l2_power_entity: sensor.grid_l2_power
   grid_l3_power_entity: sensor.grid_l3_power
+```
+
+**Three-phase devices:** the **Inverter**, **House**, **EV charger**, **Generator** and **Extra load** (e.g. a heat pump) can also use **Three phases (L1, L2, L3)** under *Power sensors*. The card adds the phases up and shows each one in the box (e.g. `L1 600 W  L2 700 W  L3 500 W`). Batteries, solar, water and gas stay single-sensor.
+
+```yaml
+- type: ev
+  name: EV charger
+  power_mode: phases
+  l1_power_entity: sensor.wallbox_l1_power
+  l2_power_entity: sensor.wallbox_l2_power
+  l3_power_entity: sensor.wallbox_l3_power
 ```
 
 Put **state of charge (%)** in the battery's *State of charge* field (under *Show time remaining*) or as an extra entity, not as the power sensor.
@@ -739,9 +759,10 @@ Each device gets a stable internal `id` automatically. `connects_to` refers to t
 | `tap_action` / `hold_action` / `double_tap_action` | Optional. What tapping, holding or double-tapping the device does (Home Assistant's standard action format) |
 | `name` | Display name |
 | `power_entity` | Power sensor (W) |
-| `power_mode` | Battery/Grid only: `single` (one sensor, + and −; default) or `split` (two separate sensors); Grid also `phases` (three-phase supply) |
+| `power_mode` | `single` (one sensor; default); Battery/Grid: `split` (two separate sensors); Grid, Inverter, House, EV, Generator, Load: `phases` (three-phase) |
 | `grid_l1_power_entity` / `grid_l2_power_entity` / `grid_l3_power_entity` | Grid with `phases`: power sensor for each phase (+ export, − import) |
-| `show_phases` | Grid with `phases`: `false` to hide the per-phase readout in the box (default `true`) |
+| `l1_power_entity` / `l2_power_entity` / `l3_power_entity` | Inverter, House, EV, Generator or Load with `power_mode: phases`: power sensor for each phase |
+| `show_phases` | With `phases`: `false` to hide the per-phase readout in the box (default `true`) |
 | `battery_charge_power_entity` / `battery_discharge_power_entity` | Battery with `split`: charging and discharging power sensors (both positive) |
 | `grid_import_power_entity` / `grid_export_power_entity` | Grid with `split`: import and export power sensors (both positive) |
 | `connects_to` | `id` of the device it's wired to (blank = Automatic) |
@@ -762,7 +783,7 @@ Each device gets a stable internal `id` automatically. `connects_to` refers to t
 | `battery_charge_limit` | Batteries only: charge limit % (default `100`) |
 | `utility_unit` | Gas only: `m³` (default) or `kWh` |
 | `gas_cv` | Gas only: calorific value in MJ/m³ for m³ ↔ kWh conversion (default `39.5`) |
-| `extra_entities` | Up to 5 extra readings, each with `entity` and `icon` |
+| `extra_entities` | Up to 10 extra readings, each with `entity` and `icon` |
 | `phone_hidden` | `true` to hide this device (and its flow lines) in the phone layout |
 | `history_graph` | `true` to show a power history graph behind the box |
 
