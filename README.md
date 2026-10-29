@@ -274,6 +274,7 @@ Add water and gas meters as devices, using a usage sensor (e.g. litres or m³ to
 - **Gas** can be shown in **m³ or kWh**. Conversion uses the standard UK billing formula: kWh = m³ × 1.02264 × calorific value ÷ 3.6. The calorific value (default 39.5 MJ/m³) is on your gas bill.
 - On **Automatic**, both connect to your **House** device and flow into it whenever usage is above zero. Use **Connects to** to link them elsewhere.
 - The watt-based flow threshold and load-based dot speed don't apply to water and gas.
+- **Water or gas leaving the house**, e.g. a sewage/wastewater meter: set its **Flow direction** to **Inverted** (`invert_flow: true`) and the dots flow from the House out to it.
 
 ---
 
