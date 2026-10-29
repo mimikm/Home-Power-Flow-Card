@@ -147,12 +147,18 @@ devices:
       entity: switch.ev_charger
       confirmation: true
 
-  - type: load
+  - type: heatpump                             # three-phase heat pump
     id: heat_pump
     name: Heat Pump
-    power_entity: sensor.heat_pump_power
+    power_mode: phases
+    l1_power_entity: sensor.heat_pump_l1_power
+    l2_power_entity: sensor.heat_pump_l2_power
+    l3_power_entity: sensor.heat_pump_l3_power
     connects_to: house
-    flow_color: "#ff7043"
+    extra_entities:
+      - entity: sensor.heat_pump_flow_temperature
+        icon: mdi:thermometer
+        decimals: 1                            # override Home Assistant's rounding
 
   - type: gas
     id: gas
