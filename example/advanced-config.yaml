@@ -24,6 +24,7 @@ flow_threshold_watts: 20     # hide flows below 20 W (sensor noise)
 show_idle_lines: true
 history_hours: 24
 time_format: 24h
+extra_entities_scale: 1.2    # slightly bigger text for extra readings
 
 # ---------- Background, weather and seasons ----------
 weather_entity: weather.home
