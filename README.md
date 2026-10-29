@@ -108,7 +108,7 @@ Pick a style under **View style** at the top of the editor. All styles use the s
 - A configurable **noise threshold** keeps idle connections quiet
 
 ### 🔌 Any setup, including multi-inverter
-- Device types: ☀️ Solar, ⚡ Inverter, 🔋 Battery, 🧠 Gateway / distribution board, 🏠 House, 🌐 Grid, ⛽ Generator, 💧 Water, 🔥 Gas, 🚗 EV charger and ⚙️ Extra load, as many of each as you need
+- Device types: ☀️ Solar, ⚡ Inverter, 🔋 Battery, 🧠 Gateway / distribution board, 🏠 House, 🌐 Grid, ⛽ Generator, 💧 Water, 🔥 Gas, 🚗 EV charger, ♨️ Heat pump and ⚙️ Extra load, as many of each as you need
 - **"Connects to"** links let you describe your real wiring (e.g. Solar 2 → Inverter 2)
 - A **Gateway** device can act as the meeting point between several inverters
 - Left on **Automatic**, everything still connects sensibly out of the box
@@ -121,7 +121,7 @@ Pick a style under **View style** at the top of the editor. All styles use the s
 - **History graph** (optional, per device): a faint graph of the device's power history behind its box, in the device's flow colour, with a zero line for signed values like batteries and the grid
 - Power shown in **W or kW**: automatically switches to kW from 1000 W (e.g. `3.20 kW`), or set it to always W / always kW
 - **Invert flow** per device, for sensors that report power the other way round
-- Up to **10 extra entities** per device (SoC, voltage, temperature...) with their own icons, shown in small text under the power value. Their **text size** is adjustable for the whole card (Sizing) or per device, without changing the box
+- Up to **10 extra entities** per device (SoC, voltage, temperature...) with their own icons, shown in small text under the power value. Values use **Home Assistant's own rounding** (the entity's display precision) unless you pick a number of **decimals**; reorder them with ↑ ↓ in the editor. Their **text size** is adjustable for the whole card (Sizing) or per device, without changing the box
 - **No house sensor?** The House can **calculate its load** from your other devices ([Calculated house load](#-calculated-house-load))
 - **Battery glow**: batteries pulse green when charging and amber when discharging (can be turned off per battery)
 - **Battery time remaining** (optional): e.g. `⏳ 2h 40m to 4%` or `⏳ 1h 15m to full`, from the battery's state of charge and capacity, with its own reserve and charge limit
@@ -219,7 +219,7 @@ Batteries and the grid can be set up either way (device setting **Power sensors*
   grid_l3_power_entity: sensor.grid_l3_power
 ```
 
-**Three-phase devices:** the **Inverter**, **House**, **EV charger**, **Generator** and **Extra load** (e.g. a heat pump) can also use **Three phases (L1, L2, L3)** under *Power sensors*. The card adds the phases up and shows each one in the box (e.g. `L1 600 W  L2 700 W  L3 500 W`). Batteries, solar, water and gas stay single-sensor.
+**Three-phase devices:** the **Inverter**, **House**, **EV charger**, **Generator**, **Heat pump** and **Extra load** can also use **Three phases (L1, L2, L3)** under *Power sensors*. The card adds the phases up and shows each one in the box (e.g. `L1 600 W  L2 700 W  L3 500 W`). Batteries, solar, water and gas stay single-sensor.
 
 ```yaml
 - type: ev
@@ -242,7 +242,7 @@ No sensor for your home's consumption? Set the House device's **Power sensors** 
 
 - It updates with every reading and drives the flow lines, self-sufficiency and every view style, just like a real sensor. The box shows a small *calculated* note.
 - Works with one or two battery/grid sensors, three-phase devices and **Flow direction**, so set those up correctly first.
-- **Loads beside the House** (an EV charger or heat pump on Automatic or connected to the inverter) are taken off, because they aren't part of the house.
+- **Loads beside the House** (an EV charger, heat pump or extra load on Automatic or connected to the inverter) are taken off, because they aren't part of the house.
 - **Loads connected to the House** count as part of it. Tick **Leave out devices connected to the House** to show just the rest of the house.
 - Needs a Grid device with a power sensor. The history graph needs a real sensor, so it isn't shown for a calculated House.
 
@@ -593,12 +593,18 @@ devices:
       entity: switch.ev_charger
       confirmation: true
 
-  - type: load
+  - type: heatpump                             # three-phase heat pump
     id: heat_pump
     name: Heat Pump
-    power_entity: sensor.heat_pump_power
+    power_mode: phases
+    l1_power_entity: sensor.heat_pump_l1_power
+    l2_power_entity: sensor.heat_pump_l2_power
+    l3_power_entity: sensor.heat_pump_l3_power
     connects_to: house
-    flow_color: "#ff7043"
+    extra_entities:
+      - entity: sensor.heat_pump_flow_temperature
+        icon: mdi:thermometer
+        decimals: 1                            # override Home Assistant's rounding
 
   - type: gas
     id: gas
@@ -779,13 +785,13 @@ Each device gets a stable internal `id` automatically. `connects_to` refers to t
 
 | Option | Description |
 |---|---|
-| `type` | `solar`, `inverter`, `battery`, `gateway`, `house`, `grid`, `generator`, `water`, `gas`, `ev` or `load` |
+| `type` | `solar`, `inverter`, `battery`, `gateway`, `house`, `grid`, `generator`, `water`, `gas`, `ev`, `heatpump` or `load` |
 | `tap_action` / `hold_action` / `double_tap_action` | Optional. What tapping, holding or double-tapping the device does (Home Assistant's standard action format) |
 | `name` | Display name |
 | `power_entity` | Power sensor (W) |
-| `power_mode` | `single` (one sensor; default); Battery/Grid: `split` (two separate sensors); Grid, Inverter, House, EV, Generator, Load: `phases` (three-phase); House: `calc` ([calculated](#-calculated-house-load)) |
+| `power_mode` | `single` (one sensor; default); Battery/Grid: `split` (two separate sensors); Grid, Inverter, House, EV, Generator, Heat pump, Load: `phases` (three-phase); House: `calc` ([calculated](#-calculated-house-load)) |
 | `grid_l1_power_entity` / `grid_l2_power_entity` / `grid_l3_power_entity` | Grid with `phases`: power sensor for each phase (+ export, − import) |
-| `l1_power_entity` / `l2_power_entity` / `l3_power_entity` | Inverter, House, EV, Generator or Load with `power_mode: phases`: power sensor for each phase |
+| `l1_power_entity` / `l2_power_entity` / `l3_power_entity` | Inverter, House, EV, Generator, Heat pump or Load with `power_mode: phases`: power sensor for each phase |
 | `show_phases` | With `phases`: `false` to hide the per-phase readout in the box (default `true`) |
 | `battery_charge_power_entity` / `battery_discharge_power_entity` | Battery with `split`: charging and discharging power sensors (both positive) |
 | `grid_import_power_entity` / `grid_export_power_entity` | Grid with `split`: import and export power sensors (both positive) |
@@ -807,7 +813,7 @@ Each device gets a stable internal `id` automatically. `connects_to` refers to t
 | `battery_charge_limit` | Batteries only: charge limit % (default `100`) |
 | `utility_unit` | Gas only: `m³` (default) or `kWh` |
 | `gas_cv` | Gas only: calorific value in MJ/m³ for m³ ↔ kWh conversion (default `39.5`) |
-| `extra_entities` | Up to 10 extra readings, each with `entity` and `icon` |
+| `extra_entities` | Up to 10 extra readings, each with `entity`, `icon` and optional `decimals` (`0`–`4`; default: Home Assistant's display precision) |
 | `extra_entities_scale` | Text size of this device's extra entities; overrides the card-wide setting |
 | `calc_exclude_connected` | House with `power_mode: calc`: `true` leaves out loads connected to the House |
 | `phone_hidden` | `true` to hide this device (and its flow lines) in the phone layout |
