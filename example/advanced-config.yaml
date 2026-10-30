@@ -100,6 +100,8 @@ devices:
     battery_discharge_power_entity: sensor.aio_battery_discharge_power
     connects_to: inv2
     battery_soc_entity: sensor.aio_battery_soc
+    main_value: soc                            # big number shows the charge (%)
+    show_power: true                           # power moves to the small text
     battery_capacity_entity: sensor.aio_battery_capacity
     battery_charge_limit: 100
     battery_time: true

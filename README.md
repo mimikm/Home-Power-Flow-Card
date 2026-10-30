@@ -122,6 +122,7 @@ Pick a style under **View style** at the top of the editor. All styles use the s
 - Power shown in **W or kW**: automatically switches to kW from 1000 W (e.g. `3.20 kW`), or set it to always W / always kW
 - **Invert flow** per device, for sensors that report power the other way round
 - Up to **10 extra entities** per device (SoC, voltage, temperature...) with their own icons, shown in small text under the power value. Values use **Home Assistant's own rounding** (the entity's display precision) unless you pick a number of **decimals**; reorder them with ↑ ↓ in the editor. Their **text size** is adjustable for the whole card (Sizing) or per device, without changing the box
+- **Main value**: show a battery's charge or any extra entity as the big number, with or without the power ([Main value](#-main-value))
 - **No house sensor?** The House can **calculate its load** from your other devices ([Calculated house load](#-calculated-house-load))
 - **Battery glow**: batteries pulse green when charging and amber when discharging (can be turned off per battery)
 - **Battery time remaining** (optional): e.g. `⏳ 2h 40m to 4%` or `⏳ 1h 15m to full`, from the battery's state of charge and capacity, with its own reserve and charge limit
@@ -251,6 +252,31 @@ No sensor for your home's consumption? Set the House device's **Power sensors** 
   name: House
   power_mode: calc
   calc_exclude_connected: false   # true = leave out loads connected to the House
+```
+
+---
+
+## 🔢 Main value
+
+Choose what each device shows as its **big number** under **Main value** in the device's settings:
+
+| Main value | Shows |
+|---|---|
+| **Power** (default) | The power sensor, as before |
+| **State of charge (%)** | Batteries with a *State of charge* sensor: the charge level, e.g. `82%` |
+| **Extra entity N** | One of the device's extra entities, e.g. a temperature or energy today |
+
+- **Also show the power in the small text** keeps the power visible underneath; untick it to hide the watts completely, e.g. a battery that shows just `82% · Charging`.
+- Flow lines, colours, self-sufficiency and totals always use the power sensor, whatever is shown.
+- Works in every view style. In **At a glance**, battery tiles already show the charge, so turning off the power leaves `Charging · 1h 30m to full` underneath.
+
+```yaml
+- type: battery
+  name: Battery
+  power_entity: sensor.battery_power
+  battery_soc_entity: sensor.battery_soc
+  main_value: soc        # power (default), soc or extra_1 … extra_10
+  show_power: false      # hide the watts
 ```
 
 ---
@@ -547,6 +573,8 @@ devices:
     battery_discharge_power_entity: sensor.aio_battery_discharge_power
     connects_to: inv2
     battery_soc_entity: sensor.aio_battery_soc
+    main_value: soc                            # big number shows the charge (%)
+    show_power: true                           # power moves to the small text
     battery_capacity_entity: sensor.aio_battery_capacity
     battery_charge_limit: 100
     battery_time: true
@@ -816,6 +844,8 @@ Each device gets a stable internal `id` automatically. `connects_to` refers to t
 | `gas_cv` | Gas only: calorific value in MJ/m³ for m³ ↔ kWh conversion (default `39.5`) |
 | `extra_entities` | Up to 10 extra readings, each with `entity`, `icon` and optional `decimals` (`0`–`4`; default: Home Assistant's display precision) |
 | `extra_entities_scale` | Text size of this device's extra entities; overrides the card-wide setting |
+| `main_value` | What the big number shows: `power` (default), `soc` (batteries) or `extra_1` … `extra_10` ([Main value](#-main-value)) |
+| `show_power` | With another main value: `false` hides the power from the small text (default `true`) |
 | `calc_exclude_connected` | House with `power_mode: calc`: `true` leaves out loads connected to the House |
 | `phone_hidden` | `true` to hide this device (and its flow lines) in the phone layout |
 | `history_graph` | `true` to show a power history graph behind the box |
