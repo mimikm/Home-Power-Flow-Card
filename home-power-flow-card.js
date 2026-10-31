@@ -10,7 +10,7 @@
  * Issues & feature requests: https://github.com/mimikm/Home-Power-Flow-Card/issues
  */
 (() => {
-  const VERSION = '0.10.0';
+  const VERSION = '0.10.1';
   // The built-in backgrounds load from the GitHub repo (via the jsDelivr
   // CDN). HACS installs the card from the release file, which carries only
   // the .js, so the pictures are no longer copied into /hacsfiles/.
@@ -1986,6 +1986,11 @@
       const aHas = hasPower(a);
       const bHas = hasPower(b);
       let source = (aHas && !bHas) ? a : (bHas && !aHas) ? b : null;
+      // Grid and battery readings carry a direction (+/-); a house or load
+      // doesn't. When a two-way device is wired straight to a one-way one,
+      // the two-way device decides which way the line flows.
+      const twoWay = x => x?.type === 'grid' || x?.type === 'battery';
+      if (!source && aHas && bHas && twoWay(a) !== twoWay(b)) source = twoWay(a) ? a : b;
       if (!source && aHas && bHas && (preferChild === a || preferChild === b)) source = preferChild;
       const value = source === a ? va : source === b ? vb : null;
 
@@ -2009,13 +2014,17 @@
           // Solar and generators only produce power: always toward the rest of the system.
           reverse = (b === source);
         } else if (t === 'battery') {
-          // positive = charging (hub -> battery). Position-independent: the
-          // automatic/explicit builder always places the hub first.
-          reverse = Number(value) < 0 ? false : true;
+          // negative = charging (other side -> battery), positive =
+          // discharging. Works whichever end of the line the battery is on.
+          const towardBattery = Number(value) < 0;
+          reverse = towardBattery !== aIsHub;
         } else if (t === 'grid') {
-          // positive = export (hub -> grid), negative = import (grid -> hub).
-          // Sensors with the opposite convention are corrected by Invert flow.
-          reverse = Number(value) < 0 ? true : false;
+          // positive = export (other side -> grid), negative = import
+          // (grid -> other side), whichever end of the line the grid is on
+          // (e.g. a custom Grid -> House connection). Sensors with the
+          // opposite convention are corrected by Invert flow.
+          const towardGrid = Number(value) >= 0;
+          reverse = towardGrid !== aIsHub;
         } else {
           // Generic bidirectional convention for every other device type
           // (house, EV, load, gateway, or a second inverter reporting its
