@@ -130,7 +130,7 @@ Pick a style under **View style** at the top of the editor. All styles use the s
 ### 🖱️ Flexible layout
 - **Resize any device box** like a window: drag its right or bottom edge or corner in the layout editor. The text scales so everything (value, extras, battery time) always fits. Separate sizes for desktop and phone; double-click the corner to reset
 - **Drag and drop** devices, the title, the weather box, the Today panel, the grid mix box and the last updated box to exactly where you want them
-- **Custom backgrounds**: separate day and night images, switched automatically by the sun
+- **Custom backgrounds**: separate day and night images, switched automatically by the sun, or **several pictures through the day** (dawn, day, sunset, night…), each starting at a sun time or a clock time
 - **Seasonal background**: a day and night picture for Halloween, Christmas, Easter or your own dates, coming back by itself every year
 - **Animated rain & snow**: falling rain, snow, sleet, hail and lightning drawn live over any background whenever your weather entity reports them
 - **Any card shape**, including ultra-wide: 3:2, 4:3, 16:10, 16:9, 2:1, 21:9 and 32:9, **match your background image**, or **fill the screen** for an almost full-screen dashboard
@@ -314,6 +314,34 @@ On narrow screens the card switches to a **portrait layout** with its own box po
 - **Copy desktop layout** starts from your desktop positions; **Reset phone layout** goes back to the automatic arrangement.
 - **Background focus:** two sliders choose which part of your background stays in view in the portrait crop.
 - **Show on phone:** untick any device or panel to hide it in the phone layout only. Hiding a device also hides its flow lines.
+
+---
+
+## 🌅 Backgrounds through the day
+
+Tick **Change through the day** in the Background section to use several pictures instead of one day and one night picture (up to 8).
+
+- Each picture has a **start**: **Dawn**, **Sunrise**, **Midday**, **Sunset** or **Dusk**, with an optional offset in minutes (e.g. *Sunset −30*), or a fixed **time** (e.g. 22:00).
+- A picture shows from its start until the next one begins; the start times decide the order. Before the first start of the day, the last picture carries on.
+- Sun times come from your sun entity (`sun.sun`), so they move with the seasons.
+- Pictures change with a soft cross-fade. The editor shows each picture's start time today and which one is **showing now**; 👁 previews it in the layout.
+- **Use Dawn · Day · Sunset · Night** sets up four slots in one tap, keeping your day and night pictures.
+- Seasonal pictures still take over on their dates, and animated rain and snow still show on top. Untick it to go back to day and night.
+
+```yaml
+background_slots_enabled: true
+background_slots:
+  - start: dawn
+    image: /local/bg-dawn.jpg
+  - start: sunrise
+    offset: 60            # minutes after sunrise
+    image: /local/bg-day.jpg
+  - start: sunset
+    offset: -30           # golden hour
+    image: /local/bg-golden.jpg
+  - start: "22:00"
+    image: /local/bg-night.jpg
+```
 
 ---
 
@@ -756,9 +784,11 @@ Each device gets a stable internal `id` automatically. `connects_to` refers to t
 | `flow_routes` / `phone_flow_routes` | — | Manual line bend points per connection (set in the layout editor) |
 | `time_format` | `24h` | `24h` or `12h` for the clock |
 | `weather_entity` | — | Weather entity for the weather box |
-| `sun_entity` | `sun.sun` | Switches between the day and night backgrounds |
+| `sun_entity` | `sun.sun` | Switches between the day and night backgrounds, and gives the sun times for pictures through the day |
 | `background` | built-in | Day background image URL (the built-in pictures load from this GitHub repository) |
 | `background_night` | built-in | Night background image URL |
+| `background_slots_enabled` | `false` | Use pictures through the day instead of day/night ([Backgrounds through the day](#-backgrounds-through-the-day)) |
+| `background_slots` | — | Up to 8 pictures: `image`, `start` (`dawn`, `sunrise`, `noon`, `sunset`, `dusk` or a time like `"22:00"`) and optional `offset` (minutes, −240 to 240, sun times only) |
 | `weather_effects` | `false` | Animated rain, snow, hail and lightning over the background |
 | `weather_effects_amount` | `1` | How much rain/snow, `0.25` to `2` |
 | `weather_effects_lightning` | `true` | Lightning flashes in thunderstorms |
