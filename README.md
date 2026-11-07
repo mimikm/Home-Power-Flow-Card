@@ -767,6 +767,7 @@ Each device gets a stable internal `id` automatically. `connects_to` refers to t
 | `weather_tap_action` (and `_hold_action`, `_double_tap_action`) | | Optional. Actions for the weather box; the same for `bins_`, `updated_` and `gridmix_` |
 | `view_style` | `classic` | `classic`, `rings`, `river`, `tiles`, `glance` or `schematic` (see [View styles](#-view-styles)) |
 | `rings_summary` | `true` | Compact rings: `false` removes the self-powered summary from the middle (an inverter in the middle shows its own reading) |
+| `glance_summary` | `true` | At a glance: `false` hides the self-powered box |
 | `glance_battery_tiles` | `true` | At a glance: a tile for each battery with a state of charge sensor; `false` shows batteries as chips with their charge level |
 | `theme` | `dark` | `auto`, `dark`, `light`, `midnight`, `ocean`, `forest`, `sunset`, `graphite` or `custom` |
 | `card_aspect` | `3:2` | Card shape: `3:2`, `4:3`, `16:10`, `16:9`, `2:1`, `21:9`, `32:9`, `image` (match background) or `screen` (fill screen) |
