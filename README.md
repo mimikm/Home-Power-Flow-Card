@@ -172,7 +172,7 @@ Pick a style under **View style** at the top of the editor. All styles use the s
 - Tap any device to open its Home Assistant details, or choose your own **tap, hold and double-tap actions** per device and panel
 
 ### 🌐 Languages
-The card and its editor are available in **English**, **Polish** and **Spanish**, and automatically follow the language set in your Home Assistant profile. Your own names and titles are never changed. Other languages fall back to English.
+The card and its editor are available in **English**, **Polish**, **Spanish** and **German** (thanks to [@mphlipp](https://github.com/mphlipp) for the German wording), and automatically follow the language set in your Home Assistant profile. Your own names and titles are never changed. Other languages fall back to English.
 
 ### 💾 Backup & Restore
 Export your whole card configuration as a JSON file with one click, and import it again later. Handy before big changes, or to share a working setup.
