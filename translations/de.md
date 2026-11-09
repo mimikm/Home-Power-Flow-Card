@@ -1,6 +1,6 @@
-# German translation – review list
+# German translation
 
-All card and editor texts in German. Please check the **German** column and suggest changes in issue [#18](https://github.com/mimikm/Home-Power-Flow-Card/issues/18) (row number + your wording), or edit this file in a pull request.
+All card and editor texts in German. Reviewed by [@mphlipp](https://github.com/mphlipp) in [#18](https://github.com/mimikm/Home-Power-Flow-Card/issues/18). Suggestions are welcome: open an issue with the row number and your wording, or edit this file in a pull request.
 
 Notes:
 - `{n}`, `{p}`, `{e}` etc. are placeholders filled in by the card (numbers, power, entity names) and must stay as they are.
@@ -20,7 +20,7 @@ Notes:
 | 9 | {n}s ago | vor {n} s |
 | 10 | {m}m {s}s ago | vor {m} min {s} s |
 | 11 | {h}h {m}m ago | vor {h} h {m} min |
-| 12 | {d}d {h}h ago | vor {d} T {h} h |
+| 12 | {d}d {h}h ago | vor {d} d {h} h |
 | 13 | No data | Keine Daten |
 | 14 | Unknown | Unbekannt |
 | 15 | to full | bis voll |
@@ -63,12 +63,12 @@ Notes:
 | 52 | Home Power Flow | Home Power Flow |
 | 53 | Bidirectional power flow from live positive/negative values, dotted connections, single moving power dot, invertible device direction, dynamic flow colors and draggable layout. Entity IDs are shown in full below each picker. | Bidirektionaler Energiefluss aus positiven/negativen Live-Werten, gepunktete Verbindungen, ein bewegter Energiepunkt, umkehrbare Geräterichtung, dynamische Flussfarben und frei verschiebbares Layout. Entitäts-IDs werden unter jeder Auswahl vollständig angezeigt. |
 | 54 | Backup | Sicherung |
-| 55 | Download the whole card configuration as a file, or restore one saved earlier. Importing replaces every setting below (devices, connections, layout, statistics) - it does not save to your dashboard until you click Save. | Lade die gesamte Kartenkonfiguration als Datei herunter oder stelle eine früher gespeicherte wieder her. Der Import ersetzt alle Einstellungen unten (Geräte, Verbindungen, Layout, Statistiken) - gespeichert wird erst, wenn du auf Speichern klickst. |
+| 55 | Download the whole card configuration as a file, or restore one saved earlier. Importing replaces every setting below (devices, connections, layout, statistics) - it does not save to your dashboard until you click Save. | Lade die gesamte Kartenkonfiguration als Datei herunter oder stelle eine früher gespeicherte wieder her. Der Import ersetzt alle Einstellungen unten (Geräte, Verbindungen, Layout, Statistiken) – gespeichert wird erst, wenn du auf Speichern klickst. |
 | 56 | ⬇ Export config | ⬇ Konfiguration exportieren |
 | 57 | ⬆ Import config | ⬆ Konfiguration importieren |
 | 58 | Downloaded. | Heruntergeladen. |
-| 59 | Export failed - see the browser console for details. | Export fehlgeschlagen - Details in der Browser-Konsole. |
-| 60 | Import failed - that file is not a valid Home Power Flow Card config. | Import fehlgeschlagen - die Datei ist keine gültige Home Power Flow Card Konfiguration. |
+| 59 | Export failed - see the browser console for details. | Export fehlgeschlagen – Details in der Browser-Konsole. |
+| 60 | Import failed - that file is not a valid Home Power Flow Card config. | Import fehlgeschlagen – die Datei ist keine gültige Konfiguration der Home Power Flow Card. |
 | 61 | Imported. Click Save below to keep it on this dashboard. | Importiert. Klicke unten auf Speichern, um sie auf diesem Dashboard zu behalten. |
 | 62 | Title | Titel |
 | 63 | Subtitle | Untertitel |
@@ -84,10 +84,10 @@ Notes:
 | 73 | Restore default | Standard wiederherstellen |
 | 74 | Using the default background | Standardhintergrund wird verwendet |
 | 75 | Uploading… | Wird hochgeladen… |
-| 76 | Upload failed - check that you are an admin user and try again. | Hochladen fehlgeschlagen - prüfe, ob du Administrator bist, und versuche es erneut. |
+| 76 | Upload failed - check that you are an admin user and try again. | Hochladen fehlgeschlagen – prüfe, ob du Administrator bist, und versuche es erneut. |
 | 77 | Sun entity (switches day/night background) | Sonnen-Entität (wechselt Tag-/Nachthintergrund) |
 | 78 | Flow threshold (W) | Flussschwelle (W) |
-| 79 | Flow animation speed (seconds) | Animationsgeschwindigkeit (Sekunden) |
+| 79 | Flow animation speed (seconds) | Animationsdauer (Sekunden) |
 | 80 | Particle stagger (seconds) | Partikelabstand (Sekunden) |
 | 81 | Not selected | Nicht ausgewählt |
 | 82 | Last updated box | Box „Zuletzt aktualisiert“ |
@@ -191,7 +191,7 @@ Notes:
 | 180 | Used to convert between m³ and kWh (see your gas bill). On Automatic, gas connects to your House device. | Für die Umrechnung zwischen m³ und kWh (siehe Gasrechnung). Bei Automatisch wird Gas mit deinem Haus-Gerät verbunden. |
 | 181 | ＋ Add extra entity | ＋ Zusätzliche Entität hinzufügen |
 | 182 | Maximum of 10 extra entities reached. | Maximal 10 zusätzliche Entitäten erreicht. |
-| 183 | Icon (Material Design Icons) | Icon (Material Design Icons) |
+| 183 | Icon (Material Design Icons) | Symbol (Material Design Icons) |
 | 184 | Connections | Verbindungen |
 | 185 | Optional. Leave empty to use the automatic topology. Add connections to take full control of where power flows. | Optional. Leer lassen für die automatische Topologie. Füge Verbindungen hinzu, um selbst festzulegen, wohin die Energie fließt. |
 | 186 | From | Von |
@@ -202,9 +202,9 @@ Notes:
 | 191 | Remove connection | Verbindung entfernen |
 | 192 | ＋ Add connection | ＋ Verbindung hinzufügen |
 | 193 | Today statistics | Heute-Statistiken |
-| 194 | Add up to 20 custom statistics. Choose your own name, entity and icon. | Bis zu 20 eigene Statistiken mit eigenem Namen, eigener Entität und eigenem Icon. |
+| 194 | Add up to 20 custom statistics. Choose your own name, entity and icon. | Bis zu 20 eigene Statistiken mit eigenem Namen, eigener Entität und eigenem Symbol. |
 | 195 | Material Design Icon | Material Design Icon |
-| 196 | Custom icon override | Eigenes Icon |
+| 196 | Custom icon override | Eigenes Symbol |
 | 197 | ＋ Add statistic | ＋ Statistik hinzufügen |
 | 198 | No statistics added. | Keine Statistiken hinzugefügt. |
 | 199 | Statistic | Statistik |
@@ -233,7 +233,7 @@ Notes:
 | 222 | Optional | Optional |
 | 223 | Or paste an image URL instead | Oder stattdessen eine Bild-URL einfügen |
 | 224 | Remove | Entfernen |
-| 225 | e.g. 13.5 | z. B. 13.5 |
+| 225 | e.g. 13.5 | z. B. 13,5 |
 | 226 | e.g. SW1A, blank = all of GB | z. B. SW1A, leer = ganz GB |
 | 227 | Not connected to anything | Mit nichts verbunden |
 | 228 | idle | inaktiv |
@@ -245,14 +245,14 @@ Notes:
 | 234 | Top | Oben |
 | 235 | Left | Links |
 | 236 | Right | Rechts |
-| 237 | Auto-hide (slides out on hover or tap) | Automatisch ausblenden (fährt bei Hover oder Tippen aus) |
+| 237 | Auto-hide (slides out on hover or tap) | Automatisch ausblenden (fährt beim Darüberfahren oder Tippen aus) |
 | 238 | On phone | Auf dem Handy |
 | 239 | Same as desktop | Wie Desktop |
 | 240 | Floating | Schwebend |
 | 241 | Docked | Angedockt |
 | 242 | Phone dock edge | Andockkante auf dem Handy |
 | 243 | Phone auto-hide | Auf dem Handy automatisch ausblenden |
-| 244 | Docked panels sit on an edge of the card and can't be dragged. Auto-hide shrinks the panel to a tab that slides out on hover or tap. | Angedockte Panels sitzen an einem Kartenrand und lassen sich nicht verschieben. Automatisch ausblenden verkleinert das Panel zu einem Reiter, der bei Hover oder Tippen ausfährt. |
+| 244 | Docked panels sit on an edge of the card and can't be dragged. Auto-hide shrinks the panel to a tab that slides out on hover or tap. | Angedockte Panels sitzen an einem Kartenrand und lassen sich nicht verschieben. Automatisch ausblenden verkleinert das Panel zu einem Reiter, der beim Darüberfahren oder Tippen ausfährt. |
 | 245 | Box opacity | Box-Deckkraft |
 | 246 | Card shape | Kartenformat |
 | 247 | 3:2 (default) | 3:2 (Standard) |
@@ -289,13 +289,13 @@ Notes:
 | 278 | Manual (draw your own) | Manuell (selbst zeichnen) |
 | 279 | Manual lines: click a line to add a bend point, drag points to move them (they snap into line; hold Shift to place freely), double-click a point to remove it, double-click a line to make it straight again. | Manuelle Linien: Klicke auf eine Linie, um einen Knickpunkt hinzuzufügen, ziehe Punkte zum Verschieben (sie rasten ein; mit Umschalt frei platzieren), Doppelklick auf einen Punkt entfernt ihn, Doppelklick auf eine Linie macht sie wieder gerade. |
 | 280 | ↺ Reset all lines | ↺ Alle Linien zurücksetzen |
-| 281 | Flow line look (day) | Linien-Look (Tag) |
-| 282 | Flow line look (night) | Linien-Look (Nacht) |
+| 281 | Flow line look (day) | Linienstil (Tag) |
+| 282 | Flow line look (night) | Linienstil (Nacht) |
 | 283 | Same as day | Wie am Tag |
 | 284 | Classic | Klassisch |
 | 285 | Neon | Neon |
 | 286 | Energy stream | Energiestrom |
-| 287 | Marching | Marschierend |
+| 287 | Marching | Lauflicht |
 | 288 | Minimal | Minimal |
 | 289 | Blueprint | Blaupause |
 | 290 | Static | Statisch |
@@ -317,7 +317,7 @@ Notes:
 | 306 | Not connected to anything: add an Inverter or Gateway, or set Connects to. | Mit nichts verbunden: Füge einen Wechselrichter oder ein Gateway hinzu oder setze „Verbunden mit“. |
 | 307 | Water and gas connect to a House device on Automatic: add a House device or set Connects to. | Wasser und Gas werden bei Automatisch mit einem Haus-Gerät verbunden: Füge ein Haus-Gerät hinzu oder setze „Verbunden mit“. |
 | 308 | Time remaining needs a state of charge sensor and a capacity. | Die Restzeit braucht einen Ladezustandssensor und eine Kapazität. |
-| 309 | {n} device(s) need attention | {n} Gerät(e) brauchen Aufmerksamkeit |
+| 309 | {n} device(s) need attention | Bitte {n} Gerät(e) prüfen |
 | 310 | Day | Tag |
 | 311 | Night | Nacht |
 | 312 | Rain | Regen |
@@ -325,8 +325,8 @@ Notes:
 | 314 | Halloween | Halloween |
 | 315 | Christmas | Weihnachten |
 | 316 | Easter | Ostern |
-| 317 | Custom dates | Eigene Daten |
-| 318 | Season | Saison |
+| 317 | Custom dates | Eigene Zeiträume |
+| 318 | Season | Anlass |
 | 319 | Upload | Hochladen |
 | 320 | Uses day picture | Nutzt Tagesbild |
 | 321 | Paste an image URL | Bild-URL einfügen |
@@ -348,30 +348,30 @@ Notes:
 | 337 | Preview only while the editor is open; the card then follows your real weather again. | Vorschau nur, solange der Editor offen ist; danach folgt die Karte wieder deinem echten Wetter. |
 | 338 | Animated rain and snow need a Weather entity (set above). | Animierter Regen und Schnee brauchen eine Wetter-Entität (oben einstellen). |
 | 339 | Seasonal background | Saisonaler Hintergrund |
-| 340 | A different picture for a time of year, such as Halloween or Christmas. It comes back by itself every year. | Ein anderes Bild für eine Jahreszeit, etwa Halloween oder Weihnachten. Es kommt jedes Jahr von selbst wieder. |
+| 340 | A different picture for a time of year, such as Halloween or Christmas. It comes back by itself every year. | Ein anderes Bild für eine bestimmte Zeit im Jahr, etwa Halloween oder Weihnachten. Es kommt jedes Jahr von selbst wieder. |
 | 341 | Tap a box to upload a picture. Leave Night empty to use the Day picture all the time. Animated rain and snow still show on top. | Tippe auf eine Box, um ein Bild hochzuladen. Lass Nacht leer, um immer das Tagesbild zu nutzen. Animierter Regen und Schnee werden weiterhin darüber angezeigt. |
-| 342 | View style | Ansicht |
+| 342 | View style | Darstellung |
 | 343 | Compact rings | Kompakte Ringe |
-| 344 | Energy river | Energiefluss-Strom |
+| 344 | Energy river | Energie-Flussbänder |
 | 345 | Tiles | Kacheln |
 | 346 | At a glance | Auf einen Blick |
 | 347 | Schematic | Schaltplan |
 | 348 | Your background picture with floating boxes and flow lines. | Dein Hintergrundbild mit schwebenden Boxen und Flusslinien. |
-| 349 | Round icons around a hub. Small and tidy, great for phones and Sections dashboards. | Runde Symbole um einen Mittelpunkt. Klein und aufgeräumt, ideal für Handys und Abschnitts-Dashboards. |
-| 350 | Where your power comes from and where it goes, as flowing bands sized by power. | Woher deine Energie kommt und wohin sie geht, als fließende Bänder in Leistungsbreite. |
+| 349 | Round icons around a hub. Small and tidy, great for phones and Sections dashboards. | Runde Symbole um einen Mittelpunkt. Klein und aufgeräumt, ideal für Handys und Ansichten vom Typ „Abschnitte“. |
+| 350 | Where your power comes from and where it goes, as flowing bands sized by power. | Woher deine Energie kommt und wohin sie geht, als fließende Bänder, deren Breite der Leistung entspricht. |
 | 351 | Big numbers in tidy tiles with history graphs. Ideal for wall tablets. | Große Zahlen in aufgeräumten Kacheln mit Verlaufsgrafiken. Ideal für Wandtablets. |
 | 352 | One plain-language headline you can read from across the room. | Eine Schlagzeile in Klartext, lesbar vom anderen Ende des Raums. |
-| 353 | A technical one-line diagram with electrical symbols on grid paper. | Ein technisches Einlinienschaltbild mit elektrischen Symbolen auf Millimeterpapier. |
+| 353 | A technical one-line diagram with electrical symbols on grid paper. | Ein technischer einpoliger Übersichtsschaltplan mit elektrischen Symbolen auf Millimeterpapier. |
 | 354 | Background pictures, box positions, box sizes and line shapes only apply to the Classic style. Devices, colours, theme, Today statistics and history graphs work in every style. | Hintergrundbilder, Boxpositionen, Boxgrößen und Linienformen gelten nur für den klassischen Stil. Geräte, Farben, Design, Heute-Statistiken und Verlaufsgrafiken funktionieren in jedem Stil. |
 | 355 | Producing | Erzeugung |
 | 356 | Using | Verbrauch |
-| 357 | Charging | Ladung |
-| 358 | Discharging | Entladung |
+| 357 | Charging | Laden |
+| 358 | Discharging | Entladen |
 | 359 | Importing | Bezug |
 | 360 | Exporting | Einspeisung |
-| 361 | Active | aktiv |
+| 361 | Active | Aktiv |
 | 362 | In use | In Betrieb |
-| 363 | Idle | inaktiv |
+| 363 | Idle | Inaktiv |
 | 364 | in use | Verbrauch |
 | 365 | self-powered | autark |
 | 366 | Self-powered | Autark |
@@ -391,7 +391,7 @@ Notes:
 | 380 | Running on battery | Läuft mit Batterie |
 | 381 | Running on the grid | Läuft mit Netzstrom |
 | 382 | All quiet | Alles ruhig |
-| 383 | Sending {p} to the grid | {p} gehen ins Netz |
+| 383 | Sending {p} to the grid | {p} ins Netz |
 | 384 | charging battery {s} | lädt Batterie {s} |
 | 385 | {p} from solar | {p} von der Sonne |
 | 386 | {p} from the grid | {p} aus dem Netz |
@@ -433,7 +433,7 @@ Notes:
 | 422 | 1 row | 1 Zeile |
 | 423 | {n} rows | {n} Zeilen |
 | 424 | About | Info |
-| 425 | All of GB | Ganz GB |
+| 425 | All of GB | Ganz Großbritannien |
 | 426 | Auto | Auto |
 | 427 | Background | Hintergrund |
 | 428 | Choose an entity | Entität wählen |
@@ -458,14 +458,14 @@ Notes:
 | 447 | {n} of 4 on | {n} von 4 an |
 | 448 | Full screen | Vollbild |
 | 449 | Exit full screen | Vollbild beenden |
-| 450 | Show full-screen button | Vollbild-Taste anzeigen |
+| 450 | Show full-screen button | Vollbild-Schaltfläche anzeigen |
 | 451 | Keep the screen on in full screen | Bildschirm im Vollbild eingeschaltet lassen |
-| 452 | Tap actions | Tipp-Aktionen |
+| 452 | Tap actions | Aktionen beim Tippen |
 | 453 | Tap | Tippen |
 | 454 | Hold | Halten |
 | 455 | Double tap | Doppeltippen |
 | 456 | Details | Details |
-| 457 | Go to page | Zu Seite wechseln |
+| 457 | Go to page | Seite öffnen |
 | 458 | Toggle | Umschalten |
 | 459 | Run action | Aktion ausführen |
 | 460 | Open link | Link öffnen |
@@ -529,3 +529,5 @@ Notes:
 | 518 | Untick to leave the middle empty (or show the inverter's own reading), e.g. for a simple Grid, House and EV layout. | Abwählen, um die Mitte leer zu lassen (oder den eigenen Wert des Wechselrichters zu zeigen), z. B. für ein einfaches Layout mit Netz, Haus und Wallbox. |
 | 519 | Self-powered box | Autarkie-Box |
 | 520 | No custom connections — automatic topology is active. | Keine eigenen Verbindungen — die automatische Topologie ist aktiv. |
+| 521 | Show clock in the header | Uhr in der Kopfzeile anzeigen |
+| 522 | Summary line under the header | Zusammenfassung unter der Kopfzeile |

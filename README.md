@@ -172,7 +172,7 @@ Pick a style under **View style** at the top of the editor. All styles use the s
 - Tap any device to open its Home Assistant details, or choose your own **tap, hold and double-tap actions** per device and panel
 
 ### 🌐 Languages
-The card and its editor are available in **English**, **Polish**, **Spanish** and **German** (thanks to [@mphlipp](https://github.com/mphlipp) for the German wording), and automatically follow the language set in your Home Assistant profile. Your own names and titles are never changed. Other languages fall back to English.
+The card and its editor are available in **English**, **Polish**, **Spanish** and **German** (German reviewed by [@mphlipp](https://github.com/mphlipp)), and automatically follow the language set in your Home Assistant profile. Your own names and titles are never changed. Other languages fall back to English.
 
 ### 💾 Backup & Restore
 Export your whole card configuration as a JSON file with one click, and import it again later. Handy before big changes, or to share a working setup.
@@ -766,6 +766,8 @@ Each device gets a stable internal `id` automatically. `connects_to` refers to t
 | `fullscreen_wake` | `true` | Keeps the screen on while in full screen (needs Home Assistant over HTTPS) |
 | `weather_tap_action` (and `_hold_action`, `_double_tap_action`) | | Optional. Actions for the weather box; the same for `bins_`, `updated_` and `gridmix_` |
 | `view_style` | `classic` | `classic`, `rings`, `river`, `tiles`, `glance` or `schematic` (see [View styles](#-view-styles)) |
+| `show_clock` | `true` | Compact rings, Energy river, Tiles and At a glance: `false` hides the clock in the header |
+| `river_summary` | `true` | Energy river: `false` hides the summary line under the header ("Using … · …% self-powered") |
 | `rings_summary` | `true` | Compact rings: `false` removes the self-powered summary from the middle (an inverter in the middle shows its own reading) |
 | `glance_summary` | `true` | At a glance: `false` hides the self-powered box |
 | `glance_battery_tiles` | `true` | At a glance: a tile for each battery with a state of charge sensor; `false` shows batteries as chips with their charge level |
@@ -904,6 +906,8 @@ Suggestions, bug reports and improvements are very welcome, so please [open an i
 ## ❤️ Thanks
 
 This project started as a personal dashboard improvement and is growing into a community project. Thank you to everyone testing it, suggesting improvements and helping make it better.
+
+- 🇩🇪 German translation reviewed by [@mphlipp](https://github.com/mphlipp)
 
 Grid mix data: [Carbon Intensity API](https://carbonintensity.org.uk/) by the National Energy System Operator (NESO).
 
