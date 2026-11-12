@@ -39,6 +39,10 @@ If you enjoy the card and want to support its development:
 
 **[☕ Buy me a coffee](https://buymeacoffee.com/mimikm)**
 
+Switching energy supplier? Joining **Octopus Energy** with my referral code gives us both credit, and costs you nothing:
+
+**[🐙 Octopus Energy referral code](https://octopusreferralcode.com)**
+
 ---
 
 ## 📦 Installation
