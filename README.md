@@ -83,7 +83,7 @@ Pick a style under **View style** at the top of the editor. All styles use the s
 
 | | |
 |---|---|
-| ![Compact rings](https://github.com/mimikm/Home-Power-Flow-Card/raw/main/images/style-rings.png) **⭕ Compact rings**<br>Round icons around a hub, with battery level and self-sufficiency as rings (the self-powered summary in the middle can be switched off). Small and tidy, great for phones and Sections dashboards. | ![Energy river](https://github.com/mimikm/Home-Power-Flow-Card/raw/main/images/style-river.png) **🌊 Energy river**<br>Where your power comes from and where it goes, as flowing bands as wide as the power they carry. |
+| ![Compact rings](https://github.com/mimikm/Home-Power-Flow-Card/raw/main/images/style-rings.png) **⭕ Compact rings**<br>Round icons around a hub, with battery level and self-sufficiency as rings (the self-powered summary in the middle can be switched off; circle size, height limit and positions are adjustable for small wall displays). Small and tidy, great for phones and Sections dashboards. | ![Energy river](https://github.com/mimikm/Home-Power-Flow-Card/raw/main/images/style-river.png) **🌊 Energy river**<br>Where your power comes from and where it goes, as flowing bands as wide as the power they carry. |
 | ![Tiles](https://github.com/mimikm/Home-Power-Flow-Card/raw/main/images/style-tiles.png) **🔲 Tiles**<br>Big numbers in tidy tiles with history graphs behind them, a self-sufficiency ring and battery bars. Ideal for wall tablets. | ![At a glance](https://github.com/mimikm/Home-Power-Flow-Card/raw/main/images/style-glance.png) **👀 At a glance**<br>One plain-language headline, like "Running on sunshine" or "Running on battery", that you can read from across the room. The colour changes with the situation. Each battery with a state of charge sensor gets a small tile with its charge, a fill bar, power and what it's doing (switch **Battery tiles** off for plain chips instead). |
 | ![Schematic](https://github.com/mimikm/Home-Power-Flow-Card/raw/main/images/style-schematic.png) **📐 Schematic**<br>A technical one-line diagram with electrical symbols on grid paper, Blueprint arrows and an engineering title block. | |
 
@@ -773,6 +773,9 @@ Each device gets a stable internal `id` automatically. `connects_to` refers to t
 | `show_clock` | `true` | Compact rings, Energy river, Tiles and At a glance: `false` hides the clock in the header |
 | `river_summary` | `true` | Energy river: `false` hides the summary line under the header ("Using … · …% self-powered") |
 | `rings_summary` | `true` | Compact rings: `false` removes the self-powered summary from the middle (an inverter in the middle shows its own reading) |
+| `rings_scale` | `1` | Compact rings: size of the circles and their text, `0.6` to `2` |
+| `rings_max_height` | `min(74vh, 640px)` | Compact rings: height limit of the drawing, in px (e.g. `440`) or a CSS size (`90vh`, `none`) |
+| `rings_angles` | — | Compact rings: where each device type sits around the middle, in degrees (`0` = right, `90` = below, `180` = left, `-90` = above), e.g. `{ solar: 180, grid: -90 }` |
 | `glance_summary` | `true` | At a glance: `false` hides the self-powered box |
 | `glance_battery_tiles` | `true` | At a glance: a tile for each battery with a state of charge sensor; `false` shows batteries as chips with their charge level |
 | `theme` | `dark` | `auto`, `dark`, `light`, `midnight`, `ocean`, `forest`, `sunset`, `graphite` or `custom` |
@@ -880,6 +883,7 @@ Each device gets a stable internal `id` automatically. `connects_to` refers to t
 | `battery_charge_limit` | Batteries only: charge limit % (default `100`) |
 | `utility_unit` | Gas only: `m³` (default) or `kWh` |
 | `gas_cv` | Gas only: calorific value in MJ/m³ for m³ ↔ kWh conversion (default `39.5`) |
+| `angle` | Compact rings: this device's position around the middle in degrees, overriding `rings_angles` |
 | `extra_entities` | Up to 10 extra readings, each with `entity`, `icon` and optional `decimals` (`0`–`4`; default: Home Assistant's display precision) |
 | `extra_entities_scale` | Text size of this device's extra entities; overrides the card-wide setting |
 | `main_value` | What the big number shows: `power` (default), `soc` (batteries) or `extra_1` … `extra_10` ([Main value](#-main-value)) |
